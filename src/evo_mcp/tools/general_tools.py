@@ -4,6 +4,8 @@ MCP tools for general operations (health checks, object CRUD, etc).
 
 import logging
 from uuid import UUID
+from datetime import datetime
+import sys
 
 from fastmcp import Context
 
@@ -16,6 +18,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+from evo.workspaces.endpoints import InstanceUsersApi
+from evo.workspaces.endpoints.models import AddInstanceUsersRequest, UserRoleMapping
 
 
 def register_general_tools(mcp):
