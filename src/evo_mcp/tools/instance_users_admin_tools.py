@@ -1,13 +1,18 @@
-from evo_mcp.context import evo_context, ensure_initialized
+import functools
+from typing import Callable
+
 from evo.workspaces.endpoints import InstanceUsersApi
 from evo.workspaces.endpoints.models import AddInstanceUsersRequest, UserRoleMapping
 
+from evo_mcp.context import evo_context, ensure_initialized
 
 def register_instance_user_admin_tools(mcp):
     """Register tools for managing instance users with the FastMCP server."""
   
     @mcp.tool()
-    async def get_users_in_instance() -> list[dict]:
+    async def get_users_in_instance(
+        count: int | None = 10,
+    ) -> list[dict]:
         """Get all users of an instance the user is connected to.
         
         This would allow an admin to see who has access to the instance.
@@ -31,9 +36,39 @@ def register_instance_user_admin_tools(mcp):
         #TODO maybe move this to context.py maybe or all instance related code to a separate instance tools file
         # Also I could not find a client for the instance users in the SDK, so I used the endpoint directly
         instance_users_api_client = InstanceUsersApi(evo_context.connector)
+
+        async def read_pages_from_api(func: Callable, up_to: int | None = None, limit: int = 100):
+            """Page through the API client method `func` until we get up_to results or run out of pages.
+
+            `up_to` should be None to read all the pages.
+
+            Only supports raw API clients, not SDK clients that return a evo.common.Pages object.
+            """
+            offset = 0
+            ret = []
+            while True:
+                response = await func(offset=offset, limit=limit)
+                # We could probably look at the type of `response` and handle
+                # `Page` objects here too.
+                ret.extend(response.results)
+
+                if up_to and len(ret) >= up_to:
+                    break
+                elif len(response.results) < limit or len(ret) >= up_to:
+                    break
+
+                offset += limit
+
+            return ret
         
-        response = await instance_users_api_client.list_instance_users(org_id=evo_context.org_id)
-        instance_users = response.results
+        instance_users = await read_pages_from_api(
+            functools.partial(
+                instance_users_api_client.list_instance_users,
+                org_id=evo_context.org_id,
+            ),
+            up_to=count,
+            limit=min([count, 100]) if count else None,
+        )
         
         return [
             {
