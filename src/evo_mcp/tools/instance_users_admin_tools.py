@@ -1,4 +1,5 @@
 import functools
+from uuid import UUID
 from typing import Callable
 
 from evo.workspaces.endpoints import InstanceUsersApi
@@ -81,15 +82,33 @@ def register_instance_user_admin_tools(mcp):
         ]
         
     @mcp.tool()
+    async def list_roles_in_instance(
+    ) -> list[dict]:
+        """List the roles available in the instance. """
+        await ensure_initialized()
+
+        if not evo_context.org_id:
+            raise ValueError("No instance selected. Please select an instance first.")
+
+        instance_users_api_client = InstanceUsersApi(evo_context.connector)
+        instance_roles_response = await instance_users_api_client.list_instance_user_roles(org_id=evo_context.org_id)
+        return instance_roles_response.roles
+
+    @mcp.tool()
     async def add_users_to_instance(
         user_emails: list[str],
+        role_name: str | None = "Evo User",
+        role_id: UUID | None = None,
     ) -> dict|str:
-        """Add one or more users to the selected instance with read only role.
+        """Add one or more users to the selected instance.
         If the user is external, an invitation will be sent.
         
         
         Args:
             user_emails: List of user email addresses to add. Accept single or multiple emails and make them to a list.
+            role_name or role_id: Must match a role returned by
+                `list_roles_in_instance`. The default role is a read only "user"
+                role.
             
         Returns:
             A dict with invitations sent and members added.
@@ -113,13 +132,13 @@ def register_instance_user_admin_tools(mcp):
             instance_roles_response = await instance_users_api_client.list_instance_user_roles(org_id=evo_context.org_id)
             instance_roles = instance_roles_response.roles
             
-            #TODO make role configurable in the future. Right now we are assigning "Evo User" role by default.
-            evo_user_role = next((role for role in instance_roles if role.name == "Evo User"), None)
+            if not role_id:
+                role_id = next((role for role in instance_roles if role.name == role_name), None).id
             
             response = await instance_users_api_client.add_instance_users(
                 org_id=evo_context.org_id,
                 add_instance_users_request=AddInstanceUsersRequest(
-                    users = [UserRoleMapping(email=email, roles=[evo_user_role.id]) 
+                    users = [UserRoleMapping(email=email, roles=[role_id])
                              for email in user_emails]
                     )
             )
