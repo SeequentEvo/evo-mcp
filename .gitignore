@@ -1,0 +1,11 @@
+*.pyc
+/venv
+.venv
+.evo_token_cache.json
+.evo_mcp_debug.log
+.env
+*.log
+.cache/
+*.db
+.vscode
+src/evo_mcp.egg-info/
