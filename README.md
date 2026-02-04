@@ -337,7 +337,7 @@ We rely on an open, friendly, inclusive environment. To help us ensure this rema
 
 ## License
 
-The Python SDK for Evo is open source and licensed under the [Apache 2.0 license.](./LICENSE.md).
+The Evo MCP server is open source and licensed under the [Apache 2.0 license.](./LICENSE.md).
 
 Copyright © 2026 Bentley Systems, Incorporated.
 
