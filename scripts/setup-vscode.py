@@ -169,42 +169,16 @@ def setup_mcp_config(config_type: str, variant: str | None = None):
     else:
         settings = {}
     
-    # Ensure servers and inputs exist
+    # Ensure servers exist
     if 'servers' not in settings:
         settings['servers'] = {}
-    if 'inputs' not in settings:
-        settings['inputs'] = []
     
     # Add or update the evo-mcp server configuration
     settings['servers']['evo-mcp'] = {
         "type": "stdio",
         "command": python_exe,
-        "args": [mcp_script],
-        "env": {
-            "MCP_TOOL_FILTER": "${input:toolFilter}",
-            "EVO_CLIENT_ID": "${input:clientID}"
-        }
+        "args": [mcp_script]
     }
-    
-    # Remove existing inputs for evo-mcp if they exist
-    settings['inputs'] = [
-        inp for inp in settings['inputs'] 
-        if inp.get('id') not in ['toolFilter', 'clientID']
-    ]
-    
-    # Add the new inputs
-    settings['inputs'].extend([
-        {
-            "type": "promptString",
-            "id": "toolFilter",
-            "description": "Enter agent type (workspace/object/all)"
-        },
-        {
-            "type": "promptString",
-            "id": "clientID",
-            "description": "Client ID to use to authorize with Seequent Evo"
-        }
-    ])
     
     # Write the updated settings to file
     try:
@@ -218,8 +192,7 @@ def setup_mcp_config(config_type: str, variant: str | None = None):
         print(f"  Script: {mcp_script}")
         print()
         print("Next steps:")
-        print("1. Restart VS Code or reload the window")
-        print("2. When prompted, provide your tool filter and Client ID")
+        print("Restart VS Code or reload the window")
         print()
         print("Note: This configuration uses the Python interpreter:")
         print(f"  {python_exe}")
