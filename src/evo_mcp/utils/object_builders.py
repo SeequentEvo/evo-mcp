@@ -683,11 +683,11 @@ class DownholeCollectionBuilder(BaseObjectBuilder):
         coords_ref = self.save_float_array3(collar_df, x_col, y_col, z_col)
         coordinates = FloatArray3_V1_0_1.from_dict(coords_ref)
         
-        # Distances 
+        # Distances (final, target, current convention)
         if max_depth_col and max_depth_col in collar_df.columns:
             # Use provided max depth column from collar data
             dist_df = collar_df[[max_depth_col, max_depth_col, max_depth_col]].copy()
-            dist_df.columns = ['x', 'y', 'z']
+            dist_df.columns = ['final', 'target', 'current']
         else:
             # Calculate max depth per hole from survey data
             max_depths = survey_df.groupby(survey_id_col)[depth_col].max().reset_index()
@@ -695,11 +695,11 @@ class DownholeCollectionBuilder(BaseObjectBuilder):
             collar_with_depth = collar_df.merge(max_depths, on=collar_id_col, how='left')
             collar_with_depth['_max_depth'] = collar_with_depth['_max_depth'].fillna(0.0)
             dist_df = collar_with_depth[['_max_depth', '_max_depth', '_max_depth']].copy()
-            dist_df.columns = ['x', 'y', 'z']
+            dist_df.columns = ['final', 'target', 'current']
         
         dist_table = pa.Table.from_pandas(
             dist_df.astype('float64'),
-            schema=pa.schema([("x", pa.float64()), ("y", pa.float64()), ("z", pa.float64())]),
+            schema=pa.schema([("final", pa.float64()), ("target", pa.float64()), ("current", pa.float64())]),
             preserve_index=False,
         )
         distances = FloatArray3_V1_0_1.from_dict(self.data_client.save_table(table=dist_table))
