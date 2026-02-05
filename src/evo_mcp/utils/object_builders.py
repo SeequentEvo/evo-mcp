@@ -659,24 +659,43 @@ class DownholeCollectionBuilder(BaseObjectBuilder):
         z_col: str,
         depth_col: str,
         azimuth_col: str,
-        dip_col: str,
+        dip_col: str,        
+        max_depth_col: Optional[str] = None,
     ) -> 'DownholeCollection_V1_3_0_Location':
-        """Build the complete location structure."""
+        
+        """Build the complete location structure.
+        
+        Args:
+            collar_df: DataFrame with collar data (one row per hole)
+            survey_df: DataFrame with survey data (multiple rows per hole)
+            hole_id_lookup: DataFrame mapping hole IDs to integer keys
+            collar_id_col: Column name in collar_df with hole IDs
+            survey_id_col: Column name in survey_df with hole IDs
+            x_col, y_col, z_col: Column names in collar_df for coordinates
+            depth_col: Column name in survey_df for depth/distance
+            azimuth_col: Column name in survey_df for azimuth
+            dip_col: Column name in survey_df for dip
+            max_depth_col: Column name in collar_df containing max depth values.
+                          If None, max depths will be calculated from survey data.
+        """
         
         # Coordinates
         coords_ref = self.save_float_array3(collar_df, x_col, y_col, z_col)
         coordinates = FloatArray3_V1_0_1.from_dict(coords_ref)
         
-        # Distances (final, target, current - using collar depth or zeros)
-        if depth_col in collar_df.columns:
-            dist_df = collar_df[[depth_col, depth_col, depth_col]].copy()
+        # Distances 
+        if max_depth_col and max_depth_col in collar_df.columns:
+            # Use provided max depth column from collar data
+            dist_df = collar_df[[max_depth_col, max_depth_col, max_depth_col]].copy()
             dist_df.columns = ['x', 'y', 'z']
         else:
-            dist_df = pd.DataFrame({
-                'x': [0.0] * len(collar_df),
-                'y': [0.0] * len(collar_df),
-                'z': [0.0] * len(collar_df)
-            })
+            # Calculate max depth per hole from survey data
+            max_depths = survey_df.groupby(survey_id_col)[depth_col].max().reset_index()
+            max_depths.columns = [collar_id_col, '_max_depth']
+            collar_with_depth = collar_df.merge(max_depths, on=collar_id_col, how='left')
+            collar_with_depth['_max_depth'] = collar_with_depth['_max_depth'].fillna(0.0)
+            dist_df = collar_with_depth[['_max_depth', '_max_depth', '_max_depth']].copy()
+            dist_df.columns = ['x', 'y', 'z']
         
         dist_table = pa.Table.from_pandas(
             dist_df.astype('float64'),
@@ -762,7 +781,8 @@ class DownholeCollectionBuilder(BaseObjectBuilder):
         z_col: str,
         depth_col: str,
         azimuth_col: str,
-        dip_col: str,
+        dip_col: str,        
+        max_depth_col: Optional[str] = None,
         interval_collections: Optional[list[dict]] = None,
         tags: Optional[dict] = None,
         crs: str = "unspecified",
@@ -771,6 +791,27 @@ class DownholeCollectionBuilder(BaseObjectBuilder):
         """Build a complete DownholeCollection object.
         
         Args:
+            name: Object name
+            description: Object description
+            collar_df: DataFrame with collar data (one row per hole)
+            survey_df: DataFrame with survey data (multiple rows per hole)
+            collar_id_col: Column name in collar_df with hole IDs
+            survey_id_col: Column name in survey_df with hole IDs   
+            x_col, y_col, z_col: Column names in collar_df for coordinates
+            depth_col: Column name in survey_df for depth/distance
+            azimuth_col: Column name in survey_df for azimuth
+            dip_col: Column name in survey_df for dip
+            max_depth_col: Column name in collar_df containing max depth values.
+                          If None, max depths will be calculated from survey data.
+            interval_collections: List of dicts defining interval collections to build, each with:
+                - name: Collection name (e.g., "Assays")
+                - dataframe: DataFrame with interval data
+                - id_col: Column in dataframe with hole IDs
+                - from_col: Column with from depths
+                - to_col: Column with to depths
+                - attribute_columns: List of columns to include as attributes (optional)
+            tags: Optional tags dictionary
+            crs: Coordinate reference system string
             invert_z: If True, negate dip values in the survey data. Use this when
                       drillholes appear upside down (going up instead of into the ground).
                       This handles the convention where negative dip = drilling down.
@@ -806,6 +847,7 @@ class DownholeCollectionBuilder(BaseObjectBuilder):
             depth_col=depth_col,
             azimuth_col=azimuth_col,
             dip_col=dip_col,
+            max_depth_col=max_depth_col,
         )
         
         # Build interval collections

@@ -407,7 +407,8 @@ def register_object_builder_tools(mcp):
         z_column: str,
         depth_column: str,
         azimuth_column: str,
-        dip_column: str,
+        dip_column: str,        
+        max_depth_column: Optional[str] = None,
         interval_files: list[dict] = [],
         tags: dict = {},
         coordinate_reference_system: str = "unspecified",
@@ -437,7 +438,9 @@ def register_object_builder_tools(mcp):
             z_column: Z coordinate column in collar
             depth_column: Depth/distance column in survey
             azimuth_column: Azimuth column in survey
-            dip_column: Dip column in survey
+            dip_column: Dip column in survey            
+            max_depth_column: Max depth column in collar file (optional - if not provided, 
+                will be calculated from survey data)
             interval_files: List of interval file configs, each with:
                 - file: Path to CSV file
                 - name: Collection name (e.g., "assay", "geology")
@@ -480,6 +483,10 @@ def register_object_builder_tools(mcp):
         missing = [c for c in required_collar if c not in collar_df.columns]
         if missing:
             result["errors"].append(f"Missing collar columns: {missing}")
+        
+        # Validate max_depth_column if provided
+        if max_depth_column and max_depth_column not in collar_df.columns:
+            result["errors"].append(f"Max depth column '{max_depth_column}' not found in collar file")
         
         required_survey = [survey_id_column, depth_column, azimuth_column, dip_column]
         missing = [c for c in required_survey if c not in survey_df.columns]
@@ -606,6 +613,7 @@ def register_object_builder_tools(mcp):
                 depth_col=depth_column,
                 azimuth_col=azimuth_column,
                 dip_col=dip_column,
+                max_depth_col=max_depth_column,
                 interval_collections=interval_configs,
                 tags=tags,
                 crs=coordinate_reference_system,
