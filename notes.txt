@@ -1,5 +1,0 @@
-
-create a snapshot tool which stores all object versions in json somewhere 
-    - restore snapshot
-can something with lineage be demo'd here 
-auth check with Evo needs to be refactored to a before_agent_callback

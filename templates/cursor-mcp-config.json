@@ -3,10 +3,6 @@
 		"evo-mcp": {
 			"command": "c:\\Dev\\evo-mcp\\venv\\Scripts\\python.exe",
 			"args": ["c:\\Dev\\evo-mcp\\src\\mcp_tools.py"],
-			"env": {
-				"MCP_TOOL_FILTER": "all",
-				"EVO_CLIENT_ID": "your-client-id-here"
-			}
 		}
 	}
 }

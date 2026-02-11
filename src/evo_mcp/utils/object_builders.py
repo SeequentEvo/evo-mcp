@@ -20,14 +20,10 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Type, TypeVar
 
-# Set up logging
-logger = logging.getLogger(__name__)
-
 import pandas as pd
 import numpy as np
 import pyarrow as pa
 
-from evo_schemas.objects import objects_schema_lookup
 from evo_schemas.components import (
     BoundingBox_V1_0_1,
     CategoryAttribute_V1_1_0,
@@ -55,11 +51,7 @@ from evo_schemas.components.segments import (
     Segments_V1_2_0_Vertices,
     Segments_V1_2_0_Indices,
 )
-from evo_schemas.components.attribute_list_property import (
-    AttributeListProperty_V1_1_0,
-)
 from evo_schemas.components.locations import Locations_V1_0_1
-from evo_schemas.elements.index_array_2 import IndexArray2_V1_0_1
 # Import downhole collection types
 from evo_schemas.components import (
     CategoryData_V1_0_1,
@@ -75,6 +67,9 @@ from evo_schemas.objects.downhole_collection import (
     DownholeCollection_V1_3_0_Location_Path,
 )
 from evo_schemas.objects.downhole_intervals import DownholeIntervals_V1_3_0
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 # Type variable for schema classes

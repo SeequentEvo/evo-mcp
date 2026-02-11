@@ -27,11 +27,8 @@ from fastapi.openapi.models import APIKeyIn
 from mcp import StdioServerParameters
 from dotenv import load_dotenv
 
-from evo_mcp.context import ensure_initialized
-
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmResponse
-from typing import Optional
 
 DEFAULT_STDIO_TIMEOUT_SECONDS = 600
 

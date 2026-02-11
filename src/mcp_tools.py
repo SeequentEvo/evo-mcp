@@ -40,7 +40,7 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
     TOOL_FILTER = "all"
 
 # Initialize FastMCP server with agent type in name for clarity
-server_name = f"Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
+server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
 mcp = FastMCP(server_name)
 
 def _get_objects_reference_content() -> str:
@@ -163,7 +163,7 @@ if TOOL_FILTER in ["all", "data"]:
     def data_prompt() -> str:
         """Prompt for local file system data connector and object creation operations."""
         return """\
-        You are a local data import specialist for the EVO platform created by Seequent.
+        You are a local data import specialist for the Evo platform created by Seequent.
 
         You can help users create geoscience objects from CSV files.
 

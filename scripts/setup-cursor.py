@@ -169,11 +169,7 @@ def setup_mcp_config(config_type: str, variant: str | None = None):
     # Add or update the evo-mcp server configuration
     settings['mcpServers']['evo-mcp'] = {
         "command": python_exe,
-        "args": [mcp_script],
-        "env": {
-            "MCP_TOOL_FILTER": "all",
-            "EVO_CLIENT_ID": "your-client-id-here"
-        }
+        "args": [mcp_script]
     }
     
     # Write the updated settings to file
@@ -188,10 +184,7 @@ def setup_mcp_config(config_type: str, variant: str | None = None):
         print(f"  Script: {mcp_script}")
         print()
         print("Next steps:")
-        print("1. Edit the configuration file to update:")
-        print("   - MCP_TOOL_FILTER (admin/data/all)")
-        print("   - EVO_CLIENT_ID (your Seequent Evo client ID)")
-        print("2. Restart Cursor or reload the window")
+        print("Restart Cursor or reload the window")
         print()
         print("Note: This configuration uses the Python interpreter:")
         print(f"  {python_exe}")

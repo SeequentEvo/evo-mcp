@@ -101,7 +101,6 @@ class EvoContext:
         oauth_connector = OAuthConnector(transport=transport, client_id=client_id, base_uri=issuer_url)
         
         # Token cache file location - use repo directory for easier debugging
-        repo_root = Path(__file__).parent.parent.parent
         token_cache_path = self.cache_path / "evo_token_cache.json"
         
         # Simple file logging helper
@@ -119,7 +118,7 @@ class EvoContext:
                 with open(token_cache_path, 'r') as f:
                     token_data = json.load(f)
                 
-                log(f"Found cached token, attempting to use it")
+                log("Found cached token, attempting to use it")
                 # Use cached access token - AccessTokenAuthorizer just takes the token directly
                 authorizer = AccessTokenAuthorizer(
                     access_token=token_data.get('access_token')
@@ -131,7 +130,7 @@ class EvoContext:
                 test_client = DiscoveryAPIClient(test_connector)
                 await test_client.list_organizations()
                 # Token is valid!
-                log(f"Cached token is valid, using it!")
+                log("Cached token is valid, using it!")
                 
             except Exception as e:
                 # Token expired or invalid, need to re-authenticate

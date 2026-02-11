@@ -15,7 +15,6 @@ All tools follow a similar pattern:
 
 import logging
 from pathlib import Path
-from typing import Optional
 from uuid import UUID
 
 import pandas as pd

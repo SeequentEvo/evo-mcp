@@ -2,14 +2,12 @@
 MCP tools for general operations (health checks, object CRUD, etc).
 """
 
-import json
 import logging
 from uuid import UUID
 
 from fastmcp import Context
 
 from evo_mcp.context import evo_context, ensure_initialized
-from evo_mcp.utils.evo_data_utils import extract_data_references
 
 # Set up logging to file for debugging
 logging.basicConfig(

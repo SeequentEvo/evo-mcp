@@ -264,7 +264,7 @@ def register_admin_tools(mcp):
                 
                 copied_count += 1
                 
-            except Exception as e:
+            except Exception:
                 failed_count += 1
                 # Continue with next object
         

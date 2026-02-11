@@ -4,22 +4,6 @@
 			"type": "stdio",
 			"command": "c:\\Dev\\evo-mcp\\venv\\Scripts\\python.exe",
 			"args": ["c:\\Dev\\evo-mcp\\src\\mcp_tools.py"],
-			"env": {
-				"MCP_TOOL_FILTER": "${input:toolFilter}",
-				"EVO_CLIENT_ID": "${input:clientID}"
-			}
 		}
-	},
-	"inputs": [
-		{
-			"type": "promptString",
-			"id": "toolFilter",
-			"description": "Enter agent type (admin/data/all)"
-		},
-		{
-			"type": "promptString",
-			"id": "clientID",
-			"description": "Client ID to use to authorize with Seequent Evo"
-		}
-	]
+	}
 }

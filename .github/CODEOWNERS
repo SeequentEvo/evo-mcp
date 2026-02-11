@@ -1,0 +1,21 @@
+# CODEOWNERS - Code ownership and review assignments
+#
+# This file defines who is responsible for reviewing and maintaining code in different parts of the repository.
+# GitHub automatically requests reviews from the specified teams/users when PRs affect their areas.
+# More specific rules override general ones.
+#
+# Format: <file-pattern> <team-or-user> [additional-teams...]
+# Documentation: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# =============================================================================
+# GLOBAL RULES
+# =============================================================================
+
+# Global fallback - applies to all files not covered by specific rules below
+* @SeequentEvo/evo-mcp-maintainers
+
+# =============================================================================
+# PACKAGE-SPECIFIC MAINTAINERS
+# =============================================================================
+
+# No package/file specific maintainers for now.
