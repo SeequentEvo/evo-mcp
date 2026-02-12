@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Bentley Systems, Incorporated
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 
 A FastMCP server that provides tools for interacting with the Evo platform,
