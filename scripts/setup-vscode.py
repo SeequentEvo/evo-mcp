@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2026 Bentley Systems, Incorporated
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Evo MCP Configuration Setup
 Cross-platform script to configure the Evo MCP server for VS Code

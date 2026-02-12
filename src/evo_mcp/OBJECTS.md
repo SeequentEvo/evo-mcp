@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Bentley Systems, Incorporated
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 This document provides a comprehensive technical overview of Evo Geoscience Objects (GOs) listed in the Seequent Developer documentation, detailing their purpose and the required and optional parameters for their schema.
 
 All Geoscience Objects inherit a set of **Base Required** properties (`name`, `uuid`, `bounding_box`, `coordinate_reference_system`, `schema`) and **Base Optional** properties (`description`, `extensions`, `tags`, `lineage`). The parameters listed below are the object-specific properties, including the components of nested objects where applicable.
