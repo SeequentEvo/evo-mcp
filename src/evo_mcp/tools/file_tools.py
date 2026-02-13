@@ -75,7 +75,11 @@ def register_file_tools(mcp):
             }
         except Exception as e:
             logger.exception("Failed to upload file")
-            return {"status": "upload_failed", "error": str(e), "path": full_target_path}
+            return {
+                "status": "upload_failed",
+                "error": str(e),
+                "path": full_target_path,
+            }
 
     @mcp.tool()
     async def list_file_versions(workspace_id: str, file_path: str) -> dict:
