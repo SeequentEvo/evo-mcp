@@ -2,11 +2,15 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import json as _json
+import logging
 import os
-from urllib.parse import urlparse
 
 from evo.oauth import EvoScopes
 from fastmcp.server.auth.oidc_proxy import OIDCProxy
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+logger = logging.getLogger(__name__)
 
 
 def create_auth_provider(base_url: str):
@@ -16,9 +20,12 @@ def create_auth_provider(base_url: str):
     Dynamic Client Registration for MCP clients and proxies the OAuth
     authorization code flow to Bentley IMS.
 
-    The upstream callback URL (where IMS redirects after login) must be
-    registered as an allowed redirect URI in the IMS application.
-    It is NOT the same as EVO_REDIRECT_URL, which is only used in STDIO mode.
+    In HTTP mode, the MCP server itself receives the OAuth callback from IMS.
+    The upstream callback URL is ``{base_url}/auth/callback`` — this must be
+    registered as an allowed redirect URI in the iTwin/IMS application.
+
+    Note: This is NOT the same as EVO_REDIRECT_URL, which is only used in
+    non-delegated mode where the evo SDK runs its own local callback server.
 
     Args:
         base_url: The public base URL of this server (e.g. "http://localhost:5001").
@@ -33,22 +40,13 @@ def create_auth_provider(base_url: str):
     issuer_url = os.getenv("ISSUER_URL", "https://ims.bentley.com")
     config_url = f"{issuer_url}/.well-known/openid-configuration"
 
-    # Derive the callback path from EVO_REDIRECT_URL so the same URL registered
-    # in the IMS application works for both STDIO and HTTP+OIDCProxy modes.
-    # e.g. http://localhost:3000/signin-callback → /signin-callback
-    # Falls back to /auth/callback if EVO_REDIRECT_URL is not set.
-    redirect_url = os.getenv("EVO_REDIRECT_URL", "")
-    if redirect_url:
-        parsed_url = urlparse(redirect_url)
-        redirect_path = parsed_url.path or "/auth/callback"
-    else:
-        redirect_path = "/auth/callback"
+    # In HTTP mode the MCP server receives the OAuth callback — not the SDK's
+    # local server.  Use the OIDCProxy default path (/auth/callback) so the
+    # redirect URI is deterministic: {base_url}/auth/callback.
 
     # Bentley IMS native/SPA apps are public clients (no client secret).
     # The proxy authenticates upstream using PKCE only.
     evo_scopes = str(EvoScopes.all_evo)
-
-    _apply_loopback_redirect_patch()
 
     return OIDCProxy(
         config_url=config_url,
@@ -56,7 +54,6 @@ def create_auth_provider(base_url: str):
         client_secret="unused",
         token_endpoint_auth_method="none",
         base_url=base_url,
-        redirect_path=redirect_path,
         require_authorization_consent=False,
         extra_authorize_params={"scope": evo_scopes},
         # MCP clients send an RFC 8707 resource indicator (the MCP server URL).
@@ -68,81 +65,107 @@ def create_auth_provider(base_url: str):
 
 
 # ---------------------------------------------------------------------------
-# Monkey-patch: RFC 8252 §7.3 loopback redirect URI port matching
+# ASGI Middleware: patch OAuth metadata for public MCP clients
 # ---------------------------------------------------------------------------
-# FastMCP's redirect_validation treats "http://localhost/callback" (no port) as
-# port 80, which rejects dynamic-port loopback URIs like
-# "http://localhost:56053/callback".  Per RFC 8252 §7.3 the authorization
-# server MUST allow any port for loopback redirect URIs.
+# FastMCP's built-in OAuth metadata endpoint only advertises
+# ["client_secret_post", "client_secret_basic"] in
+# token_endpoint_auth_methods_supported.  However, public MCP clients
+# (VS Code Copilot, Claude Code, etc.) register via DCR with
+# token_endpoint_auth_method: "none" because they don't possess a client
+# secret.  Without "none" in the metadata, compliant clients may refuse to
+# authenticate.
 #
-# Claude Code's CIMD declares redirect_uris without a port, so we patch the
-# matching function to treat a missing port on loopback patterns as a wildcard.
-# This patch can be removed once FastMCP ships a fix upstream.
+# This middleware intercepts GET /.well-known/oauth-authorization-server
+# responses and appends "none" to the list.
+#
+# Remove this middleware once the MCP Python SDK includes "none" natively
+# in build_metadata(). Fix merged but not yet released in mcp>=1.27.0.
+# Upstream: https://github.com/modelcontextprotocol/python-sdk/issues/2260
 # ---------------------------------------------------------------------------
-_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
-_loopback_patch_applied = False
 
 
-def _apply_loopback_redirect_patch() -> None:
-    """Patch fastmcp redirect-URI matching for RFC 8252 loopback compliance.
+class AuthMetadataPatchMiddleware:
+    """ASGI middleware that patches OAuth metadata to include ``"none"``
+    in ``token_endpoint_auth_methods_supported``.
 
-    Safe to call multiple times — the patch is only applied once.
+    Required for public MCP clients (VS Code, Claude Code) that use
+    ``token_endpoint_auth_method: "none"`` during Dynamic Client Registration.
+    FastMCP only advertises ``["client_secret_post", "client_secret_basic"]``.
+
+    **When to remove:** once the ``mcp`` SDK (>=1.26.0 successor) includes
+    ``"none"`` in ``build_metadata()``. Tracked in
+    `python-sdk#2260 <https://github.com/modelcontextprotocol/python-sdk/issues/2260>`_.
     """
-    global _loopback_patch_applied
-    if _loopback_patch_applied:
-        return
-    _loopback_patch_applied = True
 
-    from fastmcp.server.auth import redirect_validation as _rv
-    from fastmcp.server.auth.oauth_proxy import models as _models
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
 
-    _original_match_port = _rv._match_port
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
 
-    def _patched_match_port(
-        uri_port: "str | None",
-        pattern_port: "str | None",
-        uri_scheme: str,
-        *,
-        _pattern_host: "str | None" = None,
-    ) -> bool:
-        # RFC 8252 §7.3: loopback pattern with no explicit port → any port
-        if pattern_port is None and _pattern_host is not None and _pattern_host.lower() in _LOOPBACK_HOSTS:
-            return True
-        return _original_match_port(uri_port, pattern_port, uri_scheme)
+        path = scope.get("path", "")
+        method = scope.get("method", "?")
+        logger.debug("[req] %s %s", method, path)
 
-    _original_matches = _rv.matches_allowed_pattern
+        if not path.startswith("/.well-known/oauth-authorization-server"):
+            await self.app(scope, receive, send)
+            return
 
-    def _patched_matches_allowed_pattern(uri: str, pattern: str) -> bool:
-        from urllib.parse import urlparse as _urlparse
+        # Capture response body, patch token_endpoint_auth_methods_supported
+        response_body = bytearray()
+        response_started = False
+        original_headers: list = []
+        original_status = 200
+
+        async def capture_send(message):
+            nonlocal response_started, original_headers, original_status
+            if message["type"] == "http.response.start":
+                response_started = True
+                original_status = message.get("status", 200)
+                original_headers = list(message.get("headers", []))
+            elif message["type"] == "http.response.body":
+                response_body.extend(message.get("body", b""))
+
+        await self.app(scope, receive, capture_send)
 
         try:
-            uri_parsed = _urlparse(uri)
-            pattern_parsed = _urlparse(pattern)
-        except ValueError:
-            return _original_matches(uri, pattern)
+            data = _json.loads(bytes(response_body))
+            methods = data.get("token_endpoint_auth_methods_supported", [])
+            if "none" not in methods:
+                methods.append("none")
+                data["token_endpoint_auth_methods_supported"] = methods
+            patched = _json.dumps(data).encode()
 
-        if uri_parsed.username is not None or uri_parsed.password is not None:
-            return False
+            new_headers = [(k, v) for k, v in original_headers if k != b"content-length"]
+            new_headers.append((b"content-length", str(len(patched)).encode()))
 
-        if uri_parsed.scheme.lower() != pattern_parsed.scheme.lower():
-            return False
-
-        uri_host, uri_port = _rv._parse_host_port(uri_parsed.netloc)
-        pattern_host, pattern_port = _rv._parse_host_port(pattern_parsed.netloc)
-
-        if not _rv._match_host(uri_host, pattern_host):
-            return False
-
-        if not _patched_match_port(
-            uri_port,
-            pattern_port,
-            uri_parsed.scheme.lower(),
-            _pattern_host=pattern_host,
-        ):
-            return False
-
-        return _rv._match_path(uri_parsed.path, pattern_parsed.path)
-
-    # Patch both the module-level function and the reference inside models.py
-    _rv.matches_allowed_pattern = _patched_matches_allowed_pattern
-    _models.matches_allowed_pattern = _patched_matches_allowed_pattern
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": original_status,
+                    "headers": new_headers,
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": patched,
+                }
+            )
+            logger.debug("Patched auth metadata: added 'none' to token_endpoint_auth_methods_supported")
+        except Exception:
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": original_status,
+                    "headers": original_headers,
+                }
+            )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": bytes(response_body),
+                }
+            )
