@@ -355,6 +355,7 @@ if TOOL_FILTER in ["all", "data"]:
 if __name__ == "__main__":
     # Log startup information
     from fastmcp.utilities.logging import get_logger
+
     logger = get_logger(__name__)
     logger.info("Starting Evo MCP Server in %s mode", TRANSPORT.upper())
 
