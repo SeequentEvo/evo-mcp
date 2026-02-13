@@ -233,22 +233,21 @@ def register_general_tools(mcp):
         Subsequent tool invocations like "list workspaces" will act on this
         Evo Instance.
 
+        The provided argument must match an instance returned by list_my_instances.
+
         Args:
             instance_id: Instance UUID (provide either this or instance_name)
             instance_name: Instance name (provide either this or instance_id)
-
-        Returns:
-            The selected instance or `None` if no instance was matched from the
-            arguments.
         """
         await ensure_initialized()
 
         instances = await evo_context.discovery_client.list_organizations()
         for instance in instances:
             if instance.id == instance_id or instance.display_name == instance_name:
-                evo_context.org_id = instance.id
-                evo_context.hub_url = instance.hubs[0].url
-                evo_context.save_variables_to_cache()
+                await evo_context.switch_instance(instance.id, instance.hubs[0].url)
                 return instance
 
-        return None
+        raise ValueError(
+            f"No instance found for parameters {instance_id=} {instance_name=}. "
+            "Check that the arguments match an instance returned by `list_my_instances`."
+        )
