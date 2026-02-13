@@ -2,20 +2,11 @@
 MCP tools for general operations (health checks, object CRUD, etc).
 """
 
-import logging
 from uuid import UUID
 
 from fastmcp import Context
 
 from evo_mcp.context import evo_context, ensure_initialized
-
-# Set up logging to file for debugging
-logging.basicConfig(
-    filename='mcp_tools_debug.log',
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 
 def register_general_tools(mcp):
@@ -132,48 +123,32 @@ def register_general_tools(mcp):
             deleted: Include deleted objects
             limit: Maximum number of results
         """
-        logger.info(f"evo_list_objects called with workspace_id={workspace_id}, schema_id={schema_id}")
+        await ensure_initialized()
         
-        try:
-            logger.debug("Calling ensure_initialized()")
-            await ensure_initialized()
-            logger.debug("ensure_initialized() completed successfully")
-            
-            logger.debug(f"Getting object client for workspace {workspace_id}")
-            object_client = await evo_context.get_object_client(UUID(workspace_id))
-            logger.debug(f"Got object_client: {object_client}")
-            
-            service_health = await object_client.get_service_health()
-            status = service_health.raise_for_status()
-            logger.debug("Object client status:", status)
-            
-            logger.debug("Calling list_objects()")
-            objects = await object_client.list_objects(
-                schema_id=None, # [schema_id] if schema_id else None,
-                deleted=deleted,
-                limit=limit
-            )
-
-            logger.debug(f"list_objects() returned {len(objects.items())} objects")
-            
-            result = [
-                {
-                    "id": str(obj.id),
-                    "name": obj.name,
-                    "path": obj.path,
-                    "schema_id": obj.schema_id.sub_classification,
-                    "version_id": obj.version_id,
-                    "created_at": obj.created_at.isoformat() if obj.created_at else None,
-                    # "updated_at": obj.updated_at.isoformat() if obj.updated_at else None,
-                }
-                for obj in objects.items()
-            ]
-            logger.info(f"evo_list_objects completed successfully with {len(result)} objects")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error in evo_list_objects: {type(e).__name__}: {str(e)}", exc_info=True)
-            raise
+        object_client = await evo_context.get_object_client(UUID(workspace_id))
+        
+        service_health = await object_client.get_service_health()
+        service_health.raise_for_status()
+        
+        objects = await object_client.list_objects(
+            schema_id=None, # [schema_id] if schema_id else None,
+            deleted=deleted,
+            limit=limit
+        )
+        
+        result = [
+            {
+                "id": str(obj.id),
+                "name": obj.name,
+                "path": obj.path,
+                "schema_id": obj.schema_id.sub_classification,
+                "version_id": obj.version_id,
+                "created_at": obj.created_at.isoformat() if obj.created_at else None,
+                # "updated_at": obj.updated_at.isoformat() if obj.updated_at else None,
+            }
+            for obj in objects.items()
+        ]
+        return result
 
     @mcp.tool()
     async def get_object(
