@@ -9,6 +9,22 @@ from .object_builders import (
     LineSegmentsBuilder,
     DownholeCollectionBuilder,
 )
+from .data_analysis_utils import (
+    get_downhole_collection,
+    download_interval_data,
+    download_downhole_intervals_data,
+    get_object_type,
+    get_downhole_intervals_info,
+    calculate_interval_length,
+    calculate_gaps,
+    calculate_interval_statistics,
+    calculate_statistics_by_hole,
+    analyze_gaps,
+    calculate_multi_grade_statistics,
+    generate_grade_histogram,
+    generate_grade_violin,
+    get_collection_info,
+)
 
 __all__ = [
     'extract_data_references',
@@ -17,4 +33,18 @@ __all__ = [
     'PointsetBuilder',
     'LineSegmentsBuilder',
     'DownholeCollectionBuilder',
+    'get_downhole_collection',
+    'download_interval_data',
+    'download_downhole_intervals_data',
+    'get_object_type',
+    'get_downhole_intervals_info',
+    'calculate_interval_length',
+    'calculate_gaps',
+    'calculate_interval_statistics',
+    'calculate_statistics_by_hole',
+    'analyze_gaps',
+    'calculate_multi_grade_statistics',
+    'generate_grade_histogram',
+    'generate_grade_violin',
+    'get_collection_info',
 ]
