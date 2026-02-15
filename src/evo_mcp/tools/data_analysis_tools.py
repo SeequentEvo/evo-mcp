@@ -1,17 +1,4 @@
-"""
-MCP tools for analyzing interval data from DownholeCollection and DownholeIntervals objects.
 
-These tools retrieve interval data and calculate aggregate statistics including:
-- Length-Weighted Mean: Essential for assay grades (e.g., Au, Cu)
-- Accumulation: Grade * Interval Length (total metal content proxy)
-- Total Length: Sum of all interval lengths
-- Min/Max/Mean grade by hole ID
-- Gap Count/Length: Missing intervals within holes
-
-Supports both object types:
-- DownholeCollection: Traditional drillhole data with named collections
-- DownholeIntervals: Flattened interval data (use collection_name='intervals')
-"""
 
 import logging
 from typing import Any, Optional
