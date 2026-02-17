@@ -7,36 +7,31 @@ from evo.workspaces.endpoints.models import AddInstanceUsersRequest, UserRoleMap
 
 from evo_mcp.context import evo_context, ensure_initialized
 
-def register_instance_user_admin_tools(mcp):
+
+def register_instance_users_admin_tools(mcp):
     """Register tools for managing instance users with the FastMCP server."""
+
+    async def get_workspace_client():
+        await ensure_initialized()
+        if workspace_client := evo_context.workspace_client:
+            return workspace_client
+        else:
+            raise ValueError("Please ensure you are connected to an instance.")
   
     @mcp.tool()
     async def get_users_in_instance(
-        count: int | None = 10,
+        count: int | None = 10000,
     ) -> list[dict]:
-        """Get all users of an instance the user is connected to.
-        
-        This would allow an admin to see who has access to the instance.
-        This would also allow admin to see which user does not have access to the instance.
+        """Get all user members in an instance the user is connected to, at a time.
+       
+        This tool will allow an admin to see who has access to the instance.
+        This tool will also allow admin to see which user does not have access to the instance.
         Then admin can take action to add or remove users from the instance based on this information.
 
-        If a specific instance is not selected, it uses the currently selected instance.
-        If no instance is selected, it asks the user to select one first.
-        
         Returns:
             A list of users in the instance
-            
-        Raises:
-            ValueError: If no instance is selected.
         """
-        await ensure_initialized()
-        
-        if not evo_context.org_id:
-            raise ValueError("No instance selected. Please select an instance first.")
-        
-        #TODO maybe move this to context.py maybe or all instance related code to a separate instance tools file
-        # Also I could not find a client for the instance users in the SDK, so I used the endpoint directly
-        instance_users_api_client = InstanceUsersApi(evo_context.connector)
+        workspace_client = await get_workspace_client()
 
         async def read_pages_from_api(func: Callable, up_to: int | None = None, limit: int = 100):
             """Page through the API client method `func` until we get up_to results or run out of pages.
@@ -48,57 +43,49 @@ def register_instance_user_admin_tools(mcp):
             offset = 0
             ret = []
             while True:
-                response = await func(offset=offset, limit=limit)
-                # We could probably look at the type of `response` and handle
-                # `Page` objects here too.
-                ret.extend(response.results)
+                page = await func(offset=offset, limit=limit)
+                ret.extend(page.items())
+
+                if len(page) == 0 or len(page) < limit:
+                    break
 
                 if up_to and len(ret) >= up_to:
-                    break
-                elif len(response.results) < limit or len(ret) >= up_to:
                     break
 
                 offset += limit
 
             return ret
-        
+
         instance_users = await read_pages_from_api(
             functools.partial(
-                instance_users_api_client.list_instance_users,
-                org_id=evo_context.org_id,
+                workspace_client.list_instance_users
             ),
             up_to=count,
-            limit=min([count, 100]) if count else None,
         )
         
         return [
             {
-                "id": str(user.id),
-                # "email": user.email,
+                "user_id": user.user_id,
+                "email": user.email,
                 "name": user.full_name,
                 "roles": [role.name for role in user.roles]
             }
             for user in instance_users
         ]
-        
+    
     @mcp.tool()
     async def list_roles_in_instance(
     ) -> list[dict]:
         """List the roles available in the instance. """
-        await ensure_initialized()
+        workspace_client = await get_workspace_client()
 
-        if not evo_context.org_id:
-            raise ValueError("No instance selected. Please select an instance first.")
-
-        instance_users_api_client = InstanceUsersApi(evo_context.connector)
-        instance_roles_response = await instance_users_api_client.list_instance_user_roles(org_id=evo_context.org_id)
-        return instance_roles_response.roles
+        instance_roles_response = await workspace_client.list_instance_roles()
+        return instance_roles_response
 
     @mcp.tool()
     async def add_users_to_instance(
         user_emails: list[str],
-        role_name: str | None = "Evo User",
-        role_id: UUID | None = None,
+        role_ids: list[UUID],
     ) -> dict|str:
         """Add one or more users to the selected instance.
         If the user is external, an invitation will be sent.
@@ -106,9 +93,18 @@ def register_instance_user_admin_tools(mcp):
         
         Args:
             user_emails: List of user email addresses to add. Accept single or multiple emails and make them to a list.
-            role_name or role_id: Must match a role returned by
-                `list_roles_in_instance`. The default role is a read only "user"
-                role.
+            Do not assume the email address from first name or other information, it should be provided by the user of the tool.
+            Use `get_users_in_instance` tool to see if the current user in the instance has the admin or owner role, 
+            if not, they should not be able to add users to the instance.
+            Use `get_users_in_instance` tool to see which users are already in the instance and which users are not in the instance.
+            If a user is already in the instance, they will be skipped and not added again; ask user if they wish to update the role of this user
+            with `update_user_role_in_instance` tool instead.
+            This will help in cases where the user is already in the instance but with a different role, 
+            and we want to update the role of the user instead of adding the user again.
+            
+            role_ids: List of role IDs to assign to the users. Must match roles returned by `list_roles_in_instance`. 
+            Prompt the user to specify which roles to assign.
+            The default role is a read only "Evo user" role.
             
         Returns:
             A dict with invitations sent and members added.
@@ -117,43 +113,84 @@ def register_instance_user_admin_tools(mcp):
             
             String error message if there was an error adding users.
             
-        Raises:
-            ValueError: If no instance is selected.
         """
-        await ensure_initialized()
+        workspace_client = await get_workspace_client()
         
-        if not evo_context.org_id:
-            raise ValueError("No instance selected. Please select an instance first.")
-        
-        instance_users_api_client = InstanceUsersApi(evo_context.connector)
-        
-      #  TODO check if the user is the owner/admin of the instance before adding users.
-        try:
-            instance_roles_response = await instance_users_api_client.list_instance_user_roles(org_id=evo_context.org_id)
-            instance_roles = instance_roles_response.roles
-            
-            if not role_id:
-                role_id = next((role for role in instance_roles if role.name == role_name), None).id
-            
-            response = await instance_users_api_client.add_instance_users(
-                org_id=evo_context.org_id,
-                add_instance_users_request=AddInstanceUsersRequest(
-                    users = [UserRoleMapping(email=email, roles=[role_id])
-                             for email in user_emails]
-                    )
-            )
+        users = {email : role_ids for email in user_emails}
 
-        except Exception as e:
-            ## To see debug logs on local set the log_level to DEBUG when creating FastMCP instance in mcp_tools.py
-            ## Eg: mcp = FastMCP("EVO SDK MCP Server", log_level="DEBUG")
-            # sys.exc_info()
-            return "Error adding users: " + str(e)
-        
+        response = await workspace_client.add_users_to_instance(users=users)
+
         invitations = response.invitations or []
         members = response.members or []
         return {
             "invitations_sent": [invitation.email for invitation in invitations],
             "members_added": [member.email for member in members],
+        }
+
+    @mcp.tool()
+    async def remove_user_from_instance(
+        user_email: str,
+        user_id: UUID | None = None,
+    ) -> dict|str:
+        """Remove a user from the instance. This will revoke the user's access to the instance.
+        Check if the user requesting the removal has the admin or owner role to remove users from the instance
+        by calling `get_users_in_instance` tool. 
+        If the user does not have the required role, they should not be able to remove users from the instance.
+        
+        Args:
+            user_email: The email address of the user to remove from the instance.
+            Do not assume the email address from first name or other information, it should be provided by the user of the tool.
+            From the user list obtained from `get_users_in_instance`, for the given user email, you can find the corresponding user_id. 
+            Pass the user_id to this tool to remove the user from the instance.
+            If the user email does not exist in the instance, return a message saying the user is not in the instance.
+
+            Use `get_users_in_instance` tool to see which users are in the instance and their email addresses.
+        
+        Returns:
+            A dict with the email of the user removed.
+            
+        """
+        workspace_client = await get_workspace_client()
+
+        await workspace_client.remove_instance_user(user_id=user_id)
+
+        return {
+            "user_removed": user_email,
+        }
+
+    @mcp.tool()
+    async def update_user_role_in_instance(
+        user_email: str,
+        user_id: UUID | None = None,
+        new_role_ids: list[UUID] | None = [],
+    ) -> dict|str:
+        """Update the role of a user in the instance. This will change the user's access level in the instance.
+        Check if the user requesting the role update has the admin or owner role to update user roles in the instance
+        by calling `get_users_in_instance` tool. 
+        If the user does not have the required role, they should not be able to update user roles in the instance.
+
+        Args:
+            user_email: The email address of the user to update role for in the instance.
+            Do not assume the email address from first name or other information, it should be provided by the user of the tool.
+            From the user list obtained from `get_users_in_instance`, for the given user email, you can find the corresponding user_id. 
+            Pass the user_id to this tool to update the user's role in the instance.
+            If the user email does not exist in the instance, return a message saying the user is not in the instance.
+
+            new_role_ids: List of new role IDs to assign to the user. Must match roles returned by `list_roles_in_instance`. 
+            Prompt the user to specify which new roles to assign.
+            The default role is a read only "Evo user" role.
+
+        Returns:
+            A dict with the email of the user whose role was updated and their new roles.
+            
+        """
+        workspace_client = await get_workspace_client()
+
+        await workspace_client.update_instance_user_roles(user_id=user_id, roles=new_role_ids)
+
+        return {
+            "user_role_updated": user_email,
+            "new_roles": new_role_ids,
         }
 
   

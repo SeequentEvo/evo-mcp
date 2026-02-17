@@ -24,7 +24,8 @@ from evo_mcp.tools import (
     # register_data_tools,
     register_general_tools,
     register_filesystem_tools,
-    register_object_builder_tools
+    register_object_builder_tools,
+    register_instance_users_admin_tools,
 )
 
 # Get agent type from environment variable 
@@ -68,7 +69,7 @@ register_general_tools(mcp)  # Always register general tools
 
 if TOOL_FILTER in ["all", "admin"]:  #  "admin_agent"
     register_admin_tools(mcp)
-    
+    register_instance_users_admin_tools(mcp)
 if TOOL_FILTER in ["all", "data"]: #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
@@ -118,6 +119,9 @@ if TOOL_FILTER == "all":
         - Duplicating entire workspaces with optional filtering
         - Bulk operations on multiple objects
         - Data migration and backup operations
+        - Listing users in the instance and their roles
+        - Adding or removing users from the instance
+        - Updating user roles in the instance
 
         When a user asks about workspaces, use the available MCP tools to provide accurate information.
         Always be clear about what workspace you're working with.
