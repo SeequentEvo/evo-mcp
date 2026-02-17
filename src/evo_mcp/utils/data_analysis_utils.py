@@ -30,6 +30,36 @@ logger = logging.getLogger(__name__)
 # Data Retrieval Utilities
 # =============================================================================
 
+async def _resolve_categorical_attribute(obj, attr_jmespath: str) -> pd.Series:
+    """Resolve a categorical attribute by downloading its lookup table and integer keys.
+
+    Categorical attributes in Evo objects are stored as:
+    - ``table``: A LookupTable mapping integer keys to string values
+    - ``values``: An IntegerArray1 of keys that index into the lookup table
+
+    This mirrors the pattern used by ``object_builders.build_category_attribute``.
+
+    Args:
+        obj: The downloaded evo object
+        attr_jmespath: JMESPath to the categorical attribute root
+            (e.g. ``"collections[0].from_to.attributes[2]"``)
+
+    Returns:
+        pd.Series of resolved string values
+    """
+    # 1. Download the lookup table (key → value mapping)
+    lookup_table = await obj.download_table(f"{attr_jmespath}.table")
+    lookup_df = lookup_table.to_pandas()
+    key_to_value = dict(zip(lookup_df["key"], lookup_df["value"]))
+
+    # 2. Download the integer keys
+    values_df = await obj.download_dataframe(f"{attr_jmespath}.values")
+    int_keys = values_df.iloc[:, 0]
+
+    # 3. Map keys to their string values
+    return int_keys.map(key_to_value)
+
+
 async def get_downhole_collection(workspace_id: str, object_id: str, version: str = "") -> tuple:
     """Helper to retrieve a DownholeCollection object and its data.
     
@@ -135,12 +165,11 @@ async def download_interval_data(
             except Exception as e:
                 logger.warning(f"Failed to download attribute {attr_name}: {e}")
         elif 'table' in attr:
-            # Categorical attribute
+            # Categorical attribute — resolve via lookup table
             attr_jmespath = f"collections[{collection_idx}].from_to.attributes[{attr_idx}]"
             try:
-                cat_table = await obj.download_category_table(attr_jmespath)
-                cat_df = cat_table.to_pandas()
-                intervals_df[attr_name] = cat_df.iloc[:, 0].values
+                resolved = await _resolve_categorical_attribute(obj, attr_jmespath)
+                intervals_df[attr_name] = resolved.values
             except Exception as e:
                 logger.warning(f"Failed to download category attribute {attr_name}: {e}")
     
@@ -189,12 +218,11 @@ async def download_downhole_intervals_data(obj) -> pd.DataFrame:
             except Exception as e:
                 logger.warning(f"Failed to download attribute {attr_name}: {e}")
         elif 'table' in attr:
-            # Categorical attribute
+            # Categorical attribute — resolve via lookup table
             attr_jmespath = f"attributes[{attr_idx}]"
             try:
-                cat_table = await obj.download_category_table(attr_jmespath)
-                cat_df = cat_table.to_pandas()
-                intervals_df[attr_name] = cat_df.iloc[:, 0].values
+                resolved = await _resolve_categorical_attribute(obj, attr_jmespath)
+                intervals_df[attr_name] = resolved.values
             except Exception as e:
                 logger.warning(f"Failed to download category attribute {attr_name}: {e}")
     
