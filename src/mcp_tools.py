@@ -17,6 +17,7 @@ import os
 import logging
 from pathlib import Path
 from fastmcp import FastMCP
+from fastmcp.utilities.logging import configure_logging
 
 from evo_mcp.tools import (
     register_admin_tools,
@@ -42,6 +43,10 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
 # Initialize FastMCP server with agent type in name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
 mcp = FastMCP(server_name)
+
+# Show more traceback frame for now, we may want to disabled the rich
+# traceback formatting entirely too.
+configure_logging(tracebacks_max_frames=20)
 
 def _get_objects_reference_content() -> str:
     """Load the objects reference content from a markdown file."""
