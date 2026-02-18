@@ -22,6 +22,7 @@
   - [Cursor](#cursor)
 - [Using Evo MCP](#using-evo-mcp)
 - [Advanced](#advanced)
+  - [MCP Transport Modes](#mcp-transport-modes)
   - [Testing Evo MCP with a Google ADK agent](#testing-evo-mcp-with-a-google-adk-agent)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -170,6 +171,21 @@ Set `MCP_TOOL_FILTER` environment variable in `.env` to filter available tools:
 - `data` - Object import, download and query operations  
 - `all` - All tools (default)
 
+### 8. Configure MCP transport mode (optional)
+
+The Evo MCP server supports two transport modes: **STDIO** and **HTTP+SSE**. By default, the server runs in **STDIO** mode, which is recommended for use with VS Code and Cursor.
+
+Set `MCP_TRANSPORT` environment variable in `.env` to choose the transport mode:
+- `stdio` - Standard input/output (default, recommended for VS Code/Cursor)
+- `http` - HTTP with Server-Sent Events (useful for testing and remote access)
+
+If using HTTP mode, configure the host and port:
+```bash
+MCP_TRANSPORT=http
+MCP_HTTP_HOST=localhost
+MCP_HTTP_PORT=3000
+```
+
 ## Connect to Evo MCP
 
 Apps like VS Code and Cursor make it easy to connect to MCP servers, whether they are running locally or are available over a network or the internet. VS Code is free to download and use but Cursor requires a paid subscription.
@@ -295,6 +311,94 @@ Tips for getting the best experience:
 ---
 
 ## Advanced
+
+### MCP Transport Modes
+
+The Evo MCP server supports two transport modes for different use cases:
+
+#### STDIO Mode (Default)
+
+**Transport**: Standard input/output
+**Recommended For**: VS Code, Cursor, Claude Desktop, and other integrated MCP clients
+
+STDIO mode is the default and is optimized for direct integration with MCP client applications. The server reads JSON-RPC messages from stdin and writes responses to stdout.
+
+**Advantages:**
+- Simpler configuration - client handles connection automatically
+- Better performance for local connections
+- Directly integrated into VS Code and Cursor workflows
+- No network overhead
+- Recommended for production use with integrated clients
+
+**Setup:**
+```bash
+# In .env
+MCP_TRANSPORT=stdio  # This is the default
+```
+
+Then configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via stdio.
+
+#### HTTP Mode
+
+**Transport**: HTTP with Server-Sent Events (SSE)
+**Recommended For**: Testing, remote access, programmatic access via curl/scripts, and containerized deployments (Docker)
+
+HTTP mode exposes the MCP server as an HTTP service with SSE for streaming responses. This is useful for testing the server independently, accessing it remotely, or deploying it in containers.
+
+**Advantages:**
+- Can be accessed via curl, programming languages, or HTTP clients
+- Useful for testing and debugging
+- Enables remote access to the server
+- Simplifies integration with custom tools and scripts
+- Ideal for containerized deployments (Docker, Kubernetes)
+- Works well in cloud environments and microservices architectures
+
+**Limitations:**
+- Requires separate server process management
+- Slightly higher latency due to HTTP overhead
+- Not recommended for use with VS Code/Cursor (use STDIO mode instead)
+
+**Setup:**
+```bash
+# In .env or environment
+MCP_TRANSPORT=http
+MCP_HTTP_HOST=localhost
+MCP_HTTP_PORT=3000
+```
+
+**Start the server:**
+```bash
+python -m  mcp_tools
+# or
+python src/mcp_tools.py
+```
+
+The server will start listening on `http://localhost:3000`.
+
+**Access tools using curl:**
+```bash
+# List all workspaces
+curl -X POST http://localhost:3000/t/list_workspaces \
+  -H "Content-Type: application/json" \
+  -d '{"name": "", "deleted": false, "limit": 50}'
+
+# Create a workspace
+curl -X POST http://localhost:3000/t/create_workspace \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My New Workspace", "description": "Test workspace"}'
+```
+
+#### Choosing a Transport Mode
+
+| Use Case | Recommended Mode |
+|----------|-----------------|
+| Using VS Code with Copilot | STDIO (default) |
+| Using Cursor with AI | STDIO (default) |
+| Using Claude Desktop | STDIO (default) |
+| Testing tools with curl | HTTP |
+| Remote server access | HTTP |
+| Custom script integration | HTTP |
+| Production deployment | STDIO (with integrated client) |
 
 ### Testing Evo MCP with a Google ADK agent
 
