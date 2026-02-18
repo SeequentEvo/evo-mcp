@@ -10,11 +10,14 @@ Configuration:
 - Set EVO_LOCAL_DATA_DIR environment variable for download destination
 """
 
+import logging
 import os
 from pathlib import Path
 from uuid import UUID
 
 from evo_mcp.context import evo_context, ensure_initialized
+
+logger = logging.getLogger(__name__)
 from evo_mcp.tools.filesystem_tools import _get_data_directory
 
 
@@ -57,21 +60,25 @@ def register_file_tools(mcp):
             # Append filename to target folder path
             full_target_path = f"{target_path}/{local_path.name}"
         
-        file_client = await evo_context.get_file_client(UUID(workspace_id))
-        
-        # Prepare upload context
-        upload_ctx = await file_client.prepare_upload_by_path(full_target_path)
-        
-        # Upload the file
-        await upload_ctx.upload_from_path(str(local_path), evo_context.connector.transport)
-        
-        return {
-            "file_id": str(upload_ctx.file_id),
-            "path": full_target_path,
-            "version_id": upload_ctx.version_id,
-            "local_file": str(local_path),
-            "status": "uploaded"
-        }
+        try:
+            file_client = await evo_context.get_file_client(UUID(workspace_id))
+            
+            # Prepare upload context
+            upload_ctx = await file_client.prepare_upload_by_path(full_target_path)
+            
+            # Upload the file
+            await upload_ctx.upload_from_path(str(local_path), evo_context.connector.transport)
+            
+            return {
+                "status": "uploaded",
+                "file_id": str(upload_ctx.file_id),
+                "path": full_target_path,
+                "version_id": upload_ctx.version_id,
+                "local_file": str(local_path),
+            }
+        except Exception as e:
+            logger.exception("Failed to upload file")
+            return {"status": "upload_failed", "error": str(e), "path": full_target_path}
 
     @mcp.tool()
     async def list_file_versions(
