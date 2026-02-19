@@ -260,11 +260,7 @@ VS Code comes in two flavours - **VS Code** and **VS Code Insiders**. Install on
 
 #### Configuration
 
-MCP server configurations can be added to VS Code in one of two places:
-- **User settings**. The MCP server will be accessible everywhere (recommended).
-- **Workspace settings**. The MCP server can only be accessed in designated VS Code workspaces.
-
-Run the supplied Python script to add the required settings. The script will ask if you want to modify the **user settings** or the **workspace settings**.
+Run the supplied Python script to add the required settings. The script will ask you a series of questions.
 
 **If you set up Python with `uv`:**
 ```bash
@@ -279,7 +275,7 @@ python scripts/setup-vscode.py
 **Manual method**
 1. Copy the settings found in `templates/vscode-mcp-config.json`.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
-3. Search for "mcp". Select either **MCP: Open User Configuration** to update the user settings or **MCP: Open Workspace Folder MCP Configuration** to update the workspace settings.
+3. Search for "mcp". Select **MCP: Open User Configuration** to update the user settings.
   ![VS Code Command Palette](images/vscode-command-palette.png)
 4. Paste the settings you copied from the template and update the paths to match your installation. Save the file.
   ![VS Code MCP Settings](images/vscode-settings.png)
@@ -304,15 +300,11 @@ If you see **evo-mcp** listed without any warnings, the configuration is correct
 
 #### Installation
 
-Cursor is an AI-powered code editor with built-in support for MCP servers. To use the Evo MCP server in Cursor, you must first [download and install it](https://cursor.com/download). Note that Cursor requires a paid subscription to use MCP features.
+Cursor is an AI-powered code editor with built-in support for MCP servers. To use the Evo MCP server in Cursor first [download and install it](https://cursor.com/download). NOTE: Cursor requires a paid subscription to use MCP features.
 
 #### Configuration
 
-MCP server configurations can be added to Cursor in one of two places:
-- **User settings**. The MCP server will be accessible everywhere (recommended).
-- **Workspace settings**. The MCP server can only be accessed in designated Cursor workspaces.
-
-Run the supplied Python script to add the required settings. The script will ask if you want to modify the **user settings** or the **workspace settings**.
+Run the supplied Python script to add the required settings. The script will ask you a series of questions.
 
 **If you set up Python with `uv`:**
 ```bash
@@ -324,7 +316,7 @@ uv run python scripts/setup-cursor.py
 python scripts/setup-cursor.py
 ```
 
-#### Manual method (user settings)
+#### Manual method
 1. Copy the settings found in `templates/cursor-mcp-config.json`.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
 3. Search for "mcp". Select either **View: Open MCP Settings** to update the user settings.
@@ -338,16 +330,6 @@ python scripts/setup-cursor.py
   ![Cursor MCP Settings](images/cursor-settings.png)
 6. When prompted, enter agent type: `admin`, `data`, or `all`.
 7. The MCP server will start automatically when accessed by Cursor AI.
-
-#### Manual method (workspace settings)
-1. Copy the settings found in `templates/cursor-mcp-config.json`.
-2. Create a new folder in your workspace called **.cache** (be sure to include the period character). 
-3. Create a new file within this folder called **mcp.json**.
-4. Open **mcp.json**, paste the settings you copied from the template and update the paths to match your installation. Save the file.
-  ![Cursor MCP Settings](images/cursor-settings.png)
-
-5. When prompted, enter agent type: `admin`, `data`, or `all`
-6. The MCP server will start automatically when accessed by Cursor AI
 
 #### Verifying the integration
 
