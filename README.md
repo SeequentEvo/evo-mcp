@@ -67,23 +67,23 @@ MCP Client (VS Code / ADK Agent / etc) <-> MCP Server (FastMCP + Evo SDK) <-> Ev
 
 ### Installation 
 
-**1. Clone this repository**
+#### 1. Clone this repository
 ```powershell
 git clone https://github.com/SeequentEvo/evo-mcp.git
 ```
 
-**2. Navigate to the root directory**
+#### 2. Navigate to the root directory
 ```powershell
 cd <path-to-this-repository>
 ```
 
-**3. Create a Python environment**
+#### 3. Create a Python environment
 
 <strong>Option 1: Using `uv` (recommended)</strong>
 
 The Python package manager `uv` makes it easy to set up your Python environment. Visit the [uv website](https://docs.astral.sh/uv/) to learn more.
 
-#### a. Install `uv` (if not already installed)
+##### a. Install `uv` (if not already installed)
 
 ##### Windows
 
@@ -97,7 +97,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-#### b. Create the Python environment including dependencies
+##### b. Create the Python environment including dependencies
 ```bash
 uv sync
 ```
@@ -106,25 +106,25 @@ uv sync
 
 If you prefer using `pip` and `pyenv` to manage your Python environment:
 
-#### a. Install `pyenv` (if not already installed)
+##### a. Install `pyenv` (if not already installed)
    - **Windows**: Use [pyenv-win](https://github.com/pyenv-win/pyenv-win#installation)
    - **macOS**: `brew install pyenv`
    - **Linux**: Follow [pyenv installation guide](https://github.com/pyenv/pyenv#installation)
 
 
-#### b. Install Python 3.10+
+##### b. Install Python 3.10+
    ```bash
    pyenv install 3.10
    pyenv local 3.10
    ```
 
-#### c. Create a virtual environment
+##### c. Create a virtual environment
 
 ```bash
 python -m venv .venv
 ```
 
-#### d. Activate the virtual environment
+##### d. Activate the virtual environment
 
 ##### Windows
 ```powershell
@@ -137,23 +137,75 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-#### e. Install dependencies
+##### e. Install dependencies
 
-##### Install essential runtime dependencies
+Install essential runtime dependencies:
 
 ```bash
 pip install -e .
 ```
 
-##### Install dev dependencies along with the essential runtime dependencies
+Install dev dependencies along with the essential runtime dependencies:
 
 ```bash
 pip install -e '.[dev]'
 ```
 
-### 6. Configure your environment
+#### 4. Choose an MCP transport mode (optional)
 
-#### Evo app credentials
+The Evo MCP server supports two common transport modes for different use cases:
+
+##### stdio (default)
+
+**Transport**: Standard input/output
+**Recommended For**: VS Code, Cursor, Claude Desktop, and other integrated MCP clients
+
+`stdio` is the default transport mode and is optimised for direct integration with MCP client applications. The server reads JSON-RPC messages from stdin and writes responses to stdout.
+
+**Advantages:**
+- Simpler configuration - client handles connection automatically
+- Better performance for local connections
+- Directly integrated into VS Code and Cursor workflows
+- No network overhead
+- Recommended for production use with integrated clients
+
+Then configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via stdio.
+
+##### HTTP+SSE
+
+**Transport**: HTTP with Server-Sent Events (SSE)
+**Recommended For**: Testing, remote access, programmatic access via curl/scripts, and containerized deployments (Docker)
+
+`HTTP+SSE` exposes the MCP server as an HTTP service with SSE for streaming responses. This is useful for testing the server independently, accessing it remotely, or deploying it in containers.
+
+**Advantages:**
+- Can be accessed via curl, programming languages, or HTTP clients
+- Useful for testing and debugging
+- Enables remote access to the server
+- Simplifies integration with custom tools and scripts
+- Ideal for containerized deployments (Docker, Kubernetes)
+- Works well in cloud environments and microservices architectures
+
+**Limitations:**
+- Requires separate server process management
+- Slightly higher latency due to HTTP overhead
+- Not recommended for use with VS Code/Cursor (use STDIO mode instead)
+
+##### Common use cases
+
+| Use case | Recommended mode |
+|----------|-----------------|
+| Using VS Code with Copilot | stdio (default) |
+| Using Cursor with AI | stdio (default) |
+| Using Claude Desktop | stdio (default) |
+| Testing tools with curl | HTTP |
+| Remote server access | HTTP |
+| Custom script integration | HTTP |
+| Production deployment | stdio (with integrated client) |
+
+#### 5. Configure your environment
+
+##### Evo app credentials
 
 You first need to create a **native app** in the **iTwin Developer Portal**. This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
 
@@ -163,7 +215,7 @@ EVO_CLIENT_ID=your-client-id
 EVO_REDIRECT_URL=your-redirect-url
 ```
 
-#### MCP transport mode (optional)
+##### MCP transport mode (optional)
 
 The Evo MCP server supports two transport modes: **STDIO** and **HTTP+SSE**. By default, the server runs in **STDIO** mode, which is recommended for use with VS Code and Cursor.
 
@@ -182,7 +234,7 @@ MCP_HTTP_HOST=localhost
 MCP_HTTP_PORT=3000
 ```
 
-#### MCP tool filtering (optional)
+##### MCP tool filtering (optional)
 
 Set `MCP_TOOL_FILTER` environment variable in `.env` to filter available tools:
 - `admin` - Workspace/instance management and bulk data operations
@@ -195,7 +247,7 @@ MCP_TOOL_FILTER=all
 
 ## Connect to Evo MCP
 
-Apps like VS Code and Cursor make it easy to connect to MCP servers, whether they are running locally or are available over a network or the internet. VS Code is free to download and use but Cursor requires a paid subscription.
+Apps like VS Code and Cursor make it easy to connect to MCP servers, whether they are running locally, are available over a local network, or over the internet. VS Code is free to download and use. Cursor requires a paid subscription.
 
 ### VS Code
 
@@ -204,7 +256,7 @@ Apps like VS Code and Cursor make it easy to connect to MCP servers, whether the
 VS Code comes in two flavours - **VS Code** and **VS Code Insiders**. Install one of these apps before running Evo MCP. NOTE: Both of these apps can be installed and used independently.
 
 - Install the regular version of [VS Code](https://code.visualstudio.com/Download).
-- Install [VS Code Insiders](https://code.visualstudio.com/insiders/) for the most up-to-date experience. **VS Code Insiders** provides early access to the latest features and improvements for MCP integration, ensuring optimal compatibility and performance. 
+- Install [VS Code Insiders](https://code.visualstudio.com/insiders/) for the most up-to-date experience. VS Code Insiders provides early access to the latest features and improvements for MCP integration. 
 
 #### Configuration
 
@@ -372,6 +424,18 @@ MCP_HTTP_HOST=localhost
 MCP_HTTP_PORT=3000
 ```
 
+### Testing with curl
+
+Running Evo MCP in HTTP+SSE mode allows you to use `curl` to access the MCP tools.
+
+**Setup:**
+```bash
+# In .env or environment
+MCP_TRANSPORT=http
+MCP_HTTP_HOST=localhost
+MCP_HTTP_PORT=3000
+```
+
 **Start the server:**
 ```bash
 python -m  mcp_tools
@@ -394,17 +458,17 @@ curl -X POST http://localhost:3000/t/create_workspace \
   -d '{"name": "My New Workspace", "description": "Test workspace"}'
 ```
 
-#### Choosing a Transport Mode
+#### Choosing a transport mode
 
 | Use Case | Recommended Mode |
 |----------|-----------------|
-| Using VS Code with Copilot | STDIO (default) |
-| Using Cursor with AI | STDIO (default) |
-| Using Claude Desktop | STDIO (default) |
+| Using VS Code with Copilot | stdio (default) |
+| Using Cursor with AI | stdio (default) |
+| Using Claude Desktop | stdio (default) |
 | Testing tools with curl | HTTP |
 | Remote server access | HTTP |
 | Custom script integration | HTTP |
-| Production deployment | STDIO (with integrated client) |
+| Production deployment | stdio (with integrated client) |
 
 ### Testing Evo MCP with a Google ADK agent
 
