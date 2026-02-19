@@ -101,7 +101,32 @@ def get_python_executable(project_dir: Path, is_workspace: bool) -> str:
         return str(current_python)
 
 
-def setup_mcp_config(config_type: str, variant: str | None = None):
+def get_protocol_choice():
+    """Ask user which MCP protocol to use"""
+    print()
+    print("Which MCP transport protocol would you like to use?")
+    print("1. STDIO (recommended for VS Code/Cursor)")
+    print("   - Native IDE integration")
+    print("   - Best performance for local development")
+    print("2. HTTP+SSE (for testing, remote access, Docker)")
+    print("   - Easier debugging and testing")
+    print("   - Can run on remote servers")
+    print()
+    
+    while True:
+        choice = input("Enter your choice [1-2] (default: 1): ").strip()
+        if not choice:
+            choice = '1'
+        
+        if choice in ['1', '2']:
+            protocol = 'stdio' if choice == '1' else 'http'
+            return protocol
+        
+        print_color("Invalid choice. Please enter 1 or 2.", Colors.RED)
+        print()
+
+
+def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str = 'stdio'):
     """
     Set up the MCP configuration for Cursor.
     
@@ -167,10 +192,20 @@ def setup_mcp_config(config_type: str, variant: str | None = None):
         settings['mcpServers'] = {}
     
     # Add or update the evo-mcp server configuration
-    settings['mcpServers']['evo-mcp'] = {
-        "command": python_exe,
-        "args": [mcp_script]
-    }
+    if protocol == 'http':
+        # For HTTP+SSE, use http type with URL
+        config_entry = {
+            "type": "http",
+            "url": "http://localhost:3000/sse"
+        }
+    else:
+        # For STDIO, use default command/args (Cursor doesn't use type field)
+        config_entry = {
+            "command": python_exe,
+            "args": [mcp_script]
+        }
+    
+    settings['mcpServers']['evo-mcp'] = config_entry
     
     # Write the updated settings to file
     try:
@@ -182,6 +217,11 @@ def setup_mcp_config(config_type: str, variant: str | None = None):
         print("Configuration details:")
         print(f"  Command: {python_exe}")
         print(f"  Script: {mcp_script}")
+        print(f"  Transport Protocol: {protocol.upper()}")
+        if protocol == 'http':
+            print("  HTTP Configuration:")
+            print("    - Host: localhost")
+            print("    - Port: 3000")
         print()
         print("Next steps:")
         print("Restart Cursor or reload the window")
@@ -224,7 +264,12 @@ def main():
         
         config_type = 'user' if choice == '1' else 'workspace'
         print()
-        setup_mcp_config(config_type, variant if config_type == 'user' else None)
+        
+        # Ask for protocol choice
+        protocol = get_protocol_choice()
+        print()
+        
+        setup_mcp_config(config_type, variant if config_type == 'user' else None, protocol)
         
     except KeyboardInterrupt:
         print()
