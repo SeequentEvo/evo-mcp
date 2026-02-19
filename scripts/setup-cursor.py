@@ -104,8 +104,8 @@ def get_python_executable(project_dir: Path, is_workspace: bool) -> str:
 def get_protocol_choice():
     """Ask user which MCP protocol to use"""
     print()
-    print("Which MCP transport protocol would you like to use?")
-    print("1. STDIO (recommended for VS Code/Cursor)")
+    print("Which MCP transport protocol are you using?")
+    print("1. stdio (recommended for VS Code/Cursor)")
     print("   - Native IDE integration")
     print("   - Best performance for local development")
     print("2. HTTP+SSE (for testing, remote access, Docker)")
@@ -199,7 +199,7 @@ def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str
             "url": "http://localhost:3000/sse"
         }
     else:
-        # For STDIO, use default command/args (Cursor doesn't use type field)
+        # For stdio, use default command/args (Cursor doesn't use type field)
         config_entry = {
             "command": python_exe,
             "args": [mcp_script]
@@ -244,32 +244,14 @@ def main():
     # Use stable Cursor version
     variant = 'Cursor'
     
-    # Ask where to add configuration
     try:
-        while True:
-            print("Where would you like to add the MCP server configuration?")
-            print("1. User configuration (default)")
-            print("2. Workspace folder configuration")
-            print()
-            
-            choice = input("Enter your choice [1-2] (default: 1): ").strip()
-            if not choice:
-                choice = '1'
-            
-            if choice in ['1', '2']:
-                break
-            
-            print_color("Invalid choice. Please enter 1 or 2.", Colors.RED)
-            print()
-        
-        config_type = 'user' if choice == '1' else 'workspace'
-        print()
+        config_type = 'user'
         
         # Ask for protocol choice
         protocol = get_protocol_choice()
         print()
         
-        setup_mcp_config(config_type, variant if config_type == 'user' else None, protocol)
+        setup_mcp_config(config_type, variant, protocol)
         
     except KeyboardInterrupt:
         print()
