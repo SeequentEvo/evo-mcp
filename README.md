@@ -22,7 +22,7 @@
   - [Cursor](#cursor)
   - [Additional tips](#additional-tips)
 - [Advanced](#advanced)
-  - [MCP Transport Modes](#mcp-transport-modes)
+  - [MCP transport modes](#mcp-transport-modes)
   - [Testing Evo MCP with a Google ADK agent](#testing-evo-mcp-with-a-google-adk-agent)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -151,27 +151,19 @@ pip install -e .
 pip install -e '.[dev]'
 ```
 
-### 6. Configure your Evo credentials
+### 6. Configure your environment
 
-You need to create a **native app** in the iTwin Developer Portal before continuing. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn how to create an app.
+#### Evo app credentials
+
+You first need to create a **native app** in the **iTwin Developer Portal**. This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
 
 Copy the file `.env.example`, rename the copy to `.env` and fill in:
 ```bash
 EVO_CLIENT_ID=your-client-id
 EVO_REDIRECT_URL=your-redirect-url
-
-# Server configuration (optional)
-MCP_TOOL_FILTER=all
 ```
 
-### 7. Configure MCP tool filtering (optional)
-
-Set `MCP_TOOL_FILTER` environment variable in `.env` to filter available tools:
-- `admin` - Workspace/instance management and bulk data operations
-- `data` - Object import, download and query operations  
-- `all` - All tools (default)
-
-### 8. Configure MCP transport mode (optional)
+#### MCP transport mode (optional)
 
 The Evo MCP server supports two transport modes: **STDIO** and **HTTP+SSE**. By default, the server runs in **STDIO** mode, which is recommended for use with VS Code and Cursor.
 
@@ -179,11 +171,26 @@ Set `MCP_TRANSPORT` environment variable in `.env` to choose the transport mode:
 - `stdio` - Standard input/output (default, recommended for VS Code/Cursor)
 - `http` - HTTP with Server-Sent Events (useful for testing and remote access)
 
-If using HTTP mode, configure the host and port:
+```bash
+MCP_TRANSPORT=stdio
+```
+
+If using HTTP mode, also configure the host and port:
 ```bash
 MCP_TRANSPORT=http
 MCP_HTTP_HOST=localhost
 MCP_HTTP_PORT=3000
+```
+
+#### MCP tool filtering (optional)
+
+Set `MCP_TOOL_FILTER` environment variable in `.env` to filter available tools:
+- `admin` - Workspace/instance management and bulk data operations
+- `data` - Object import, download and query operations  
+- `all` - All tools (default)
+
+```bash
+MCP_TOOL_FILTER=all
 ```
 
 ## Connect to Evo MCP
@@ -311,16 +318,16 @@ To verify that the Evo MCP server is correctly configured in Cursor:
 
 ## Advanced
 
-### MCP Transport Modes
+### MCP transport modes
 
-The Evo MCP server supports two transport modes for different use cases:
+The Evo MCP server supports two common transport modes for different use cases:
 
-#### STDIO Mode (Default)
+#### stdio (default)
 
 **Transport**: Standard input/output
 **Recommended For**: VS Code, Cursor, Claude Desktop, and other integrated MCP clients
 
-STDIO mode is the default and is optimized for direct integration with MCP client applications. The server reads JSON-RPC messages from stdin and writes responses to stdout.
+`stdio` is the default transport mode and is optimised for direct integration with MCP client applications. The server reads JSON-RPC messages from stdin and writes responses to stdout.
 
 **Advantages:**
 - Simpler configuration - client handles connection automatically
@@ -337,12 +344,12 @@ MCP_TRANSPORT=stdio  # This is the default
 
 Then configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via stdio.
 
-#### HTTP Mode
+#### HTTP+SSE
 
 **Transport**: HTTP with Server-Sent Events (SSE)
 **Recommended For**: Testing, remote access, programmatic access via curl/scripts, and containerized deployments (Docker)
 
-HTTP mode exposes the MCP server as an HTTP service with SSE for streaming responses. This is useful for testing the server independently, accessing it remotely, or deploying it in containers.
+`HTTP+SSE` exposes the MCP server as an HTTP service with SSE for streaming responses. This is useful for testing the server independently, accessing it remotely, or deploying it in containers.
 
 **Advantages:**
 - Can be accessed via curl, programming languages, or HTTP clients
