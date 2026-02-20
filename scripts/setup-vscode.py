@@ -110,7 +110,32 @@ def get_python_executable(project_dir: Path, is_workspace: bool) -> str:
         return str(current_python)
 
 
-def setup_mcp_config(config_type: str, variant: str | None = None):
+def get_protocol_choice():
+    """Ask user which MCP protocol to use"""
+    print()
+    print("Which MCP transport protocol are you using?")
+    print("1. stdio (recommended for VS Code/Cursor)")
+    print("   - Native IDE integration")
+    print("   - Best performance for local development")
+    print("2. HTTP+SSE (for testing, remote access, Docker)")
+    print("   - Easier debugging and testing")
+    print("   - Can run on remote servers")
+    print()
+    
+    while True:
+        choice = input("Enter your choice [1-2] (default: 1): ").strip()
+        if not choice:
+            choice = '1'
+        
+        if choice in ['1', '2']:
+            protocol = 'stdio' if choice == '1' else 'http'
+            return protocol
+        
+        print_color("Invalid choice. Please enter 1 or 2.", Colors.RED)
+        print()
+
+
+def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str = 'stdio'):
     """
     Set up the MCP configuration for VS Code.
     
@@ -174,11 +199,21 @@ def setup_mcp_config(config_type: str, variant: str | None = None):
         settings['servers'] = {}
     
     # Add or update the evo-mcp server configuration
-    settings['servers']['evo-mcp'] = {
-        "type": "stdio",
-        "command": python_exe,
-        "args": [mcp_script]
-    }
+    if protocol == 'http':
+        # For HTTP+SSE, use http type with URL
+        config_entry = {
+            "type": "http",
+            "url": "http://localhost:3000/sse"
+        }
+    else:
+        # For stdio, use stdio type with command
+        config_entry = {
+            "type": "stdio",
+            "command": python_exe,
+            "args": [mcp_script]
+        }
+    
+    settings['servers']['evo-mcp'] = config_entry
     
     # Write the updated settings to file
     try:
@@ -190,6 +225,11 @@ def setup_mcp_config(config_type: str, variant: str | None = None):
         print("Configuration details:")
         print(f"  Command: {python_exe}")
         print(f"  Script: {mcp_script}")
+        print(f"  Transport Protocol: {protocol.upper()}")
+        if protocol == 'http':
+            print("  HTTP Configuration:")
+            print("    - Host: localhost")
+            print("    - Port: 3000")
         print()
         print("Next steps:")
         print("Restart VS Code or reload the window")
@@ -230,26 +270,13 @@ def main():
         variant = 'Code' if version_choice == '1' else 'Code - Insiders'
         print()
         
-        # Ask where to add configuration
-        while True:
-            print("Where would you like to add the MCP server configuration?")
-            print("1. User configuration (default)")
-            print("2. Workspace folder configuration")
-            print()
-            
-            choice = input("Enter your choice [1-2] (default: 1): ").strip()
-            if not choice:
-                choice = '1'
-            
-            if choice in ['1', '2']:
-                break
-            
-            print_color("Invalid choice. Please enter 1 or 2.", Colors.RED)
-            print()
+        config_type = 'user'
         
-        config_type = 'user' if choice == '1' else 'workspace'
+        # Ask for protocol choice
+        protocol = get_protocol_choice()
         print()
-        setup_mcp_config(config_type, variant if config_type == 'user' else None)
+        
+        setup_mcp_config(config_type, variant, protocol)
         
     except KeyboardInterrupt:
         print()
