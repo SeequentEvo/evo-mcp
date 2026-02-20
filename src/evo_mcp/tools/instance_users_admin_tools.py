@@ -46,10 +46,11 @@ def register_instance_users_admin_tools(mcp):
                 page = await func(offset=offset, limit=limit)
                 ret.extend(page.items())
 
-                if len(page) == 0 or len(page) < limit:
+                if len(page) < limit:
                     break
 
                 if up_to and len(ret) >= up_to:
+                    ret = ret[:up_to]
                     break
 
                 offset += limit
@@ -89,22 +90,27 @@ def register_instance_users_admin_tools(mcp):
     ) -> dict|str:
         """Add one or more users to the selected instance.
         If the user is external, an invitation will be sent.
-        
+
+        Only an instance admin or owner can add users to the instance. If a Forbidden error is returned from add_users_to_instance(), 
+        inform the user of the tool that they do not have the required permissions to add users to the instance.
+        If a user is already in the instance, an error will be returned - give the error details to the user of the tool
+        and ask user if they wish to update the role of this user. If role update is requested, use `update_user_role_in_instance` tool instead.
+        This will help in cases where the user is already in the instance but with a different role, 
+        and we want to update the role of the user instead of adding the user again.
+        With one request, assign the same role to multiple users by accepting a list of user emails and a list of role IDs.
         
         Args:
             user_emails: List of user email addresses to add. Accept single or multiple emails and make them to a list.
-            Do not assume the email address from first name or other information, it should be provided by the user of the tool.
-            Use `get_users_in_instance` tool to see if the current user in the instance has the admin or owner role, 
-            if not, they should not be able to add users to the instance.
-            Use `get_users_in_instance` tool to see which users are already in the instance and which users are not in the instance.
-            If a user is already in the instance, they will be skipped and not added again; ask user if they wish to update the role of this user
-            with `update_user_role_in_instance` tool instead.
-            This will help in cases where the user is already in the instance but with a different role, 
-            and we want to update the role of the user instead of adding the user again.
-            
+            Expected to be provided by the user of the tool. Prompt the user to provide email address/addresses if not provided.
+
+                     
             role_ids: List of role IDs to assign to the users. Must match roles returned by `list_roles_in_instance`. 
-            Prompt the user to specify which roles to assign.
-            The default role is a read only "Evo user" role.
+            Following are the instructions regarding role_ids:
+            Ask user of the tool to specify which roles to assign to the user/users. The default role is a read only "Evo user" role.
+            Use `list_roles_in_instance` tool to list available roles in the instance and their corresponding role IDs. 
+            The user can specify one or more role IDs to assign to the user/users.
+            Do not call add_users_to_instance() without providing email and role_ids, as they are required parameters.
+            
             
         Returns:
             A dict with invitations sent and members added.
@@ -130,21 +136,22 @@ def register_instance_users_admin_tools(mcp):
     @mcp.tool()
     async def remove_user_from_instance(
         user_email: str,
-        user_id: UUID | None = None,
+        user_id: UUID 
     ) -> dict|str:
         """Remove a user from the instance. This will revoke the user's access to the instance.
-        Check if the user requesting the removal has the admin or owner role to remove users from the instance
-        by calling `get_users_in_instance` tool. 
-        If the user does not have the required role, they should not be able to remove users from the instance.
+        Only an instance admin or owner can remove users from the instance. If a Forbidden error is returned from remove_instance_user(), 
+        inform the user of the tool that they do not have the required permissions to remove users from the instance. 
         
         Args:
             user_email: The email address of the user to remove from the instance.
             Do not assume the email address from first name or other information, it should be provided by the user of the tool.
-            From the user list obtained from `get_users_in_instance`, for the given user email, you can find the corresponding user_id. 
+            Prompt the user to provide the email address if not provided. 
+
+            user_id: The user ID of the user to remove from the instance. Following are the instructions to get the user_id:
+            1. Use the tool `get_users_in_instance` to get all users in the instance
+            2. Find the user_id for the given user email. 
             Pass the user_id to this tool to remove the user from the instance.
             If the user email does not exist in the instance, return a message saying the user is not in the instance.
-
-            Use `get_users_in_instance` tool to see which users are in the instance and their email addresses.
         
         Returns:
             A dict with the email of the user removed.
@@ -161,24 +168,30 @@ def register_instance_users_admin_tools(mcp):
     @mcp.tool()
     async def update_user_role_in_instance(
         user_email: str,
-        user_id: UUID | None = None,
-        new_role_ids: list[UUID] | None = [],
+        user_id: UUID,
+        role_ids: list[UUID],
     ) -> dict|str:
         """Update the role of a user in the instance. This will change the user's access level in the instance.
-        Check if the user requesting the role update has the admin or owner role to update user roles in the instance
-        by calling `get_users_in_instance` tool. 
+        Only an instance admin or owner can update user roles in the instance. If a Forbidden error is returned from update_instance_user_roles(), 
+        inform the user of the tool that they do not have the required permissions to update user roles in the instance. 
         If the user does not have the required role, they should not be able to update user roles in the instance.
+
 
         Args:
             user_email: The email address of the user to update role for in the instance.
             Do not assume the email address from first name or other information, it should be provided by the user of the tool.
-            From the user list obtained from `get_users_in_instance`, for the given user email, you can find the corresponding user_id. 
+            Prompt the user to provide the email address if not provided. 
+
+            user_id: The user ID of the user to update role for in the instance. Following are the instructions to get the user_id:
+            1. Use the tool `get_users_in_instance` to get all users in the instance
+            2. Find the user_id for the given user email. 
             Pass the user_id to this tool to update the user's role in the instance.
             If the user email does not exist in the instance, return a message saying the user is not in the instance.
 
-            new_role_ids: List of new role IDs to assign to the user. Must match roles returned by `list_roles_in_instance`. 
-            Prompt the user to specify which new roles to assign.
-            The default role is a read only "Evo user" role.
+            role_ids: List of role IDs to assign to the user. Following are the instructions regarding role_ids:
+            1. Must match roles returned by `list_roles_in_instance`. 
+            2. Prompt the user to specify which roles to assign. The default role is a read only "Evo user" role.
+            3. Do not call update_instance_user_roles() without providing user_id and role_ids, as they are required parameters.
 
         Returns:
             A dict with the email of the user whose role was updated and their new roles.
@@ -186,11 +199,11 @@ def register_instance_users_admin_tools(mcp):
         """
         workspace_client = await get_workspace_client()
 
-        await workspace_client.update_instance_user_roles(user_id=user_id, roles=new_role_ids)
+        await workspace_client.update_instance_user_roles(user_id=user_id, roles=role_ids)
 
         return {
             "user_role_updated": user_email,
-            "new_roles": new_role_ids,
+            "new_roles": role_ids,
         }
 
   
