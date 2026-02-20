@@ -12,9 +12,9 @@
 
 - [What is MCP?](#what-is-mcp)
 - [What is the Evo MCP server?](#what-is-the-evo-mcp-server)
-- [Use Cases](#use-cases)
-- [Evo MCP server architecture](#evo-mcp-server-architecture)
-- [Getting Started](#getting-started)
+  - [Use cases](#use-cases)
+  - [Server architecture](#server-architecture)
+- [Getting started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
 - [Connect to Evo MCP](#connect-to-evo-mcp)
@@ -22,8 +22,8 @@
   - [Cursor](#cursor)
   - [Additional tips](#additional-tips)
 - [Advanced](#advanced)
-  - [MCP transport modes](#mcp-transport-modes)
-  - [Testing Evo MCP with a Google ADK agent](#testing-evo-mcp-with-a-google-adk-agent)
+  - [Testing with curl](#testing-with-curl)
+  - [Testing with a Google ADK agent](#testing-with-a-google-adk-agent)
 - [Development](#development)
 - [Contributing](#contributing)
 - [Code of conduct](#code-of-conduct)
@@ -47,7 +47,7 @@ The Evo MCP server is a self-hosted server that provides a secure, standardised 
 
 The server comes packaged with many tools written by Seequent, but it is fully extensible and users are encouraged to add their own tools.
 
-## Use Cases
+### Use cases
 
 * Workspace Management: Create workspaces, summarize objects, snapshot and duplicate workspaces, copy objects between workspaces.
 * Geoscience Object Creation: structured geoscience objects (Pointsets, Line Segments, Downhole Collections, and Downhole Intervals) in Evo directly from raw CSV files, automating data validation and schema mapping.
@@ -55,7 +55,7 @@ The server comes packaged with many tools written by Seequent, but it is fully e
 > [!WARNING]
 > The Evo MCP server is in early development. Functionality is currently limited. Your feedback on future development is welcome!
 
-## Evo MCP server architecture
+### Server architecture
 
 MCP Client (VS Code / ADK Agent / etc) <-> MCP Server (FastMCP + Evo SDK) <-> Evo APIs
 
@@ -153,55 +153,55 @@ pip install -e '.[dev]'
 
 #### 4. Choose an MCP transport mode (optional)
 
-The Evo MCP server supports two common transport modes for different use cases:
+The Evo MCP server supports two common transport modes for different use cases.
 
 ##### stdio (default)
 
 **Transport**: Standard input/output
-**Recommended For**: VS Code, Cursor, Claude Desktop, and other integrated MCP clients
+**Recommended for**: VS Code, Cursor, Claude Desktop, and other integrated MCP clients
 
 `stdio` is the default transport mode and is optimised for direct integration with MCP client applications. The server reads JSON-RPC messages from stdin and writes responses to stdout.
 
-**Advantages:**
+**Advantages**
 - Simpler configuration - client handles connection automatically
 - Better performance for local connections
 - Directly integrated into VS Code and Cursor workflows
 - No network overhead
 - Recommended for production use with integrated clients
 
-Then configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via stdio.
+Configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via stdio.
 
 ##### HTTP+SSE
 
 **Transport**: HTTP with Server-Sent Events (SSE)
-**Recommended For**: Testing, remote access, programmatic access via curl/scripts, and containerized deployments (Docker)
+**Recommended for**: Testing, remote access, programmatic access via curl/scripts, and containerised deployments (Docker)
 
-`HTTP+SSE` exposes the MCP server as an HTTP service with SSE for streaming responses. This is useful for testing the server independently, accessing it remotely, or deploying it in containers.
+`HTTP+SSE` exposes the MCP server as an HTTP service with SSE for streaming responses.
 
-**Advantages:**
+**Advantages**
 - Can be accessed via curl, programming languages, or HTTP clients
 - Useful for testing and debugging
 - Enables remote access to the server
 - Simplifies integration with custom tools and scripts
-- Ideal for containerized deployments (Docker, Kubernetes)
+- Ideal for containerised deployments (Docker, Kubernetes)
 - Works well in cloud environments and microservices architectures
 
-**Limitations:**
+**Limitations**
 - Requires separate server process management
 - Slightly higher latency due to HTTP overhead
-- Not recommended for use with VS Code/Cursor (use STDIO mode instead)
+- Not recommended for use with VS Code/Cursor (use `stdio` mode instead)
 
 ##### Common use cases
 
 | Use case | Recommended mode |
 |----------|-----------------|
-| Using VS Code with Copilot | stdio (default) |
-| Using Cursor with AI | stdio (default) |
-| Using Claude Desktop | stdio (default) |
-| Testing tools with curl | HTTP |
-| Remote server access | HTTP |
-| Custom script integration | HTTP |
-| Production deployment | stdio (with integrated client) |
+| Using VS Code with Copilot | stdio |
+| Using Cursor with AI | stdio |
+| Using Claude Desktop | stdio |
+| Testing tools with curl | HTTP+SSE |
+| Remote server access | HTTP+SSE |
+| Custom script integration | HTTP+SSE |
+
 
 #### 5. Configure your environment
 
@@ -209,7 +209,7 @@ Then configure your client (VS Code, Cursor, etc.) to start the MCP server proce
 
 You first need to create a **native app** in the **iTwin Developer Portal**. This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
 
-Copy the file `.env.example`, rename the copy to `.env` and fill in:
+Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app credentials:
 ```bash
 EVO_CLIENT_ID=your-client-id
 EVO_REDIRECT_URL=your-redirect-url
@@ -217,7 +217,7 @@ EVO_REDIRECT_URL=your-redirect-url
 
 ##### MCP transport mode (optional)
 
-The Evo MCP server supports two transport modes: **STDIO** and **HTTP+SSE**. By default, the server runs in **STDIO** mode, which is recommended for use with VS Code and Cursor.
+The Evo MCP server supports two transport modes: **stdio** and **HTTP+SSE**. By default, the server runs in **stdio** mode which is recommended for use with VS Code and Cursor.
 
 Set `MCP_TRANSPORT` environment variable in `.env` to choose the transport mode:
 - `stdio` - Standard input/output (default, recommended for VS Code/Cursor)
@@ -253,14 +253,15 @@ Apps like VS Code and Cursor make it easy to connect to MCP servers, whether the
 
 #### Installation
 
-VS Code comes in two flavours - **VS Code** and **VS Code Insiders**. Install one of these apps before running Evo MCP. NOTE: Both of these apps can be installed and used independently.
+VS Code comes in two versions - **VS Code** and **VS Code Insiders**. Install one of these apps before running Evo MCP. 
+NOTE: Both of these apps can be installed and used independently.
 
-- Install the regular version of [VS Code](https://code.visualstudio.com/Download).
+- Install the regular version of [VS Code](https://code.visualstudio.com/Download) (recommended).
 - Install [VS Code Insiders](https://code.visualstudio.com/insiders/) for the most up-to-date experience. VS Code Insiders provides early access to the latest features and improvements for MCP integration. 
 
 #### Configuration
 
-Run the supplied Python script to add the required settings. The script will ask you a series of questions.
+Run the supplied Python script to add the required settings. The script will ask you a series of questions in the console.
 
 **If you set up Python with `uv`:**
 ```bash
@@ -300,11 +301,12 @@ If you see **evo-mcp** listed without any warnings, the configuration is correct
 
 #### Installation
 
-Cursor is an AI-powered code editor with built-in support for MCP servers. To use the Evo MCP server in Cursor first [download and install it](https://cursor.com/download). NOTE: Cursor requires a paid subscription to use MCP features.
+Cursor is an AI-powered code editor with built-in support for MCP servers. To use the Evo MCP server in Cursor first [download and install it](https://cursor.com/download). 
+NOTE: Cursor requires a paid subscription to use MCP features.
 
 #### Configuration
 
-Run the supplied Python script to add the required settings. The script will ask you a series of questions.
+Run the supplied Python script to add the required settings. The script will ask you a series of questions in the console.
 
 **If you set up Python with `uv`:**
 ```bash
@@ -352,63 +354,9 @@ To verify that the Evo MCP server is correctly configured in Cursor:
 
 ## Advanced
 
-### MCP transport modes
-
-The Evo MCP server supports two common transport modes for different use cases:
-
-#### stdio (default)
-
-**Transport**: Standard input/output
-**Recommended For**: VS Code, Cursor, Claude Desktop, and other integrated MCP clients
-
-`stdio` is the default transport mode and is optimised for direct integration with MCP client applications. The server reads JSON-RPC messages from stdin and writes responses to stdout.
-
-**Advantages:**
-- Simpler configuration - client handles connection automatically
-- Better performance for local connections
-- Directly integrated into VS Code and Cursor workflows
-- No network overhead
-- Recommended for production use with integrated clients
-
-**Setup:**
-```bash
-# In .env
-MCP_TRANSPORT=stdio  # This is the default
-```
-
-Then configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via stdio.
-
-#### HTTP+SSE
-
-**Transport**: HTTP with Server-Sent Events (SSE)
-**Recommended For**: Testing, remote access, programmatic access via curl/scripts, and containerized deployments (Docker)
-
-`HTTP+SSE` exposes the MCP server as an HTTP service with SSE for streaming responses. This is useful for testing the server independently, accessing it remotely, or deploying it in containers.
-
-**Advantages:**
-- Can be accessed via curl, programming languages, or HTTP clients
-- Useful for testing and debugging
-- Enables remote access to the server
-- Simplifies integration with custom tools and scripts
-- Ideal for containerized deployments (Docker, Kubernetes)
-- Works well in cloud environments and microservices architectures
-
-**Limitations:**
-- Requires separate server process management
-- Slightly higher latency due to HTTP overhead
-- Not recommended for use with VS Code/Cursor (use STDIO mode instead)
-
-**Setup:**
-```bash
-# In .env or environment
-MCP_TRANSPORT=http
-MCP_HTTP_HOST=localhost
-MCP_HTTP_PORT=3000
-```
-
 ### Testing with curl
 
-Running Evo MCP in HTTP+SSE mode allows you to use `curl` to access the MCP tools.
+Running Evo MCP in `HTTP+SSE` mode allows you to use `curl` to access the MCP tools.
 
 **Setup:**
 ```bash
@@ -440,23 +388,11 @@ curl -X POST http://localhost:3000/t/create_workspace \
   -d '{"name": "My New Workspace", "description": "Test workspace"}'
 ```
 
-#### Choosing a transport mode
-
-| Use Case | Recommended Mode |
-|----------|-----------------|
-| Using VS Code with Copilot | stdio (default) |
-| Using Cursor with AI | stdio (default) |
-| Using Claude Desktop | stdio (default) |
-| Testing tools with curl | HTTP |
-| Remote server access | HTTP |
-| Custom script integration | HTTP |
-| Production deployment | stdio (with integrated client) |
-
-### Testing Evo MCP with a Google ADK agent
+### Testing with a Google ADK agent
 
 An example Google ADK agent is provided for testing the MCP server:
 
-**Prerequisites:**
+**Prerequisites**
 - Google Cloud SDK (`gcloud` CLI) installed and configured
 
   ```powershell
@@ -465,17 +401,17 @@ An example Google ADK agent is provided for testing the MCP server:
 
 - A GCP project with Vertex AI API enabled
 
-  **Add to `.env`:**
+**Add to `.env`**
 
-    ```bash
-    GOOGLE_CLOUD_PROJECT=your-project-id
-    GOOGLE_CLOUD_LOCATION=your-region
+```bash
+GOOGLE_CLOUD_PROJECT=your-project-id
+GOOGLE_CLOUD_LOCATION=your-region
 
-    # Passed through to the MCP server's `MCP_TOOL_FILTER` config.
-    EVO_AGENT_TYPE=all
-    ```
+# Passed through to the MCP server's `MCP_TOOL_FILTER` config.
+EVO_AGENT_TYPE=all
+```
 
-**Run:**
+**Run**
   ```powershell
   cd src\agents
   adk web
