@@ -56,7 +56,46 @@ The server comes packaged with many tools written by Seequent, but it is fully e
 
 ## Evo MCP server architecture
 
-MCP Client (VS Code / ADK Agent / etc) <-> MCP Server (FastMCP + Evo SDK) <-> Evo APIs
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        MCP Clients                              │
+│         VS Code  ·  Cursor  ·  Claude Desktop  ·  ADK Agent    │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ stdio (MCP Protocol)
+┌──────────────────────────▼──────────────────────────────────────┐
+│                    Evo MCP Server (FastMCP)                      │
+│                                                                  │
+│  ┌────────────┐  ┌────────────┐  ┌─────────────┐  ┌──────────┐ │
+│  │  General    │  │   Admin    │  │    Data      │  │Filesystem│ │
+│  │  Tools      │  │   Tools   │  │    Tools     │  │  Tools   │ │
+│  │ (always on) │  │           │  │              │  │          │ │
+│  └────────────┘  └────────────┘  └─────────────┘  └──────────┘ │
+│                                                                  │
+│       MCP_TOOL_FILTER: "all" | "admin" | "data"                 │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │              EvoContext (context.py)                        │  │
+│  │   OAuth login  ·  Token caching  ·  Lazy initialization    │  │
+│  └────────────────────────────┬───────────────────────────────┘  │
+└───────────────────────────────┼──────────────────────────────────┘
+                                │ HTTPS
+┌───────────────────────────────▼──────────────────────────────────┐
+│                        Evo Platform APIs                         │
+│                                                                  │
+│     Discovery API  ·  Workspace API  ·  Object API               │
+│                    (via Evo SDK)                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Key components
+
+| Component | Description |
+|-----------|-------------|
+| **MCP Clients** | Any MCP-compatible application connects to the server over stdio. |
+| **FastMCP Server** | The core server runtime that handles MCP protocol, tool registration, and request routing. |
+| **Tool Modules** | Tools are grouped by category and conditionally registered based on the `MCP_TOOL_FILTER` setting. General tools are always loaded. |
+| **EvoContext** | Manages OAuth authentication (with token caching), Evo SDK client initialization, and organization/hub selection. Initialization is lazy — it happens on the first tool call, triggering a browser-based login if needed. |
+| **Evo Platform APIs** | The Evo SDK clients (Discovery, Workspace, Object) communicate with the Evo cloud platform over HTTPS. |
 
 ## Getting started
 
