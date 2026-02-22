@@ -10,7 +10,7 @@ Configuration:
 
     Set MCP_TRANSPORT environment variable to choose transport mode:
     - "stdio" (default): Standard input/output, used by VS Code, Cursor, Claude Desktop
-    - "http": HTTP with SSE, accessible via HTTP requests
+    - "http": Streamable HTTP, accessible via HTTP requests
 
     For HTTP transport, configure:
     - MCP_HTTP_HOST: Host to bind to (default: localhost)

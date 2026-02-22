@@ -117,7 +117,7 @@ def get_protocol_choice():
     print("1. stdio (recommended for VS Code/Cursor)")
     print("   - Native IDE integration")
     print("   - Best performance for local development")
-    print("2. HTTP+SSE (for testing, remote access, Docker)")
+    print("2. Streamable HTTP (for testing, remote access, Docker)")
     print("   - Easier debugging and testing")
     print("   - Can run on remote servers")
     print()
@@ -200,10 +200,10 @@ def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str
     
     # Add or update the evo-mcp server configuration
     if protocol == 'http':
-        # For HTTP+SSE, use http type with URL
+        # For streamable HTTP, use http type with URL
         config_entry = {
             "type": "http",
-            "url": "http://localhost:3000/sse"
+            "url": "http://localhost:3000"
         }
     else:
         # For stdio, use stdio type with command

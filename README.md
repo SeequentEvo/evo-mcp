@@ -171,12 +171,12 @@ The Evo MCP server supports two common transport modes for different use cases.
 
 Configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via stdio.
 
-##### HTTP+SSE
+##### Streamable HTTP
 
-**Transport**: HTTP with Server-Sent Events (SSE)
+**Transport**: Streamable HTTP
 **Recommended for**: Testing, remote access, programmatic access via curl/scripts, and containerised deployments (Docker)
 
-`HTTP+SSE` exposes the MCP server as an HTTP service with SSE for streaming responses.
+Streamable HTTP exposes the MCP server as an HTTP service with streaming responses.
 
 **Advantages**
 - Can be accessed via curl, programming languages, or HTTP clients
@@ -198,9 +198,9 @@ Configure your client (VS Code, Cursor, etc.) to start the MCP server process. T
 | Using VS Code with Copilot | stdio |
 | Using Cursor with AI | stdio |
 | Using Claude Desktop | stdio |
-| Testing tools with curl | HTTP+SSE |
-| Remote server access | HTTP+SSE |
-| Custom script integration | HTTP+SSE |
+| Testing tools with curl | Streamable HTTP |
+| Remote server access | Streamable HTTP |
+| Custom script integration | Streamable HTTP |
 
 
 #### 5. Configure your environment
@@ -217,11 +217,11 @@ EVO_REDIRECT_URL=your-redirect-url
 
 ##### MCP transport mode (optional)
 
-The Evo MCP server supports two transport modes: **stdio** and **HTTP+SSE**. By default, the server runs in **stdio** mode which is recommended for use with VS Code and Cursor.
+The Evo MCP server supports two transport modes: **stdio** and **streamable HTTP**. By default, the server runs in **stdio** mode which is recommended for use with VS Code and Cursor.
 
 Set `MCP_TRANSPORT` environment variable in `.env` to choose the transport mode:
 - `stdio` - Standard input/output (default, recommended for VS Code/Cursor)
-- `http` - HTTP with Server-Sent Events (useful for testing and remote access)
+- `http` - Streamable HTTP (useful for testing and remote access)
 
 ```bash
 MCP_TRANSPORT=stdio
@@ -356,7 +356,7 @@ To verify that the Evo MCP server is correctly configured in Cursor:
 
 ### Testing with curl
 
-Running Evo MCP in `HTTP+SSE` mode allows you to use `curl` to access the MCP tools.
+Running Evo MCP in streamable HTTP mode allows you to use `curl` to access the MCP tools.
 
 **Setup:**
 ```bash
