@@ -196,7 +196,7 @@ def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str
         # For streamable HTTP, use http type with URL
         config_entry = {
             "type": "http",
-            "url": "http://localhost:3000"
+            "url": "http://localhost:5000/mcp"
         }
     else:
         # For stdio, use default command/args (Cursor doesn't use type field)
@@ -221,7 +221,7 @@ def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str
         if protocol == 'http':
             print("  HTTP Configuration:")
             print("    - Host: localhost")
-            print("    - Port: 3000")
+            print("    - Port: 5000")
         print()
         print("Next steps:")
         print("Restart Cursor or reload the window")

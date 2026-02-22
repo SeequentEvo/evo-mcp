@@ -231,7 +231,7 @@ If using HTTP mode, also configure the host and port:
 ```bash
 MCP_TRANSPORT=http
 MCP_HTTP_HOST=localhost
-MCP_HTTP_PORT=3000
+MCP_HTTP_PORT=5000
 ```
 
 ##### MCP tool filtering (optional)
@@ -363,7 +363,7 @@ Running Evo MCP in streamable HTTP mode allows you to use `curl` to access the M
 # In .env or environment
 MCP_TRANSPORT=http
 MCP_HTTP_HOST=localhost
-MCP_HTTP_PORT=3000
+MCP_HTTP_PORT=5000
 ```
 
 **Start the server:**
@@ -373,17 +373,17 @@ python -m  mcp_tools
 python src/mcp_tools.py
 ```
 
-The server will start listening on `http://localhost:3000`.
+The server will start listening on `http://localhost:5000/mcp`.
 
 **Access tools using curl:**
 ```bash
 # List all workspaces
-curl -X POST http://localhost:3000/t/list_workspaces \
+curl -X POST http://localhost:5000/mcp/t/list_workspaces \
   -H "Content-Type: application/json" \
   -d '{"name": "", "deleted": false, "limit": 50}'
 
 # Create a workspace
-curl -X POST http://localhost:3000/t/create_workspace \
+curl -X POST http://localhost:5000/mcp/t/create_workspace \
   -H "Content-Type: application/json" \
   -d '{"name": "My New Workspace", "description": "Test workspace"}'
 ```

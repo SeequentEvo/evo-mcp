@@ -317,8 +317,10 @@ if __name__ == "__main__":
     # Run the server with selected transport mode
     if TRANSPORT == "http":
         logger.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
-        mcp.run(
-            transport="http",
+        import uvicorn
+        app = mcp.http_app()
+        uvicorn.run(
+            app,
             host=HTTP_HOST,
             port=HTTP_PORT
         )
