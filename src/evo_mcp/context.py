@@ -20,6 +20,7 @@ from evo.oauth import OAuthConnector, AuthorizationCodeAuthorizer, AccessTokenAu
 from evo.discovery import DiscoveryAPIClient
 from evo.common import APIConnector
 
+from evo.files import FileAPIClient
 from evo.objects import ObjectAPIClient
 from evo.workspaces import WorkspaceAPIClient
 
@@ -226,6 +227,12 @@ class EvoContext:
         workspace = await self.workspace_client.get_workspace(workspace_id)
         environment = workspace.get_environment()
         return ObjectAPIClient(environment, self.connector)
+
+    async def get_file_client(self, workspace_id: UUID) -> FileAPIClient:
+        """Get or create a file client for a workspace."""
+        workspace = await self.workspace_client.get_workspace(workspace_id)
+        environment = workspace.get_environment()
+        return FileAPIClient(environment, self.connector)
 
     async def switch_instance(self, org_id: UUID, hub_url: str):
         """Switch to a different instance and recreate clients.

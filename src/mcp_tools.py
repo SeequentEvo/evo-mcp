@@ -6,8 +6,8 @@ including workspace management, object ops, and data transfer.
 Configuration:
     Set MCP_TOOL_FILTER environment variable to filter tools and prompts:
     - "admin" : Workspace management tools 
-    - "data"    : Object query and management tools 
-    - "all"       : All tools (default)
+    - "data"  : Object query, file operations, and management tools
+    - "all"   : All tools (default)
 
 The environment variable can be set in a .env file or passed directly to the MCP server as an input parameter.
 See the file 'vscode-mcp-config-example.json' for an example of passing environment variables to the MCP server.
@@ -24,7 +24,8 @@ from evo_mcp.tools import (
     # register_data_tools,
     register_general_tools,
     register_filesystem_tools,
-    register_object_builder_tools
+    register_object_builder_tools,
+    register_file_tools
 )
 
 # Get agent type from environment variable 
@@ -73,6 +74,7 @@ if TOOL_FILTER in ["all", "data"]: #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
+    register_file_tools(mcp)
 
 # =============================================================================
 # Resources (not currently supported in ADK)
