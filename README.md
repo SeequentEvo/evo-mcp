@@ -282,6 +282,8 @@ python scripts/setup-vscode.py
 
 **Manual method**
 1. Copy the settings found in `templates/vscode-stdio-config.json`.
+  - For HTTP mode, use `templates/vscode-http-config.json` instead.
+  - Update the template URL host and port to match `MCP_HTTP_HOST` and `MCP_HTTP_PORT` in your `.env`, and ensure the HTTP server is running.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
 3. Search for "mcp". Select **MCP: Open User Configuration** to update the user settings.
   ![VS Code Command Palette](images/vscode-command-palette.png)
@@ -327,6 +329,8 @@ python scripts/setup-cursor.py
 
 #### Manual method
 1. Copy the settings found in `templates/cursor-stdio-config.json`.
+  - For HTTP mode, use `templates/cursor-http-config.json` instead.
+  - Update the template URL host and port to match `MCP_HTTP_HOST` and `MCP_HTTP_PORT` in your `.env`, and ensure the HTTP server is running.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
 3. Search for "mcp". Select either **View: Open MCP Settings** to update the user settings.
   ![Cursor Command Palette](images/cursor-command-palette.png)
