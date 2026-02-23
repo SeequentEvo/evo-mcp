@@ -375,8 +375,6 @@ If you ran `setup-vscode.py` or `setup-cursor.py` and selected `http`, the scrip
 
 Otherwise, start it manually:
 ```bash
-python -m  mcp_tools
-# or
 python src/mcp_tools.py
 ```
 
@@ -384,16 +382,30 @@ The server will start listening on `http://localhost:5000/mcp`.
 
 **Access tools using curl:**
 ```bash
-# List all workspaces
-curl -X POST http://localhost:5000/mcp/t/list_workspaces \
+# 1) Initialize session and capture MCP session ID
+SESSION_ID=$(curl -sS -D - -o /dev/null \
+  -X POST http://localhost:5000/mcp \
   -H "Content-Type: application/json" \
-  -d '{"name": "", "deleted": false, "limit": 50}'
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}' \
+  | awk 'BEGIN{IGNORECASE=1}/^mcp-session-id:/{print $2}' | tr -d '\r')
 
-# Create a workspace
-curl -X POST http://localhost:5000/mcp/t/create_workspace \
+# 2) List workspaces
+curl -sS -X POST http://localhost:5000/mcp \
   -H "Content-Type: application/json" \
-  -d '{"name": "My New Workspace", "description": "Test workspace"}'
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: ${SESSION_ID}" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_workspaces","arguments":{"name":"","deleted":false,"limit":50}}}'
+
+# 3) Create a workspace
+curl -sS -X POST http://localhost:5000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: ${SESSION_ID}" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_workspace","arguments":{"name":"My New Workspace","description":"Test workspace"}}}'
 ```
+
+> Note: Streamable HTTP requires clients to send `Accept: application/json, text/event-stream`.
 
 ### Testing with a Google ADK agent
 
