@@ -7,6 +7,7 @@ Cross-platform script to configure the Evo MCP server for VS Code
 import json
 import os
 import platform
+import subprocess
 import sys
 from pathlib import Path
 
@@ -108,6 +109,102 @@ def get_python_executable(project_dir: Path, is_workspace: bool) -> str:
     else:
         # Use absolute path for user configuration
         return str(current_python)
+
+
+def resolve_command_path(command: str, project_dir: Path) -> str:
+    """Resolve relative command/script paths against project directory."""
+    command_path = Path(command)
+    if command_path.is_absolute():
+        return str(command_path)
+    if command.startswith('./') or command.startswith('.\\'):
+        return str((project_dir / command_path).resolve())
+    return command
+
+
+def load_env_file(project_dir: Path) -> dict[str, str]:
+    """Load key/value pairs from the project's .env file."""
+    env_file = project_dir / '.env'
+    values: dict[str, str] = {}
+
+    if not env_file.exists():
+        return values
+
+    with open(env_file, 'r', encoding='utf-8') as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line or line.startswith('#'):
+                continue
+
+            if line.startswith('export '):
+                line = line[len('export '):].strip()
+
+            if '=' not in line:
+                continue
+
+            key, value = line.split('=', 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+
+            if key:
+                values[key] = value
+
+    return values
+
+
+def get_http_env_from_dotenv(project_dir: Path) -> dict[str, str] | None:
+    """Read required HTTP server environment values from .env."""
+    env_values = load_env_file(project_dir)
+    required_keys = ['MCP_TRANSPORT', 'MCP_HTTP_HOST', 'MCP_HTTP_PORT']
+    missing_keys = [key for key in required_keys if not env_values.get(key)]
+
+    if missing_keys:
+        print_color("✗ Cannot auto-start HTTP server. Missing required values in .env:", Colors.RED)
+        for key in missing_keys:
+            print_color(f"  - {key}", Colors.RED)
+        return None
+
+    transport = env_values['MCP_TRANSPORT'].lower()
+    if transport != 'http':
+        print_color("✗ Cannot auto-start HTTP server. Set MCP_TRANSPORT=http in .env.", Colors.RED)
+        return None
+
+    return {
+        'MCP_TRANSPORT': env_values['MCP_TRANSPORT'],
+        'MCP_HTTP_HOST': env_values['MCP_HTTP_HOST'],
+        'MCP_HTTP_PORT': env_values['MCP_HTTP_PORT'],
+    }
+
+
+def start_http_server(python_exe: str, mcp_script: str, project_dir: Path) -> int | None:
+    """Start Evo MCP HTTP server in the background. Returns PID if successful."""
+    python_command = resolve_command_path(python_exe, project_dir)
+    script_command = resolve_command_path(mcp_script, project_dir)
+
+    http_env = get_http_env_from_dotenv(project_dir)
+    if http_env is None:
+        return None
+
+    env = os.environ.copy()
+    env.update(http_env)
+
+    popen_kwargs = {
+        'cwd': str(project_dir),
+        'env': env,
+        'stdout': subprocess.DEVNULL,
+        'stderr': subprocess.DEVNULL,
+    }
+
+    if platform.system() == 'Windows':
+        popen_kwargs['creationflags'] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        popen_kwargs['start_new_session'] = True
+
+    try:
+        process = subprocess.Popen([python_command, script_command], **popen_kwargs)
+        return process.pid
+    except (OSError, ValueError) as e:
+        print_color(f"✗ Failed to start HTTP server automatically: {e}", Colors.RED)
+        return None
 
 
 def get_protocol_choice():
@@ -219,6 +316,11 @@ def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str
     try:
         with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(settings, f, indent=2)
+
+        server_pid = None
+        if protocol == 'http':
+            print("Starting Evo MCP HTTP server in background...")
+            server_pid = start_http_server(python_exe, mcp_script, project_dir)
         
         print_color("✓ Successfully added Evo MCP configuration", Colors.GREEN)
         print()
@@ -230,8 +332,15 @@ def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str
             print("  HTTP Configuration:")
             print("    - Host: localhost")
             print("    - Port: 5000")
+            if server_pid:
+                print("    - URL: http://localhost:5000/mcp")
+                print(f"    - Background PID: {server_pid}")
         print()
         print("Next steps:")
+        if protocol == 'http' and server_pid is None:
+            print("Ensure .env contains MCP_TRANSPORT, MCP_HTTP_HOST, and MCP_HTTP_PORT for HTTP mode.")
+            print("Start Evo MCP server manually:")
+            print(f"  {python_exe} {mcp_script}")
         print("Restart VS Code or reload the window")
         print()
         print("Note: This configuration uses the Python interpreter:")
