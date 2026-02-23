@@ -56,7 +56,35 @@ The server comes packaged with many tools written by Seequent, but it is fully e
 
 ## Evo MCP server architecture
 
-MCP Client (VS Code / ADK Agent / etc) <-> MCP Server (FastMCP + Evo SDK) <-> Evo APIs
+```mermaid
+flowchart LR
+    Clients["🖥️ MCP Clients<br/>VS Code · Cursor<br/>Claude Desktop · ADK"]
+    Clients -- stdio / streamable HTTP --> Server
+    Server -- HTTPS --> APIs
+
+    subgraph Server[Evo MCP Server]
+        Tools[Tool Modules<br/>General · Admin<br/>Data · Filesystem]
+        Filter[MCP_TOOL_FILTER]
+        Context[EvoContext<br/>OAuth · Tokens]
+        Tools --> Filter --> Context
+    end
+
+    subgraph APIs[Evo APIs]
+        Discovery[Discovery]
+        Workspace[Workspace]
+        Object[Object]
+    end
+```
+
+### Key components
+
+| Component | Description |
+|-----------|-------------|
+| **MCP clients** | Any MCP-compatible application connects to the server over `STDIO` or `streamable HTTP`. |
+| **FastMCP server** | The core server runtime that handles MCP protocol, tool registration, and request routing. |
+| **Tool modules** | Tools are grouped by category and conditionally registered based on the `MCP_TOOL_FILTER` setting. General tools are always loaded. |
+| **EvoContext** | Manages OAuth authentication (with token caching), Evo SDK client initialization, and organization/hub selection. Initialization is lazy — it happens on the first tool call, triggering a browser-based login if needed. |
+| **Evo APIs** | The Evo SDK packages (block model, geoscience object, workspace) communicate with Seequent Evo over HTTPS. |
 
 ## Getting started
 
