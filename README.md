@@ -155,12 +155,15 @@ pip install -e '.[dev]'
 
 The Evo MCP server supports two common transport modes for different use cases.
 
-##### stdio (default)
+##### STDIO transport (default)
 
 **Transport**: Standard input/output
 **Recommended for**: VS Code, Cursor, Claude Desktop, and other integrated MCP clients
 
-`stdio` is the default transport mode and is optimised for direct integration with MCP client applications. The server reads JSON-RPC messages from stdin and writes responses to stdout.
+`STDIO` is the default transport mode and is optimised for direct integration with MCP client applications. The server reads JSON-RPC messages from stdin and writes responses to stdout.
+
+STDIO (Standard Input/Output) is the default transport for FastMCP servers. When you call run() without arguments, your server uses STDIO transport. This transport communicates through standard input and output streams, making it perfect for command-line tools and desktop applications like Claude Desktop.
+With STDIO transport, the client spawns a new server process for each session and manages its lifecycle. The server reads MCP messages from stdin and writes responses to stdout. This is why STDIO servers don’t stay running - they’re started on-demand by the client.
 
 **Advantages**
 - Simpler configuration - client handles connection automatically
@@ -169,14 +172,16 @@ The Evo MCP server supports two common transport modes for different use cases.
 - No network overhead
 - Recommended for production use with integrated clients
 
-Configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via stdio.
+Configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via STDIO.
 
-##### Streamable HTTP
+##### HTTP transport (streamable)
 
 **Transport**: Streamable HTTP
 **Recommended for**: Testing, remote access, programmatic access via curl/scripts, and containerised deployments (Docker)
 
-Streamable HTTP exposes the MCP server as an HTTP service with streaming responses.
+HTTP transport turns your MCP server into a web service accessible via a URL. This transport uses the Streamable HTTP protocol, which allows clients to connect over the network. Unlike STDIO where each client gets its own process, an HTTP server can handle multiple clients simultaneously.
+
+The Streamable HTTP protocol provides full bidirectional communication between client and server, supporting all MCP operations including streaming responses. This makes it the recommended choice for network-based deployments.
 
 **Advantages**
 - Can be accessed via curl, programming languages, or HTTP clients
@@ -189,15 +194,15 @@ Streamable HTTP exposes the MCP server as an HTTP service with streaming respons
 **Limitations**
 - Requires separate server process management
 - Slightly higher latency due to HTTP overhead
-- Not recommended for use with VS Code/Cursor (use `stdio` mode instead)
+- Not recommended for use with VS Code/Cursor (use `STDIO` mode instead)
 
 ##### Common use cases
 
 | Use case | Recommended mode |
 |----------|-----------------|
-| Using VS Code with Copilot | stdio |
-| Using Cursor with AI | stdio |
-| Using Claude Desktop | stdio |
+| Using VS Code with Copilot | STDIO |
+| Using Cursor with AI | STDIO |
+| Using Claude Desktop | STDIO |
 | Testing tools with curl | Streamable HTTP |
 | Remote server access | Streamable HTTP |
 | Custom script integration | Streamable HTTP |
@@ -217,24 +222,24 @@ EVO_REDIRECT_URL=your-redirect-url
 
 ##### MCP transport mode (optional)
 
-The Evo MCP server supports two transport modes: **stdio** and **streamable HTTP**. By default, the server runs in **stdio** mode which is recommended for use with VS Code and Cursor.
+The Evo MCP server supports two transport modes: **STDIO** and **streamable HTTP**. By default, the server runs in **STDIO** mode which is recommended for local development.
 
 Set `MCP_TRANSPORT` environment variable in `.env` to choose the transport mode:
-- `stdio` - Standard input/output (default, recommended for VS Code/Cursor)
-- `http` - Streamable HTTP (useful for testing and remote access)
+- `STDIO` - Standard input/output (default)
+- `HTTP` - Streamable HTTP
 
 ```bash
-MCP_TRANSPORT=stdio
+MCP_TRANSPORT=STDIO
 ```
 
 If using HTTP mode, also configure the host and port:
 ```bash
-MCP_TRANSPORT=http
+MCP_TRANSPORT=HTTP
 MCP_HTTP_HOST=localhost
 MCP_HTTP_PORT=5000
 ```
 
-When using HTTP mode, an MCP HTTP server must be running and reachable at the configured URL. The setup scripts can start it automatically for you, or you can run it manually.
+When using HTTP mode, the MCP server must be running and reachable at the configured URL. The setup scripts can start it automatically for you, or you can run it manually.
 
 ##### MCP tool filtering (optional)
 
@@ -276,7 +281,7 @@ python scripts/setup-vscode.py
 ```
 
 **Manual method**
-1. Copy the settings found in `templates/vscode-mcp-config.json`.
+1. Copy the settings found in `templates/vscode-stdio-config.json`.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
 3. Search for "mcp". Select **MCP: Open User Configuration** to update the user settings.
   ![VS Code Command Palette](images/vscode-command-palette.png)
@@ -321,7 +326,7 @@ python scripts/setup-cursor.py
 ```
 
 #### Manual method
-1. Copy the settings found in `templates/cursor-mcp-config.json`.
+1. Copy the settings found in `templates/cursor-stdio-config.json`.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
 3. Search for "mcp". Select either **View: Open MCP Settings** to update the user settings.
   ![Cursor Command Palette](images/cursor-command-palette.png)
@@ -348,8 +353,8 @@ To verify that the Evo MCP server is correctly configured in Cursor:
 ### Additional tips
 
 - **Use a separate workspace**: Create a new workspace that is separate to your clone of this repository. If your copilot/agent has access to the source files in this repository, it may decide to ignore the MCP server.
-- **stdio mode starts on demand**: In `stdio` mode, VS Code/Cursor will launch the MCP server when needed.
-- **HTTP mode needs a running server**: If you select `http`, the server must already be running. The setup scripts will attempt to auto-start it in the background.
+- **STDIO mode starts on demand**: In `STDIO` mode, VS Code/Cursor will launch the MCP server when needed.
+- **HTTP mode needs a running server**: If you select `HTTP`, the server must already be running. The setup scripts will attempt to auto-start it in the background.
 - **Check your environment variables**: Ensure `EVO_CLIENT_ID` and `EVO_REDIRECT_URL` are set in your `.env` file before connecting.
 - **Reload after changes**: If you edit settings or `.env` values, reload the window so the client picks up the new config.
 
@@ -364,14 +369,14 @@ Running Evo MCP in streamable HTTP mode allows you to use `curl` to access the M
 **Setup:**
 ```bash
 # In .env or environment
-MCP_TRANSPORT=http
+MCP_TRANSPORT=HTTP
 MCP_HTTP_HOST=localhost
 MCP_HTTP_PORT=5000
 ```
 
 **Start the server:**
 
-If you ran `setup-vscode.py` or `setup-cursor.py` and selected `http`, the script will attempt to start the server automatically in the background.
+If you ran `setup-vscode.py` or `setup-cursor.py` and selected `HTTP`, the script will attempt to start the server automatically in the background.
 
 Otherwise, start it manually:
 ```bash
@@ -477,4 +482,4 @@ Before using an MCP Server, you should consider conducting your own independent 
 
 ## Acknowledgements
 
-Much of this document was inspired by the excellent guide written by [AWS Labs](https://github.com/awslabs/mcp).
+Much of this document was inspired by the excellent guides written by [FastMCP](https://gofastmcp.com) and [AWS Labs](https://github.com/awslabs/mcp).

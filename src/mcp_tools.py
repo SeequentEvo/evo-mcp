@@ -16,8 +16,8 @@ Configuration:
     - MCP_HTTP_HOST: Host to bind to (default: localhost)
     - MCP_HTTP_PORT: Port to listen on (default: 5000)
 
-The environment variables can be set in a .env file or passed directly to the MCP server as input parameters.
-See the file 'vscode-mcp-config-example.json' for an example of passing environment variables to the MCP server.
+The environment variables can be set in a .env file or 
+passed directly to the MCP server as input parameters.
 """
 
 import os
@@ -49,7 +49,7 @@ if TRANSPORT == "http":
 
 # Get agent type from environment variable
 # This can either be set via MCP inputs, or the .env file used by the agent example
-TOOL_FILTER = os.getenv("MCP_TOOL_FILTER", 
+TOOL_FILTER = os.getenv("MCP_TOOL_FILTER",
     os.getenv(
         "MCP_AGENT_TYPE",  # Kept for backwards compatibility
         "all",
@@ -325,5 +325,5 @@ if __name__ == "__main__":
             port=HTTP_PORT
         )
     else:
-        # Default stdio mode
+        # Default STDIO mode
         mcp.run()
