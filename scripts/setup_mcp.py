@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Evo MCP Configuration Setup
-Cross-platform script to configure the Evo MCP server for VS Code
+Cross-platform script to configure the Evo MCP server for VS Code or Cursor.
 """
 
 import json
@@ -14,10 +14,27 @@ from pathlib import Path
 
 class Colors:
     """ANSI color codes for terminal output"""
-    BLUE = '\033[34m'
-    GREEN = '\033[32m'
-    RED = '\033[31m'
-    RESET = '\033[0m'
+
+    BLUE = "\033[34m"
+    GREEN = "\033[32m"
+    RED = "\033[31m"
+    RESET = "\033[0m"
+
+
+class ClientChoice:
+    """Client app metadata for configuration."""
+
+    def __init__(self, display_name: str, client_type: str, variant: str):
+        self.display_name = display_name
+        self.client_type = client_type
+        self.variant = variant
+
+
+CLIENT_CHOICES = {
+    "1": ClientChoice("VS Code", "vscode", "Code"),
+    "2": ClientChoice("VS Code Insiders", "vscode", "Code - Insiders"),
+    "3": ClientChoice("Cursor", "cursor", "Cursor"),
+}
 
 
 def print_color(text: str, color: str = Colors.RESET):
@@ -25,60 +42,67 @@ def print_color(text: str, color: str = Colors.RESET):
     print(f"{color}{text}{Colors.RESET}")
 
 
-def get_config_dir(variant: str | None = None) -> Path | None:
-    """
-    Get the VS Code configuration directory for the current platform.
-    If variant is provided, use it; otherwise detect from environment or search.
-    """
+def get_vscode_config_dir(variant: str) -> Path | None:
+    """Get the VS Code configuration directory for the current platform."""
     system = platform.system()
-    
-    variants = ['Code', 'Code - Insiders']
-    
-    # If variant is provided, check only that one
-    if variant:
-        variants = [variant]
-    
-    if system == 'Windows':
-        appdata = os.environ.get('APPDATA')
+
+    if system == "Windows":
+        appdata = os.environ.get("APPDATA")
         if not appdata:
             return None
-        
-        for v in variants:
-            config_dir = Path(appdata) / v / 'User'
-            if config_dir.parent.exists():
-                return config_dir
-    
-    elif system == 'Darwin':  # macOS
-        home = Path.home()
-        for v in variants:
-            config_dir = home / 'Library' / 'Application Support' / v / 'User'
-            if config_dir.parent.exists():
-                return config_dir
-    
-    elif system == 'Linux':
-        home = Path.home()
-        for v in variants:
-            config_dir = home / '.config' / v / 'User'
-            if config_dir.parent.exists():
-                return config_dir
-    
+        config_dir = Path(appdata) / variant / "User"
+        return config_dir if config_dir.parent.exists() else None
+
+    if system == "Darwin":
+        config_dir = Path.home() / "Library" / "Application Support" / variant / "User"
+        return config_dir if config_dir.parent.exists() else None
+
+    if system == "Linux":
+        config_dir = Path.home() / ".config" / variant / "User"
+        return config_dir if config_dir.parent.exists() else None
+
     return None
+
+
+def get_cursor_config_dir(variant: str) -> Path | None:
+    """Get the Cursor configuration directory for the current platform."""
+    system = platform.system()
+
+    if system == "Windows":
+        return Path.home() / ".cursor"
+
+    if system == "Darwin":
+        config_dir = Path.home() / ".cursor"
+        return config_dir if config_dir.exists() else None
+
+    if system == "Linux":
+        config_dir = Path.home() / ".config" / variant / "User"
+        return config_dir if config_dir.parent.exists() else None
+
+    return None
+
+
+def get_config_dir(client: ClientChoice) -> Path | None:
+    """Resolve client config directory based on chosen app."""
+    if client.client_type == "vscode":
+        return get_vscode_config_dir(client.variant)
+    return get_cursor_config_dir(client.variant)
 
 
 def find_venv_python(project_dir: Path) -> Path | None:
     """Try to find a virtual environment in the project directory"""
     system = platform.system()
-    venv_names = ['.venv', 'venv', 'env']
-    
+    venv_names = [".venv", "venv", "env"]
+
     for venv_name in venv_names:
-        if system == 'Windows':
-            python_path = project_dir / venv_name / 'Scripts' / 'python.exe'
+        if system == "Windows":
+            python_path = project_dir / venv_name / "Scripts" / "python.exe"
         else:
-            python_path = project_dir / venv_name / 'bin' / 'python'
-        
+            python_path = project_dir / venv_name / "bin" / "python"
+
         if python_path.exists():
             return python_path
-    
+
     return None
 
 
@@ -88,27 +112,22 @@ def get_python_executable(project_dir: Path, is_workspace: bool) -> str:
     Uses the currently running Python interpreter, or tries to find a venv.
     """
     current_python = Path(sys.executable)
-    
+
     if is_workspace:
-        # For workspace config, try to use relative path if Python is in project
         try:
             rel_path = current_python.relative_to(project_dir)
-            # Convert to forward slashes for cross-platform compatibility
-            return './' + str(rel_path).replace('\\', '/')
+            return "./" + str(rel_path).replace("\\", "/")
         except ValueError:
-            # Python is not in project directory, try to find a venv
             venv_python = find_venv_python(project_dir)
             if venv_python:
                 try:
                     rel_path = venv_python.relative_to(project_dir)
-                    return './' + str(rel_path).replace('\\', '/')
+                    return "./" + str(rel_path).replace("\\", "/")
                 except ValueError:
                     pass
-            # Fall back to absolute path
             return str(current_python)
-    else:
-        # Use absolute path for user configuration
-        return str(current_python)
+
+    return str(current_python)
 
 
 def resolve_command_path(command: str, project_dir: Path) -> str:
@@ -116,32 +135,32 @@ def resolve_command_path(command: str, project_dir: Path) -> str:
     command_path = Path(command)
     if command_path.is_absolute():
         return str(command_path)
-    if command.startswith('./') or command.startswith('.\\'):
+    if command.startswith("./") or command.startswith(".\\"):
         return str((project_dir / command_path).resolve())
     return command
 
 
 def load_env_file(project_dir: Path) -> dict[str, str]:
     """Load key/value pairs from the project's .env file."""
-    env_file = project_dir / '.env'
+    env_file = project_dir / ".env"
     values: dict[str, str] = {}
 
     if not env_file.exists():
         return values
 
-    with open(env_file, 'r', encoding='utf-8') as f:
+    with open(env_file, "r", encoding="utf-8") as f:
         for raw_line in f:
             line = raw_line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
 
-            if line.startswith('export '):
-                line = line[len('export '):].strip()
+            if line.startswith("export "):
+                line = line[len("export ") :].strip()
 
-            if '=' not in line:
+            if "=" not in line:
                 continue
 
-            key, value = line.split('=', 1)
+            key, value = line.split("=", 1)
             key = key.strip()
             value = value.strip().strip('"').strip("'")
 
@@ -154,7 +173,7 @@ def load_env_file(project_dir: Path) -> dict[str, str]:
 def get_http_env_from_dotenv(project_dir: Path) -> dict[str, str] | None:
     """Read required HTTP server environment values from .env."""
     env_values = load_env_file(project_dir)
-    required_keys = ['MCP_TRANSPORT', 'MCP_HTTP_HOST', 'MCP_HTTP_PORT']
+    required_keys = ["MCP_TRANSPORT", "MCP_HTTP_HOST", "MCP_HTTP_PORT"]
     missing_keys = [key for key in required_keys if not env_values.get(key)]
 
     if missing_keys:
@@ -163,15 +182,15 @@ def get_http_env_from_dotenv(project_dir: Path) -> dict[str, str] | None:
             print_color(f"  - {key}", Colors.RED)
         return None
 
-    transport = env_values['MCP_TRANSPORT'].lower()
-    if transport != 'http':
+    transport = env_values["MCP_TRANSPORT"].lower()
+    if transport != "http":
         print_color("✗ Cannot auto-start HTTP server. Set MCP_TRANSPORT=http in .env.", Colors.RED)
         return None
 
     return {
-        'MCP_TRANSPORT': env_values['MCP_TRANSPORT'],
-        'MCP_HTTP_HOST': env_values['MCP_HTTP_HOST'],
-        'MCP_HTTP_PORT': env_values['MCP_HTTP_PORT'],
+        "MCP_TRANSPORT": env_values["MCP_TRANSPORT"],
+        "MCP_HTTP_HOST": env_values["MCP_HTTP_HOST"],
+        "MCP_HTTP_PORT": env_values["MCP_HTTP_PORT"],
     }
 
 
@@ -188,16 +207,16 @@ def start_http_server(python_exe: str, mcp_script: str, project_dir: Path) -> in
     env.update(http_env)
 
     popen_kwargs = {
-        'cwd': str(project_dir),
-        'env': env,
-        'stdout': subprocess.DEVNULL,
-        'stderr': subprocess.DEVNULL,
+        "cwd": str(project_dir),
+        "env": env,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
     }
 
-    if platform.system() == 'Windows':
-        popen_kwargs['creationflags'] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    if platform.system() == "Windows":
+        popen_kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     else:
-        popen_kwargs['start_new_session'] = True
+        popen_kwargs["start_new_session"] = True
 
     try:
         process = subprocess.Popen([python_command, script_command], **popen_kwargs)
@@ -207,7 +226,27 @@ def start_http_server(python_exe: str, mcp_script: str, project_dir: Path) -> in
         return None
 
 
-def get_protocol_choice():
+def get_client_choice() -> ClientChoice:
+    """Ask user which client app to configure."""
+    print("Which client app are you using?")
+    print("1. VS Code (recommended)")
+    print("2. VS Code Insiders")
+    print("3. Cursor")
+    print()
+
+    while True:
+        choice = input("Enter your choice [1-3] (default: 1): ").strip()
+        if not choice:
+            choice = "1"
+
+        if choice in CLIENT_CHOICES:
+            return CLIENT_CHOICES[choice]
+
+        print_color("Invalid choice. Please enter 1, 2, or 3.", Colors.RED)
+        print()
+
+
+def get_protocol_choice() -> str:
     """Ask user which MCP protocol to use"""
     print()
     print("Which MCP transport protocol are you using?")
@@ -218,71 +257,71 @@ def get_protocol_choice():
     print("   - Easier debugging and testing")
     print("   - Can run on remote servers")
     print()
-    
+
     while True:
         choice = input("Enter your choice [1-2] (default: 1): ").strip()
         if not choice:
-            choice = '1'
-        
-        if choice in ['1', '2']:
-            protocol = 'stdio' if choice == '1' else 'http'
-            return protocol
-        
+            choice = "1"
+
+        if choice in ["1", "2"]:
+            return "stdio" if choice == "1" else "http"
+
         print_color("Invalid choice. Please enter 1 or 2.", Colors.RED)
         print()
 
 
-def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str = 'stdio'):
-    """
-    Set up the MCP configuration for VS Code.
-    
-    Args:
-        config_type: Either 'user' or 'workspace'
-        variant: VS Code variant ('Code - Insiders' or 'Code'), only used for user config
-    """
+def build_config_entry(client: ClientChoice, protocol: str, python_exe: str, mcp_script: str) -> tuple[str, dict]:
+    """Build client-specific MCP config entry and top-level key."""
+    if client.client_type == "cursor":
+        top_level_key = "mcpServers"
+        if protocol == "http":
+            entry = {"type": "http", "url": "http://localhost:5000/mcp"}
+        else:
+            entry = {"command": python_exe, "args": [mcp_script]}
+        return top_level_key, entry
+
+    top_level_key = "servers"
+    if protocol == "http":
+        entry = {"type": "http", "url": "http://localhost:5000/mcp"}
+    else:
+        entry = {"type": "stdio", "command": python_exe, "args": [mcp_script]}
+    return top_level_key, entry
+
+
+def setup_mcp_config(client: ClientChoice, protocol: str = "stdio"):
+    """Set up the MCP configuration for the selected client app."""
     print_color("Evo MCP Configuration Setup", Colors.BLUE)
     print("=" * 30)
     print()
-    
-    # Get the project directory (parent of scripts folder)
+
     script_dir = Path(__file__).parent.resolve()
     project_dir = script_dir.parent
-    
-    is_workspace = config_type == 'workspace'
-    
+
+    config_type = "user"
+    is_workspace = config_type == "workspace"
+
     if is_workspace:
-        # Workspace configuration
-        config_dir = Path('.vscode')
-        config_file = config_dir / 'mcp.json'
-        print_color("Using workspace folder configuration", Colors.GREEN)
+        config_dir = Path(".vscode")
+        config_file = config_dir / "mcp.json"
     else:
-        # User configuration
-        config_dir = get_config_dir(variant)
-        
+        config_dir = get_config_dir(client)
         if not config_dir:
-            print_color(f"✗ Could not find {variant} installation directory", Colors.RED)
+            print_color(f"✗ Could not find {client.display_name} installation directory", Colors.RED)
             sys.exit(1)
-        
-        config_file = config_dir / 'mcp.json'
-        print_color(f"Using user configuration for {variant}", Colors.GREEN)
-    
+        config_file = config_dir / "mcp.json"
+        print_color(f"Using user configuration for {client.display_name}", Colors.GREEN)
+
     print(f"Configuration file: {config_file}")
     print()
-    
-    # Get paths
+
     python_exe = get_python_executable(project_dir, is_workspace)
-    if is_workspace:
-        mcp_script = './src/mcp_tools.py'
-    else:
-        mcp_script = str(project_dir / 'src' / 'mcp_tools.py')
-    
-    # Create directory if it doesn't exist
+    mcp_script = str(project_dir / "src" / "mcp_tools.py")
+
     config_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Read or create settings JSON
+
     if config_file.exists():
         try:
-            with open(config_file, 'r', encoding='utf-8') as f:
+            with open(config_file, "r", encoding="utf-8") as f:
                 settings = json.load(f)
         except json.JSONDecodeError as e:
             print_color(f"✗ Invalid JSON in existing config file: {e}", Colors.RED)
@@ -290,45 +329,31 @@ def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str
             sys.exit(1)
     else:
         settings = {}
-    
-    # Ensure servers exist
-    if 'servers' not in settings:
-        settings['servers'] = {}
-    
-    # Add or update the evo-mcp server configuration
-    if protocol == 'http':
-        # For streamable HTTP, use http type with URL
-        config_entry = {
-            "type": "http",
-            "url": "http://localhost:5000/mcp"
-        }
-    else:
-        # For stdio, use stdio type with command
-        config_entry = {
-            "type": "stdio",
-            "command": python_exe,
-            "args": [mcp_script]
-        }
-    
-    settings['servers']['evo-mcp'] = config_entry
-    
-    # Write the updated settings to file
+
+    top_level_key, config_entry = build_config_entry(client, protocol, python_exe, mcp_script)
+
+    if top_level_key not in settings:
+        settings[top_level_key] = {}
+
+    settings[top_level_key]["evo-mcp"] = config_entry
+
     try:
-        with open(config_file, 'w', encoding='utf-8') as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2)
 
         server_pid = None
-        if protocol == 'http':
+        if protocol == "http":
             print("Starting Evo MCP HTTP server in background...")
             server_pid = start_http_server(python_exe, mcp_script, project_dir)
-        
+
         print_color("✓ Successfully added Evo MCP configuration", Colors.GREEN)
         print()
         print("Configuration details:")
+        print(f"  Client App: {client.display_name}")
         print(f"  Command: {python_exe}")
         print(f"  Script: {mcp_script}")
         print(f"  Transport Protocol: {protocol.upper()}")
-        if protocol == 'http':
+        if protocol == "http":
             print("  HTTP Configuration:")
             print("    - Host: localhost")
             print("    - Port: 5000")
@@ -337,11 +362,16 @@ def setup_mcp_config(config_type: str, variant: str | None = None, protocol: str
                 print(f"    - Background PID: {server_pid}")
         print()
         print("Next steps:")
-        if protocol == 'http' and server_pid is None:
+        if protocol == "http" and server_pid is None:
             print("Ensure .env contains MCP_TRANSPORT, MCP_HTTP_HOST, and MCP_HTTP_PORT for HTTP mode.")
             print("Start Evo MCP server manually:")
             print(f"  {python_exe} {mcp_script}")
-        print("Restart VS Code or reload the window")
+
+        if client.client_type == "cursor":
+            print("Restart Cursor or reload the window")
+        else:
+            print("Restart VS Code or reload the window")
+
         print()
         print("Note: This configuration uses the Python interpreter:")
         print(f"  {python_exe}")
@@ -357,41 +387,18 @@ def main():
     print_color("Evo MCP Configuration Setup", Colors.BLUE)
     print("=" * 30)
     print()
-    
-    # Ask which VS Code version
+
     try:
-        while True:
-            print("Which version of VS Code are you using?")
-            print("1. VS Code (recommended)")
-            print("2. VS Code Insiders")
-            print()
-            
-            version_choice = input("Enter your choice [1-2] (default: 1): ").strip()
-            if not version_choice:
-                version_choice = '1'
-            
-            if version_choice in ['1', '2']:
-                break
-            
-            print_color("Invalid choice. Please enter 1 or 2.", Colors.RED)
-            print()
-        
-        variant = 'Code' if version_choice == '1' else 'Code - Insiders'
+        client = get_client_choice()
         print()
-        
-        config_type = 'user'
-        
-        # Ask for protocol choice
         protocol = get_protocol_choice()
         print()
-        
-        setup_mcp_config(config_type, variant, protocol)
-        
+        setup_mcp_config(client, protocol)
     except KeyboardInterrupt:
         print()
         print_color("Setup cancelled by user", Colors.RED)
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

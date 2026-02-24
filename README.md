@@ -266,12 +266,12 @@ Run the supplied Python script to add the required settings. The script will ask
 
 **If you set up Python with `uv`:**
 ```bash
-uv run python scripts/setup-vscode.py
+uv run python scripts/setup_mcp.py
 ```
 
 **If you set up Python with `pip`:**
 ```bash
-python scripts/setup-vscode.py
+python scripts/setup_mcp.py
 ```
 
 **Manual method**
@@ -313,12 +313,12 @@ Run the supplied Python script to add the required settings. The script will ask
 
 **If you set up Python with `uv`:**
 ```bash
-uv run python scripts/setup-cursor.py
+uv run python scripts/setup_mcp.py
 ```
 
 **If you set up Python with `pip`:**
 ```bash
-python scripts/setup-cursor.py
+python scripts/setup_mcp.py
 ```
 
 #### Manual method
@@ -374,7 +374,7 @@ MCP_HTTP_PORT=5000
 
 **Start the server:**
 
-If you ran `setup-vscode.py` or `setup-cursor.py` and selected `HTTP`, the script will attempt to start the server automatically in the background.
+If you ran `setup_mcp.py` and selected `HTTP`, the script will attempt to start the server automatically in the background.
 
 Otherwise, start it manually:
 ```bash
