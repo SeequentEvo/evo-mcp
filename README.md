@@ -352,7 +352,7 @@ To verify that the Evo MCP server is correctly configured in Cursor:
 
 - **Use a separate workspace**: Create a new workspace that is separate to your clone of this repository. If your copilot/agent has access to the source files in this repository, it may decide to ignore the MCP server.
 - **STDIO mode starts on demand**: In `STDIO` mode, VS Code/Cursor will launch the MCP server when needed.
-- **HTTP mode needs a running server**: If you select `HTTP`, the server must already be running. The setup scripts will attempt to auto-start it in the background.
+- **HTTP mode needs a running server**: If you select `HTTP`, the server must already be running. The setup script can start it for you in the current terminal session so you can see live output.
 - **Check your environment variables**: Ensure `EVO_CLIENT_ID` and `EVO_REDIRECT_URL` are set in your `.env` file before connecting.
 - **Reload after changes**: If you edit settings or `.env` values, reload the window so the client picks up the new config.
 
@@ -374,7 +374,7 @@ MCP_HTTP_PORT=5000
 
 **Start the server:**
 
-If you ran `setup_mcp.py` and selected `HTTP`, the script will attempt to start the server automatically in the background.
+If you ran `setup_mcp.py`, selected `HTTP`, and chose to start now, the script starts the server in the current terminal so you can see live logs.
 
 Otherwise, start it manually:
 ```bash

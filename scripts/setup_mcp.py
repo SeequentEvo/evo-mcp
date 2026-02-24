@@ -81,7 +81,7 @@ def prompt_for_env_value(
     print()
     print(description)
 
-    if current_value and current_value != default and "Replace this" not in current_value:
+    if current_value and "Replace this" not in current_value:
         print(f"Current value: {current_value}")
         if is_confirmed():
             return current_value
@@ -207,9 +207,6 @@ def write_env_file(project_dir: Path, values: dict[str, str]) -> None:
 
 def configure_env_settings(project_dir: Path) -> dict[str, str]:
     """Interactively configure environment settings."""
-    print_color("Environment Configuration", Colors.BLUE)
-    print("=" * 30)
-    print()
 
     ensure_env_file_exists(project_dir)
     current_values = load_env_file(project_dir)
@@ -225,7 +222,7 @@ def configure_env_settings(project_dir: Path) -> dict[str, str]:
     new_values["EVO_REDIRECT_URL"] = prompt_for_env_value(
         "EVO_REDIRECT_URL",
         current_values.get("EVO_REDIRECT_URL"),
-        "Your Evo application redirect URL.",
+        "Your Evo application redirect URL from the iTwin Developer Portal.",
         DEFAULT_REDIRECT_URL,
     )
 
@@ -269,7 +266,7 @@ def resolve_command_path(command: str, project_dir: Path) -> str:
 
 
 def start_http_server(python_exe: str, mcp_script: str, project_dir: Path) -> int | None:
-    """Start Evo MCP HTTP server in the background. Returns PID if successful."""
+    """Start Evo MCP HTTP server in the foreground and return exit code."""
     python_command = resolve_command_path(python_exe, project_dir)
     script_command = resolve_command_path(mcp_script, project_dir)
 
@@ -280,23 +277,20 @@ def start_http_server(python_exe: str, mcp_script: str, project_dir: Path) -> in
     env = os.environ.copy()
     env.update(http_env)
 
-    popen_kwargs = {
-        "cwd": str(project_dir),
-        "env": env,
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
-    }
-
-    if platform.system() == "Windows":
-        popen_kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
-        popen_kwargs["start_new_session"] = True
-
     try:
-        process = subprocess.Popen([python_command, script_command], **popen_kwargs)
-        return process.pid
+        completed = subprocess.run(
+            [python_command, script_command],
+            cwd=str(project_dir),
+            env=env,
+            check=False,
+        )
+        return completed.returncode
+    except KeyboardInterrupt:
+        print()
+        print_color("HTTP server stopped by user.", Colors.BLUE)
+        return 130
     except (OSError, ValueError) as e:
-        print_color(f"✗ Failed to start HTTP server automatically: {e}", Colors.RED)
+        print_color(f"✗ Failed to start HTTP server: {e}", Colors.RED)
         return None
 
 
@@ -323,7 +317,7 @@ def get_protocol_choice(
     """Ask user which MCP protocol to use and configure HTTP if needed."""
     print()
     print("Which MCP transport protocol are you using?")
-    print("1. stdio (recommended for VS Code/Cursor)")
+    print("1. STDIO (recommended for VS Code/Cursor)")
     print("2. Streamable HTTP (for testing, remote access, Docker)")
     print()
 
@@ -513,10 +507,7 @@ def setup_mcp_config(
         with open(config_file, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2)
 
-        server_pid = None
-        if protocol == "http" and start_server_now:
-            print("Starting Evo MCP HTTP server in background...")
-            server_pid = start_http_server(python_exe, mcp_script, project_dir)
+        server_exit_code = None
 
         print_color("✓ Successfully added Evo MCP configuration", Colors.GREEN)
         print()
@@ -532,12 +523,10 @@ def setup_mcp_config(
             print("  HTTP Configuration:")
             print(f"    - Host: {http_host}")
             print(f"    - Port: {http_port}")
-            if server_pid:
-                print(f"    - URL: {http_url}")
-                print(f"    - Background PID: {server_pid}")
+            print(f"    - URL: {http_url}")
         print()
         print("Next steps:")
-        if protocol == "http" and (not start_server_now or server_pid is None):
+        if protocol == "http" and not start_server_now:
             print("Start Evo MCP server manually:")
             print(f"  {python_exe} {mcp_script}")
 
@@ -551,6 +540,13 @@ def setup_mcp_config(
         print(f"  {python_exe}")
         print("If you need to use a different Python environment, activate it")
         print("and run this setup script again.")
+
+        if protocol == "http" and start_server_now:
+            print()
+            print_color("Starting Evo MCP HTTP server in foreground (Ctrl+C to stop)...", Colors.BLUE)
+            server_exit_code = start_http_server(python_exe, mcp_script, project_dir)
+            if server_exit_code not in [0, 130, None]:
+                print_color(f"✗ HTTP server exited with code {server_exit_code}", Colors.RED)
     except (IOError, OSError) as e:
         print_color(f"✗ Failed to update configuration file: {e}", Colors.RED)
         sys.exit(1)
@@ -560,7 +556,6 @@ def main():
     """Main entry point"""
     print_color("Evo MCP Configuration Setup", Colors.BLUE)
     print("=" * 30)
-    print()
 
     script_dir = Path(__file__).parent.resolve()
     project_dir = script_dir.parent
