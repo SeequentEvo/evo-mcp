@@ -12,7 +12,7 @@
 
 - [What is MCP?](#what-is-mcp)
 - [What is the Evo MCP server?](#what-is-the-evo-mcp-server)
-  - [Use cases](#use-cases)
+  - [How teams use Evo MCP](#how-teams-use-evo-mcp)
   - [Server architecture](#server-architecture)
 - [Getting started](#getting-started)
   - [Prerequisites](#prerequisites)
@@ -47,13 +47,13 @@ The Evo MCP server is a self-hosted server that provides a secure, standardised 
 
 The server comes packaged with many tools written by Seequent, but it is fully extensible and users are encouraged to add their own tools.
 
-### Use cases
+### How teams use Evo MCP
 
-* Workspace Management: Create workspaces, summarize objects, snapshot and duplicate workspaces, copy objects between workspaces.
-* Geoscience Object Creation: structured geoscience objects (Pointsets, Line Segments, Downhole Collections, and Downhole Intervals) in Evo directly from raw CSV files, automating data validation and schema mapping.
+* Workspace management: Create workspaces, summarize objects, snapshot and duplicate workspaces, copy objects between workspaces.
+* Geoscience object creation: structured geoscience objects (pointsets, line segments, downhole collections, and downhole intervals) in Evo directly from raw CSV files, automating data validation and schema mapping.
 
 > [!WARNING]
-> The Evo MCP server is in early development. Functionality is currently limited. Your feedback on future development is welcome!
+> The Evo MCP server is in early development and functionality is limited. Your feedback on future development is welcome!
 
 ### Server architecture
 
@@ -157,12 +157,9 @@ The Evo MCP server supports two common transport modes for different use cases.
 
 ##### STDIO transport (default)
 
-**Transport**: Standard input/output
 **Recommended for**: VS Code, Cursor, Claude Desktop, and other integrated MCP clients
 
-`STDIO` is the default transport mode and is optimised for direct integration with MCP client applications. The server reads JSON-RPC messages from stdin and writes responses to stdout.
-
-STDIO (Standard Input/Output) is the default transport for FastMCP servers. When you call run() without arguments, your server uses STDIO transport. This transport communicates through standard input and output streams, making it perfect for command-line tools and desktop applications like Claude Desktop.
+`STDIO` (Standard Input/Output) is the default transport mode and is optimised for direct integration with MCP client applications. This transport communicates through standard input and output streams, making it perfect for command-line tools and desktop applications like VS Code and Cursor.
 With STDIO transport, the client spawns a new server process for each session and manages its lifecycle. The server reads MCP messages from stdin and writes responses to stdout. This is why STDIO servers don’t stay running - they’re started on-demand by the client.
 
 **Advantages**
@@ -170,13 +167,11 @@ With STDIO transport, the client spawns a new server process for each session an
 - Better performance for local connections
 - Directly integrated into VS Code and Cursor workflows
 - No network overhead
-- Recommended for production use with integrated clients
 
 Configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via STDIO.
 
-##### HTTP transport (streamable)
+##### Streamable HTTP transport
 
-**Transport**: Streamable HTTP
 **Recommended for**: Testing, remote access, programmatic access via curl/scripts, and containerised deployments (Docker)
 
 HTTP transport turns your MCP server into a web service accessible via a URL. This transport uses the Streamable HTTP protocol, which allows clients to connect over the network. Unlike STDIO where each client gets its own process, an HTTP server can handle multiple clients simultaneously.
@@ -194,7 +189,6 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 **Limitations**
 - Requires separate server process management
 - Slightly higher latency due to HTTP overhead
-- Not recommended for use with VS Code/Cursor (use `STDIO` mode instead)
 
 ##### Common use cases
 
