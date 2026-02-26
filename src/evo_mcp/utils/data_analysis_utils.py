@@ -155,23 +155,25 @@ async def download_interval_data(
     for attr_idx, attr in enumerate(attributes):
         attr_name = attr.get('name', f'attr_{attr_idx}')
         
-        # Check if it's continuous or categorical
-        if 'values' in attr:
-            # Continuous attribute
-            attr_jmespath = f"collections[{collection_idx}].from_to.attributes[{attr_idx}].values"
-            try:
-                attr_df = await obj.download_dataframe(attr_jmespath)
-                intervals_df[attr_name] = attr_df.iloc[:, 0].values
-            except Exception as e:
-                logger.warning(f"Failed to download attribute {attr_name}: {e}")
-        elif 'table' in attr:
-            # Categorical attribute — resolve via lookup table
+        # Check if it's categorical or continuous.
+        # Categorical attributes have both 'table' (lookup) and 'values' (int keys),
+        # so we must check for 'table' first to avoid misclassifying them as continuous.
+        if 'table' in attr:
+            # Categorical attribute — resolve integer keys via lookup table
             attr_jmespath = f"collections[{collection_idx}].from_to.attributes[{attr_idx}]"
             try:
                 resolved = await _resolve_categorical_attribute(obj, attr_jmespath)
                 intervals_df[attr_name] = resolved.values
             except Exception as e:
                 logger.warning(f"Failed to download category attribute {attr_name}: {e}")
+        elif 'values' in attr:
+            # Continuous attribute — raw float values
+            attr_jmespath = f"collections[{collection_idx}].from_to.attributes[{attr_idx}].values"
+            try:
+                attr_df = await obj.download_dataframe(attr_jmespath)
+                intervals_df[attr_name] = attr_df.iloc[:, 0].values
+            except Exception as e:
+                logger.warning(f"Failed to download attribute {attr_name}: {e}")
     
     return intervals_df
 
@@ -208,23 +210,25 @@ async def download_downhole_intervals_data(obj) -> pd.DataFrame:
     for attr_idx, attr in enumerate(attributes):
         attr_name = attr.get('name', f'attr_{attr_idx}')
         
-        # Check if it's continuous or categorical
-        if 'values' in attr:
-            # Continuous attribute
-            attr_jmespath = f"attributes[{attr_idx}].values"
-            try:
-                attr_df = await obj.download_dataframe(attr_jmespath)
-                intervals_df[attr_name] = attr_df.iloc[:, 0].values
-            except Exception as e:
-                logger.warning(f"Failed to download attribute {attr_name}: {e}")
-        elif 'table' in attr:
-            # Categorical attribute — resolve via lookup table
+        # Check if it's categorical or continuous.
+        # Categorical attributes have both 'table' (lookup) and 'values' (int keys),
+        # so we must check for 'table' first to avoid misclassifying them as continuous.
+        if 'table' in attr:
+            # Categorical attribute — resolve integer keys via lookup table
             attr_jmespath = f"attributes[{attr_idx}]"
             try:
                 resolved = await _resolve_categorical_attribute(obj, attr_jmespath)
                 intervals_df[attr_name] = resolved.values
             except Exception as e:
                 logger.warning(f"Failed to download category attribute {attr_name}: {e}")
+        elif 'values' in attr:
+            # Continuous attribute — raw float values
+            attr_jmespath = f"attributes[{attr_idx}].values"
+            try:
+                attr_df = await obj.download_dataframe(attr_jmespath)
+                intervals_df[attr_name] = attr_df.iloc[:, 0].values
+            except Exception as e:
+                logger.warning(f"Failed to download attribute {attr_name}: {e}")
     
     return intervals_df
 
@@ -478,6 +482,95 @@ def analyze_gaps(df: pd.DataFrame) -> dict:
         "holes_without_gaps": df['hole_id'].nunique() - len(hole_gap_stats),
         "gap_statistics_by_hole": hole_gap_stats,
         "gap_details": gaps_df
+    }
+
+
+def calculate_categorical_statistics(
+    df: pd.DataFrame,
+    column: str,
+    max_categories: int = 100,
+) -> dict:
+    """Calculate summary statistics for a categorical column.
+
+    Computes value counts, frequency distribution, and per-hole breakdowns
+    that are useful for understanding lithology codes, rock types, alteration
+    categories, and similar text-based interval attributes.
+
+    Args:
+        df: DataFrame with the categorical column, plus hole_id, from, to.
+        column: Name of the categorical column to analyse.
+        max_categories: Cap the number of distinct values stored (default 100).
+
+    Returns:
+        Dict with:
+        - unique_count: Number of distinct non-null values
+        - null_count / total_count
+        - value_counts: List of {value, count, fraction} sorted descending
+        - by_hole: Per-hole unique-value lists (for drill-log coverage analysis)
+
+    Raises:
+        ValueError: If column not found in the DataFrame.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found. Available: {list(df.columns)}")
+
+    series = df[column]
+    total = len(series)
+    null_count = int(series.isna().sum())
+    non_null = series.dropna()
+
+    # Overall value counts
+    vc = non_null.value_counts()
+    if len(vc) > max_categories:
+        vc = vc.head(max_categories)
+        truncated = True
+    else:
+        truncated = False
+
+    # Calculate interval lengths for length-based summaries
+    has_intervals = 'from' in df.columns and 'to' in df.columns
+    if has_intervals:
+        lengths = calculate_interval_length(df)
+    else:
+        lengths = None
+
+    # Total length per category value
+    length_by_value = {}
+    if lengths is not None:
+        valid_mask = series.notna() & lengths.notna() & (lengths > 0)
+        for val in vc.index:
+            val_mask = valid_mask & (series == val)
+            length_by_value[str(val)] = float(lengths[val_mask].sum())
+
+    value_counts = [
+        {
+            "value": str(val),
+            "count": int(cnt),
+            "fraction": round(cnt / max(len(non_null), 1), 4),
+            "total_length": length_by_value.get(str(val), 0.0),
+        }
+        for val, cnt in vc.items()
+    ]
+
+    # Per-hole breakdown (unique values per hole)
+    by_hole = []
+    if 'hole_id' in df.columns:
+        for hole_id, grp in df.groupby('hole_id'):
+            hole_vals = grp[column].dropna().unique().tolist()
+            by_hole.append({
+                "hole_id": str(hole_id),
+                "unique_values": [str(v) for v in hole_vals],
+                "count": len(grp),
+                "null_count": int(grp[column].isna().sum()),
+            })
+
+    return {
+        "unique_count": int(non_null.nunique()),
+        "total_count": total,
+        "null_count": null_count,
+        "truncated": truncated,
+        "value_counts": value_counts,
+        "by_hole": by_hole,
     }
 
 
