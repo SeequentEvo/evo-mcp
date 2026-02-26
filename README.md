@@ -386,6 +386,8 @@ python src/mcp_tools.py
 The server will start listening on `http://localhost:5000/mcp`.
 
 **Access tools using curl:**
+
+**macOS/Linux (bash/zsh)**
 ```bash
 # 1) Initialize session and capture MCP session ID
 SESSION_ID=$(curl -sS -D - -o /dev/null \
@@ -407,6 +409,32 @@ curl -sS -X POST http://localhost:5000/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "Mcp-Session-Id: ${SESSION_ID}" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_workspace","arguments":{"name":"My New Workspace","description":"Test workspace"}}}'
+```
+
+**Windows (PowerShell)**
+```powershell
+# 1) Initialize session and capture MCP session ID
+$initHeaders = curl.exe -sS -D - -o NUL `
+  -X POST http://localhost:5000/mcp `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json, text/event-stream" `
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
+
+$SESSION_ID = ($initHeaders | Select-String -Pattern '^mcp-session-id:\s*(.+)$' -CaseSensitive:$false).Matches[0].Groups[1].Value.Trim()
+
+# 2) List workspaces
+curl.exe -sS -X POST http://localhost:5000/mcp `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json, text/event-stream" `
+  -H "Mcp-Session-Id: $SESSION_ID" `
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_workspaces","arguments":{"name":"","deleted":false,"limit":50}}}'
+
+# 3) Create a workspace
+curl.exe -sS -X POST http://localhost:5000/mcp `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json, text/event-stream" `
+  -H "Mcp-Session-Id: $SESSION_ID" `
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_workspace","arguments":{"name":"My New Workspace","description":"Test workspace"}}}'
 ```
 
