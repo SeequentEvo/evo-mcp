@@ -29,7 +29,8 @@ from evo_mcp.tools import (
     register_general_tools,
     register_filesystem_tools,
     register_object_builder_tools,
-    register_instance_users_admin_tools,
+    register_instance_users_admin_tools,    
+    register_data_analysis_tools,
 )
 
 # Get agent type from environment variable 
@@ -78,6 +79,7 @@ if TOOL_FILTER in ["all", "data"]: #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
+    register_data_analysis_tools(mcp)
 
 # =============================================================================
 # Resources (not currently supported in ADK)
