@@ -9,4 +9,3 @@
 *.db
 .vscode
 src/evo_mcp.egg-info/
-notebooks/mongo_config.json

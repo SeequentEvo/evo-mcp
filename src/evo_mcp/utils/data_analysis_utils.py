@@ -1,5 +1,10 @@
+# SPDX-FileCopyrightText: 2026 Bentley Systems, Incorporated
+#
+# SPDX-License-Identifier: Apache-2.0
+
+
 """
-Utility functions for analyzing interval data from DownholeCollection and DownholeIntervals objects.
+Utility functions for currently only analyzing interval data from DownholeCollection and DownholeIntervals objects.
 
 These utilities provide core analysis functions that can be used independently
 or wrapped by MCP tools. Includes:
