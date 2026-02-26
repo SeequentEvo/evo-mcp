@@ -7,7 +7,7 @@ from uuid import UUID
 from fastmcp import Context
 
 from evo_mcp.context import evo_context, ensure_initialized
-
+from evo_mcp.utils.evo_data_utils import discover_objects
 
 def register_general_tools(mcp):
     """Register all general tools with the FastMCP server."""
@@ -123,32 +123,13 @@ def register_general_tools(mcp):
             deleted: Include deleted objects
             limit: Maximum number of results
         """
-        await ensure_initialized()
-        
-        object_client = await evo_context.get_object_client(UUID(workspace_id))
-        
-        service_health = await object_client.get_service_health()
-        service_health.raise_for_status()
-        
-        objects = await object_client.list_objects(
-            schema_id=None, # [schema_id] if schema_id else None,
+        object_types = [schema_id] if schema_id else None
+        return await discover_objects(
+            workspace_id=workspace_id,
+            object_types=object_types,
             deleted=deleted,
-            limit=limit
+            limit=limit,
         )
-        
-        result = [
-            {
-                "id": str(obj.id),
-                "name": obj.name,
-                "path": obj.path,
-                "schema_id": obj.schema_id.sub_classification,
-                "version_id": obj.version_id,
-                "created_at": obj.created_at.isoformat() if obj.created_at else None,
-                # "updated_at": obj.updated_at.isoformat() if obj.updated_at else None,
-            }
-            for obj in objects.items()
-        ]
-        return result
 
     @mcp.tool()
     async def get_object(
