@@ -460,7 +460,7 @@ GOOGLE_CLOUD_PROJECT=your-project-id
 GOOGLE_CLOUD_LOCATION=your-region
 
 # Passed through to the MCP server's `MCP_TOOL_FILTER` config.
-EVO_AGENT_TYPE=all
+MCP_TOOL_FILTER=all
 ```
 
 **Run**
