@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from evo.aio import AioTransport
-from evo.oauth import OAuthConnector, AuthorizationCodeAuthorizer, AccessTokenAuthorizer, EvoScopes
+from evo.oauth import OAuthConnector, AuthorizationCodeAuthorizer, AccessTokenAuthorizer, EvoScopes, ClientCredentialsAuthorizer
 from evo.discovery import DiscoveryAPIClient
 from evo.common import APIConnector
 
@@ -131,6 +131,27 @@ class EvoContext:
         from evo_mcp import __dist_name__, __version__
         self.transport = AioTransport(user_agent=f"{__dist_name__}/{__version__}")
         return self.transport
+    
+    async def get_access_token_via_client_credentials(self) -> str:
+        logger.debug("Obtaining a new service token")
+        client_id = os.getenv("EVO_CLIENT_ID")
+        client_secret = os.getenv("EVO_CLIENT_SECRET")
+        issuer_url = os.getenv('ISSUER_URL')
+        if not client_id or not client_secret:
+            raise ValueError("EVO_CLIENT_ID and EVO_CLIENT_SECRET environment variables are required with client credentials authentication method")
+        
+        transport = self.get_transport()
+        oauth_connector = OAuthConnector(transport=transport, client_id=client_id, client_secret=client_secret, base_uri=issuer_url)
+        authorizer = ClientCredentialsAuthorizer(oauth_connector, scopes=EvoScopes.all_evo)
+        
+        headers = await authorizer.get_default_headers()
+        auth_header = headers.get('Authorization', '')
+
+        if auth_header.startswith('Bearer '):
+            return auth_header[7:]  # Remove 'Bearer ' prefix         
+        else:
+            logger.error("ERROR: Could not extract access token from headers")
+            raise ValueError("Failed to obtain access token from OAuth login")
 
     async def get_access_token_via_user_login(self) -> str:
         # Set up OAuth authentication (following SDK example pattern)
@@ -168,7 +189,11 @@ class EvoContext:
         
         # If no valid cached token, do full OAuth login
         if access_token is None:
-            access_token = await self.get_access_token_via_user_login()
+            auth_method = os.environ.get("AUTH_METHOD")
+            if auth_method == "client_credentials":
+                access_token = await self.get_access_token_via_client_credentials()
+            else:
+                access_token = await self.get_access_token_via_user_login()
             self.save_access_token_to_cache(access_token)
 
         authorizer = AccessTokenAuthorizer(
