@@ -206,7 +206,7 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 
 ##### Evo app credentials
 
-You first need to create a **native app** in the **iTwin Developer Portal**. This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
+You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
 
 Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app credentials:
 ```bash
