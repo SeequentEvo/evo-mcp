@@ -285,8 +285,7 @@ python scripts/setup_mcp.py
   ![VS Code Command Palette](images/vscode-command-palette.png)
 4. Paste the settings you copied from the template, update the paths to match your local installation, and save the file. NOTE: The JSON template shows Windows file paths but the screenshot below shows macOS file paths. Follow the conventions that suit your operating system. 
   ![VS Code MCP Settings](images/vscode-settings.png)
-5. When prompted by the app, enter agent type: `admin`, `data`, or `all`.
-6. The MCP server will start automatically when accessed by Copilot.
+5. The MCP server will start automatically when accessed by Copilot.
 
 #### Verify the configuration
 
@@ -339,8 +338,7 @@ python scripts/setup_mcp.py
 
 5. Paste the settings you copied from the template, update the paths to match your local installation, and save the file. NOTE: The JSON template shows Windows file paths but the screenshot below shows macOS file paths. Follow the conventions that suit your operating system. 
   ![Cursor MCP Settings](images/cursor-settings.png)
-6. When prompted, enter agent type: `admin`, `data`, or `all`.
-7. The MCP server will start automatically when accessed by Cursor AI.
+6. The MCP server will start automatically when accessed by Cursor AI.
 
 #### Verifying the integration
 
