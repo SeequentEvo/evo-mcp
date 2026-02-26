@@ -250,6 +250,8 @@ MCP_TOOL_FILTER=all
 
 Apps like VS Code and Cursor make it easy to connect to MCP servers, whether they are running locally, are available over a local network, or over the internet. VS Code is free to download and use. Cursor requires a paid subscription.
 
+NOTE: Installing any of the MCP client apps described in this section is entirely optional. If you have a favourite MCP client app that you think we should document here, please create a [feature request ticket](https://github.com/SeequentEvo/evo-mcp/issues) and let us know.
+
 ### VS Code
 
 #### Installation
@@ -281,7 +283,7 @@ python scripts/setup_mcp.py
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
 3. Search for "mcp". Select **MCP: Open User Configuration** to update the user settings.
   ![VS Code Command Palette](images/vscode-command-palette.png)
-4. Paste the settings you copied from the template and update the paths to match your installation. Save the file.
+4. Paste the settings you copied from the template, update the paths to match your local installation, and save the file. NOTE: The JSON template shows Windows file paths but the screenshot below shows macOS file paths. Follow the conventions that suit your operating system. 
   ![VS Code MCP Settings](images/vscode-settings.png)
 5. When prompted by the app, enter agent type: `admin`, `data`, or `all`.
 6. The MCP server will start automatically when accessed by Copilot.
@@ -295,7 +297,9 @@ To verify that the Evo MCP server is correctly configured in VS Code:
     ![VS Code Extensions](images/vscode-extensions.png)
 
 2. Look for **evo-mcp** in the list of **MCP Servers - Installed**.
-  ![VS Code MCP Servers](images/vscode-mcp-servers.png)
+
+    ![VS Code MCP Servers](images/vscode-mcp-servers.png)
+
 3. Ensure there are no warning icons or error messages displayed.
 
 If you see **evo-mcp** listed without any warnings, the configuration is correct and the server is ready to use.
@@ -333,7 +337,7 @@ python scripts/setup_mcp.py
 
     ![Cursor MCP Add New Settings](images/cursor-mcp-add-new.png)
 
-5. Paste the settings you copied from the template and update the paths to match your installation. Save the file.
+5. Paste the settings you copied from the template, update the paths to match your local installation, and save the file. NOTE: The JSON template shows Windows file paths but the screenshot below shows macOS file paths. Follow the conventions that suit your operating system. 
   ![Cursor MCP Settings](images/cursor-settings.png)
 6. When prompted, enter agent type: `admin`, `data`, or `all`.
 7. The MCP server will start automatically when accessed by Cursor AI.
