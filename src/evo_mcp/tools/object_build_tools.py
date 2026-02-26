@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Bentley Systems, Incorporated
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 MCP tools for building and creating Geoscience Objects from CSV data.
 
@@ -15,6 +19,7 @@ All tools follow a similar pattern:
 
 import logging
 from pathlib import Path
+from typing import Optional
 from uuid import UUID
 from typing import Optional
 

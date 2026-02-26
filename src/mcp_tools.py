@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Bentley Systems, Incorporated
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 
 A FastMCP server that provides tools for interacting with the Evo platform,
@@ -17,13 +21,15 @@ import os
 import logging
 from pathlib import Path
 from fastmcp import FastMCP
+from fastmcp.utilities.logging import configure_logging
 
 from evo_mcp.tools import (
     register_admin_tools,
     # register_data_tools,
     register_general_tools,
     register_filesystem_tools,
-    register_object_builder_tools,    
+    register_object_builder_tools,
+    register_instance_users_admin_tools,,    
     register_data_analysis_tools,
 )
 
@@ -43,6 +49,10 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
 # Initialize FastMCP server with agent type in name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
 mcp = FastMCP(server_name)
+
+# Show more traceback frame for now, we may want to disabled the rich
+# traceback formatting entirely too.
+configure_logging(tracebacks_max_frames=20)
 
 def _get_objects_reference_content() -> str:
     """Load the objects reference content from a markdown file."""
@@ -64,7 +74,7 @@ register_general_tools(mcp)  # Always register general tools
 
 if TOOL_FILTER in ["all", "admin"]:  #  "admin_agent"
     register_admin_tools(mcp)
-    
+    register_instance_users_admin_tools(mcp)
 if TOOL_FILTER in ["all", "data"]: #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
@@ -115,6 +125,9 @@ if TOOL_FILTER == "all":
         - Duplicating entire workspaces with optional filtering
         - Bulk operations on multiple objects
         - Data migration and backup operations
+        - Listing users in the instance and their roles
+        - Adding or removing users from the instance
+        - Updating user roles in the instance
 
         When a user asks about workspaces, use the available MCP tools to provide accurate information.
         Always be clear about what workspace you're working with.

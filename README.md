@@ -138,8 +138,16 @@ source .venv/bin/activate
 
 #### e. Install dependencies
 
+##### Install essential runtime dependencies
+
 ```bash
-pip install -r requirements.txt
+pip install -e .
+```
+
+##### Install dev dependencies along with the essential runtime dependencies
+
+```bash
+pip install -e '.[dev]'
 ```
 
 ### 6. Configure your Evo credentials
@@ -337,7 +345,7 @@ We rely on an open, friendly, inclusive environment. To help us ensure this rema
 
 ## License
 
-The Evo MCP server is open source and licensed under the [Apache 2.0 license.](./LICENSE.md).
+The Evo MCP server is open source and licensed under the [Apache 2.0 license](./LICENSE.md).
 
 Copyright © 2026 Bentley Systems, Incorporated.
 
