@@ -379,26 +379,46 @@ def get_vscode_config_dir(variant: str) -> Path | None:
     """Get the VS Code configuration directory for the current platform."""
     system = platform.system()
 
-    # WSL detection
-    is_wsl = False
-    try:
-        with open("/proc/version", "r") as f:
-            version_info = f.read().lower()
-            if "microsoft" in version_info or "wsl" in version_info:
-                is_wsl = True
-    except Exception:
-        pass
+    def is_wsl_environment() -> bool:
+        if system != "Linux":
+            return False
+        if os.environ.get("WSL_INTEROP") or os.environ.get("WSL_DISTRO_NAME"):
+            return True
+        try:
+            with open("/proc/sys/kernel/osrelease", "r", encoding="utf-8") as f:
+                return "microsoft" in f.read().lower()
+        except OSError:
+            return False
 
-    if is_wsl:
-        # WSL: VS Code config is in /mnt/c/Users/<username>/AppData/Roaming/Code/User
+    if is_wsl_environment():
+        candidates: list[Path] = []
+
+        # VS Code Remote - WSL stores user settings in the server data directory.
+        agent_folder = os.environ.get("VSCODE_AGENT_FOLDER")
+        if agent_folder:
+            candidates.append(Path(agent_folder) / "data" / "User")
+
+        if variant == "Code - Insiders":
+            candidates.append(Path.home() / ".vscode-server-insiders" / "data" / "User")
+        else:
+            candidates.append(Path.home() / ".vscode-server" / "data" / "User")
+
+        # Fallback for unusual setups that intentionally write to Windows AppData from WSL.
         win_home = os.environ.get("WIN_HOME")
-        if not win_home:
-            # Try to infer Windows home from WSL environment
-            import getpass
-            username = getpass.getuser()
-            win_home = f"/mnt/c/Users/{username}"
-        config_dir = Path(win_home) / "AppData" / "Roaming" / variant / "User"
-        return config_dir if config_dir.parent.exists() else None
+        if win_home:
+            candidates.append(Path(win_home) / "AppData" / "Roaming" / variant / "User")
+
+        for candidate in candidates:
+            if candidate.parent.exists():
+                print_color(f"Debug: WSL detected, using VS Code config directory: {candidate}", Colors.BLUE)
+                return candidate
+
+        checked_paths = ", ".join(str(path) for path in candidates)
+        print_color(
+            f"Debug: WSL detected, but no VS Code config directory was found. Checked: {checked_paths}",
+            Colors.BLUE,
+        )
+        return None
 
     if system == "Windows":
         appdata = os.environ.get("APPDATA")
