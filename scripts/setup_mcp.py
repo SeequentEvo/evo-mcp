@@ -9,9 +9,12 @@ Evo MCP Configuration Setup
 Cross-platform script to configure the Evo MCP server for VS Code or Cursor.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -57,9 +60,12 @@ def print_color(text: str, color: str = Colors.RESET):
     print(f"{color}{text}{Colors.RESET}")
 
 
-def is_confirmed(prompt: str = "Is this correct? [Y/n]: ") -> bool:
-    """Prompt for yes/no confirmation with yes as default."""
-    return input(prompt).strip().lower() in ["", "y", "yes"]
+def is_confirmed(prompt: str = "Is this correct? [Y/n]: ", default_yes: bool = True) -> bool:
+    """Prompt for yes/no confirmation with configurable default."""
+    choice = input(prompt).strip().lower()
+    if not choice:
+        return default_yes
+    return choice in ["y", "yes"]
 
 
 def prompt_choice(
@@ -468,6 +474,65 @@ def get_python_executable() -> str:
     return str(Path(sys.executable))
 
 
+def is_virtual_environment_active() -> bool:
+    """Return True when setup is running inside a Python virtual environment."""
+    return (
+        sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+        or bool(os.environ.get("VIRTUAL_ENV"))
+    )
+
+
+def resolve_python_executable(python_command: str) -> str | None:
+    """Resolve a Python command to an executable path and verify it is runnable."""
+    command = python_command.strip()
+    if not command:
+        return None
+
+    if not any(sep in command for sep in ["/", "\\"]):
+        which = shutil.which(command)
+        if which:
+            command = which
+
+    try:
+        completed = subprocess.run(
+            [command, "-c", "import sys; print(sys.executable)"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, ValueError):
+        return None
+
+    if completed.returncode != 0:
+        return None
+
+    resolved = completed.stdout.strip().splitlines()
+    return resolved[-1] if resolved else None
+
+
+def choose_python_executable(default_python: str) -> str:
+    """Allow the user to confirm or override the Python executable for MCP config."""
+    print(f"Current Python interpreter: {default_python}")
+
+    if is_virtual_environment_active():
+        print_color("Detected active virtual environment.", Colors.GREEN)
+        if is_confirmed("Use this Python interpreter? [Y/n]: "):
+            return default_python
+    else:
+        print_color("Warning: setup is running outside a virtual environment.", Colors.RED)
+        print("If Evo MCP dependencies are in a virtual environment, use that interpreter path.")
+        if is_confirmed("Use this interpreter anyway? [y/N]: ", default_yes=False):
+            return default_python
+
+    while True:
+        candidate = input(f"Enter Python executable path (default: {default_python}): ").strip()
+        candidate = candidate or default_python
+        resolved = resolve_python_executable(candidate)
+        if resolved:
+            return resolved
+        print_color("✗ Python executable not found or not runnable. Please try again.", Colors.RED)
+
+
 def build_config_entry(
     client: ClientChoice,
     protocol: str,
@@ -520,7 +585,7 @@ def setup_mcp_config(
     print(f"Configuration file: {config_file}")
     print()
 
-    python_exe = get_python_executable()
+    python_exe = choose_python_executable(get_python_executable())
     mcp_script = str(project_dir / "src" / "mcp_tools.py")
 
     config_dir.mkdir(parents=True, exist_ok=True)
