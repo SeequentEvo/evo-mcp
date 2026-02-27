@@ -148,8 +148,8 @@ def register_general_tools(mcp):
             logger.debug(f"Got object_client: {object_client}")
             
             service_health = await object_client.get_service_health()
-            status = service_health.raise_for_status()
-            logger.debug("Object client status:", status)
+            service_health.raise_for_status()
+            logger.debug("Object client health check passed")
             
             logger.debug("Calling list_objects()")
             objects = await object_client.list_objects(
