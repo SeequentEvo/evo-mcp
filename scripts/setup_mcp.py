@@ -379,6 +379,27 @@ def get_vscode_config_dir(variant: str) -> Path | None:
     """Get the VS Code configuration directory for the current platform."""
     system = platform.system()
 
+    # WSL detection
+    is_wsl = False
+    try:
+        with open("/proc/version", "r") as f:
+            version_info = f.read().lower()
+            if "microsoft" in version_info or "wsl" in version_info:
+                is_wsl = True
+    except Exception:
+        pass
+
+    if is_wsl:
+        # WSL: VS Code config is in /mnt/c/Users/<username>/AppData/Roaming/Code/User
+        win_home = os.environ.get("WIN_HOME")
+        if not win_home:
+            # Try to infer Windows home from WSL environment
+            import getpass
+            username = getpass.getuser()
+            win_home = f"/mnt/c/Users/{username}"
+        config_dir = Path(win_home) / "AppData" / "Roaming" / variant / "User"
+        return config_dir if config_dir.parent.exists() else None
+
     if system == "Windows":
         appdata = os.environ.get("APPDATA")
         if not appdata:
@@ -487,7 +508,12 @@ def setup_mcp_config(
     if config_file.exists():
         try:
             with open(config_file, "r", encoding="utf-8") as f:
-                settings = json.load(f)
+                raw_config = f.read()
+
+            if raw_config.strip():
+                settings = json.loads(raw_config)
+            else:
+                settings = {}
         except json.JSONDecodeError as e:
             print_color(f"✗ Invalid JSON in existing config file: {e}", Colors.RED)
             print(f"Please fix the syntax error in: {config_file}")
