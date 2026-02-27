@@ -308,16 +308,22 @@ def start_http_server(python_exe: str, mcp_script: str, project_dir: Path) -> in
 def get_client_choice() -> ClientChoice:
     """Ask user which client app to configure."""
     print("Which client app are you using?")
-    print("1. VS Code (recommended)")
-    print("2. VS Code Insiders")
-    print("3. Cursor")
+
+    ordered_choices = sorted(CLIENT_CHOICES.items(), key=lambda item: int(item[0]))
+    for key, client in ordered_choices:
+        suffix = " (recommended)" if key == "1" else ""
+        print(f"{key}. {client.display_name}{suffix}")
+
     print()
 
+    choice_keys = {key for key, _ in ordered_choices}
+    choice_list = ", ".join(sorted(choice_keys, key=int))
+
     choice = prompt_choice(
-        "Enter your choice [1-3] (default: 1): ",
-        set(CLIENT_CHOICES.keys()),
+        f"Enter your choice (default: 1): ",
+        choice_keys,
         "1",
-        "Invalid choice. Please enter 1, 2, or 3.",
+        f"Invalid choice. Please enter one of: {choice_list}.",
     )
     return CLIENT_CHOICES[choice]
 
