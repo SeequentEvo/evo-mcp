@@ -40,9 +40,22 @@ from evo_mcp.tools import (
     register_data_analysis_tools,
 )
 
-# Get agent type from environment variable 
-# Thsi can either be set via MCP inputs, or the .env file used by the agent example
-TOOL_FILTER = os.getenv("MCP_TOOL_FILTER", 
+# Get transport mode from environment variable
+TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio").lower()
+VALID_TRANSPORTS = ["stdio", "http"]
+
+if TRANSPORT not in VALID_TRANSPORTS:
+    logging.warning("Invalid MCP_TRANSPORT '%s', defaulting to 'stdio'", TRANSPORT)
+    TRANSPORT = "stdio"
+
+# Get HTTP configuration if using HTTP transport
+if TRANSPORT == "http":
+    HTTP_HOST = os.getenv("MCP_HTTP_HOST", "localhost")
+    HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
+
+# Get agent type from environment variable
+# This can either be set via MCP inputs, or the .env file used by the agent example
+TOOL_FILTER = os.getenv("MCP_TOOL_FILTER",
     os.getenv(
         "MCP_AGENT_TYPE",  # Kept for backwards compatibility
         "all",
