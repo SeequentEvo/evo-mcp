@@ -12,17 +12,18 @@
 
 - [What is MCP?](#what-is-mcp)
 - [What is the Evo MCP server?](#what-is-the-evo-mcp-server)
-- [Use Cases](#use-cases)
-- [Evo MCP server architecture](#evo-mcp-server-architecture)
-- [Getting Started](#getting-started)
+  - [How teams use Evo MCP](#how-teams-use-evo-mcp)
+  - [Server architecture](#server-architecture)
+- [Getting started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
 - [Connect to Evo MCP](#connect-to-evo-mcp)
   - [VS Code](#vs-code)
   - [Cursor](#cursor)
-- [Using Evo MCP](#using-evo-mcp)
+  - [Additional tips](#additional-tips)
 - [Advanced](#advanced)
-  - [Testing Evo MCP with a Google ADK agent](#testing-evo-mcp-with-a-google-adk-agent)
+  - [Testing with curl](#testing-with-curl)
+  - [Testing with a Google ADK agent](#testing-with-a-google-adk-agent)
 - [Development](#development)
 - [Contributing](#contributing)
 - [Code of conduct](#code-of-conduct)
@@ -46,15 +47,15 @@ The Evo MCP server is a self-hosted server that provides a secure, standardised 
 
 The server comes packaged with many tools written by Seequent, but it is fully extensible and users are encouraged to add their own tools.
 
-## Use Cases
+### How teams use Evo MCP
 
-* Workspace Management: Create workspaces, summarize objects, snapshot and duplicate workspaces, copy objects between workspaces.
-* Geoscience Object Creation: structured geoscience objects (Pointsets, Line Segments, Downhole Collections, and Downhole Intervals) in Evo directly from raw CSV files, automating data validation and schema mapping.
+* Workspace management: Create workspaces, summarize objects, snapshot and duplicate workspaces, copy objects between workspaces.
+* Geoscience object creation: structured geoscience objects (pointsets, line segments, downhole collections, and downhole intervals) in Evo directly from raw CSV files, automating data validation and schema mapping.
 
 > [!WARNING]
-> The Evo MCP server is in early development. Functionality is currently limited. Your feedback on future development is welcome!
+> The Evo MCP server is in early development and functionality is limited. Your feedback on future development is welcome!
 
-## Evo MCP server architecture
+### Server architecture
 
 MCP Client (VS Code / ADK Agent / etc) <-> MCP Server (FastMCP + Evo SDK) <-> Evo APIs
 
@@ -66,23 +67,23 @@ MCP Client (VS Code / ADK Agent / etc) <-> MCP Server (FastMCP + Evo SDK) <-> Ev
 
 ### Installation 
 
-**1. Clone this repository**
+#### 1. Clone this repository
 ```powershell
 git clone https://github.com/SeequentEvo/evo-mcp.git
 ```
 
-**2. Navigate to the root directory**
+#### 2. Navigate to the root directory
 ```powershell
 cd <path-to-this-repository>
 ```
 
-**3. Create a Python environment**
+#### 3. Create a Python environment
 
 <strong>Option 1: Using `uv` (recommended)</strong>
 
 The Python package manager `uv` makes it easy to set up your Python environment. Visit the [uv website](https://docs.astral.sh/uv/) to learn more.
 
-#### a. Install `uv` (if not already installed)
+##### a. Install `uv` (if not already installed)
 
 ##### Windows
 
@@ -96,7 +97,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-#### b. Create the Python environment including dependencies
+##### b. Create the Python environment including dependencies
 ```bash
 uv sync
 ```
@@ -105,25 +106,25 @@ uv sync
 
 If you prefer using `pip` and `pyenv` to manage your Python environment:
 
-#### a. Install `pyenv` (if not already installed)
+##### a. Install `pyenv` (if not already installed)
    - **Windows**: Use [pyenv-win](https://github.com/pyenv-win/pyenv-win#installation)
    - **macOS**: `brew install pyenv`
    - **Linux**: Follow [pyenv installation guide](https://github.com/pyenv/pyenv#installation)
 
 
-#### b. Install Python 3.10+
+##### b. Install Python 3.10+
    ```bash
    pyenv install 3.10
    pyenv local 3.10
    ```
 
-#### c. Create a virtual environment
+##### c. Create a virtual environment
 
 ```bash
 python -m venv .venv
 ```
 
-#### d. Activate the virtual environment
+##### d. Activate the virtual environment
 
 ##### Windows
 ```powershell
@@ -136,80 +137,155 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-#### e. Install dependencies
+##### e. Install dependencies
 
-##### Install essential runtime dependencies
+Install essential runtime dependencies:
 
 ```bash
 pip install -e .
 ```
 
-##### Install dev dependencies along with the essential runtime dependencies
+Install dev dependencies along with the essential runtime dependencies:
 
 ```bash
 pip install -e '.[dev]'
 ```
 
-### 6. Configure your Evo credentials
+#### 4. Choose an MCP transport mode (optional)
 
-You need to create a **native app** in the iTwin Developer Portal before continuing. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn how to create an app.
+The Evo MCP server supports two common transport modes for different use cases.
 
-Copy the file `.env.example`, rename the copy to `.env` and fill in:
+##### STDIO transport (default)
+
+**Recommended for**: VS Code, Cursor, Claude Desktop, and other integrated MCP clients
+
+`STDIO` (Standard Input/Output) is the default transport mode and is optimised for direct integration with MCP client applications. This transport communicates through standard input and output streams, making it perfect for command-line tools and desktop applications like VS Code and Cursor.
+With STDIO transport, the client spawns a new server process for each session and manages its lifecycle. The server reads MCP messages from stdin and writes responses to stdout. This is why STDIO servers don’t stay running - they’re started on-demand by the client.
+
+**Advantages**
+- Simpler configuration - client handles connection automatically
+- Better performance for local connections
+- Directly integrated into VS Code and Cursor workflows
+- No network overhead
+
+Configure your client (VS Code, Cursor, etc.) to start the MCP server process. The client will handle all communication via STDIO.
+
+##### Streamable HTTP transport
+
+**Recommended for**: Testing, remote access, programmatic access via curl/scripts, and containerised deployments (Docker)
+
+HTTP transport turns your MCP server into a web service accessible via a URL. This transport uses the Streamable HTTP protocol, which allows clients to connect over the network. Unlike STDIO where each client gets its own process, an HTTP server can handle multiple clients simultaneously.
+
+The Streamable HTTP protocol provides full bidirectional communication between client and server, supporting all MCP operations including streaming responses. This makes it the recommended choice for network-based deployments.
+
+**Advantages**
+- Can be accessed via curl, programming languages, or HTTP clients
+- Useful for testing and debugging
+- Enables remote access to the server
+- Simplifies integration with custom tools and scripts
+- Ideal for containerised deployments (Docker, Kubernetes)
+- Works well in cloud environments and microservices architectures
+
+**Limitations**
+- Requires separate server process management
+- Slightly higher latency due to HTTP overhead
+
+##### Common use cases
+
+| Use case | Recommended mode |
+|----------|-----------------|
+| Using VS Code with Copilot | STDIO |
+| Using Cursor with AI | STDIO |
+| Using Claude Desktop | STDIO |
+| Testing tools with curl | Streamable HTTP |
+| Remote server access | Streamable HTTP |
+| Custom script integration | Streamable HTTP |
+
+
+#### 5. Configure your environment
+
+##### Evo app credentials
+
+You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
+
+Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app credentials:
 ```bash
 EVO_CLIENT_ID=your-client-id
 EVO_REDIRECT_URL=your-redirect-url
-
-# Server configuration (optional)
-MCP_TOOL_FILTER=all
 ```
 
-### 7. Configure MCP tool filtering (optional)
+##### MCP transport mode (optional)
+
+The Evo MCP server supports two transport modes: **STDIO** and **streamable HTTP**. By default, the server runs in **STDIO** mode which is recommended for local development.
+
+Set `MCP_TRANSPORT` environment variable in `.env` to choose the transport mode:
+- `STDIO` - Standard input/output (default)
+- `HTTP` - Streamable HTTP
+
+```bash
+MCP_TRANSPORT=STDIO
+```
+
+If using HTTP mode, also configure the host and port:
+```bash
+MCP_TRANSPORT=HTTP
+MCP_HTTP_HOST=localhost
+MCP_HTTP_PORT=5000
+```
+
+When using HTTP mode, the MCP server must be running and reachable at the configured URL. The setup scripts can start it automatically for you, or you can run it manually.
+
+##### MCP tool filtering (optional)
 
 Set `MCP_TOOL_FILTER` environment variable in `.env` to filter available tools:
 - `admin` - Workspace/instance management and bulk data operations
 - `data` - Object import, download and query operations  
 - `all` - All tools (default)
 
+```bash
+MCP_TOOL_FILTER=all
+```
+
 ## Connect to Evo MCP
 
-Apps like VS Code and Cursor make it easy to connect to MCP servers, whether they are running locally or are available over a network or the internet. VS Code is free to download and use but Cursor requires a paid subscription.
+Apps like VS Code and Cursor make it easy to connect to MCP servers, whether they are running locally, are available over a local network, or over the internet. VS Code is free to download and use. Cursor requires a paid subscription.
+
+NOTE: Installing any of the MCP client apps described in this section is entirely optional. If you have a favourite MCP client app that you think we should document here, please create a [feature request ticket](https://github.com/SeequentEvo/evo-mcp/issues) and let us know.
 
 ### VS Code
 
 #### Installation
 
-VS Code comes in two flavours - **VS Code** and **VS Code Insiders**. Install one of these apps before running Evo MCP. NOTE: Both of these apps can be installed and used independently.
+VS Code comes in two versions - **VS Code** and **VS Code Insiders**. Install one of these apps before running Evo MCP. 
+NOTE: Both of these apps can be installed and used independently.
 
-- Install the regular version of [VS Code](https://code.visualstudio.com/Download).
-- Install [VS Code Insiders](https://code.visualstudio.com/insiders/) for the most up-to-date experience. **VS Code Insiders** provides early access to the latest features and improvements for MCP integration, ensuring optimal compatibility and performance. 
+- Install the regular version of [VS Code](https://code.visualstudio.com/Download) (recommended).
+- Install [VS Code Insiders](https://code.visualstudio.com/insiders/) for the most up-to-date experience. VS Code Insiders provides early access to the latest features and improvements for MCP integration. 
 
 #### Configuration
 
-MCP server configurations can be added to VS Code in one of two places:
-- **User settings**. The MCP server will be accessible everywhere (recommended).
-- **Workspace settings**. The MCP server can only be accessed in designated VS Code workspaces.
-
-Run the supplied Python script to add the required settings. The script will ask if you want to modify the **user settings** or the **workspace settings**.
+Run the supplied Python script to add the required settings. The script will ask you a series of questions in the console.
 
 **If you set up Python with `uv`:**
 ```bash
-uv run python scripts/setup-vscode.py
+uv run python scripts/setup_mcp.py
 ```
 
 **If you set up Python with `pip`:**
 ```bash
-python scripts/setup-vscode.py
+python scripts/setup_mcp.py
 ```
 
 **Manual method**
-1. Copy the settings found in `templates/vscode-mcp-config.json`.
+1. Copy the settings found in `templates/vscode-stdio-config.json`.
+  - For HTTP mode, use `templates/vscode-http-config.json` instead.
+  - Update the template URL host and port to match `MCP_HTTP_HOST` and `MCP_HTTP_PORT` in your `.env`, and ensure the HTTP server is running.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
-3. Search for "mcp". Select either **MCP: Open User Configuration** to update the user settings or **MCP: Open Workspace Folder MCP Configuration** to update the workspace settings.
+3. Search for "mcp". Select **MCP: Open User Configuration** to update the user settings.
   ![VS Code Command Palette](images/vscode-command-palette.png)
-4. Paste the settings you copied from the template and update the paths to match your installation. Save the file.
+4. Paste the settings you copied from the template, update the paths to match your local installation, and save the file. NOTE: The JSON template shows Windows file paths but the screenshot below shows macOS file paths. Follow the conventions that suit your operating system. 
   ![VS Code MCP Settings](images/vscode-settings.png)
-5. When prompted by the app, enter agent type: `admin`, `data`, or `all`.
-6. The MCP server will start automatically when accessed by Copilot.
+5. The MCP server will start automatically when accessed by Copilot.
 
 #### Verify the configuration
 
@@ -220,7 +296,9 @@ To verify that the Evo MCP server is correctly configured in VS Code:
     ![VS Code Extensions](images/vscode-extensions.png)
 
 2. Look for **evo-mcp** in the list of **MCP Servers - Installed**.
-  ![VS Code MCP Servers](images/vscode-mcp-servers.png)
+
+    ![VS Code MCP Servers](images/vscode-mcp-servers.png)
+
 3. Ensure there are no warning icons or error messages displayed.
 
 If you see **evo-mcp** listed without any warnings, the configuration is correct and the server is ready to use.
@@ -229,28 +307,27 @@ If you see **evo-mcp** listed without any warnings, the configuration is correct
 
 #### Installation
 
-Cursor is an AI-powered code editor with built-in support for MCP servers. To use the Evo MCP server in Cursor, you must first [download and install it](https://cursor.com/download). Note that Cursor requires a paid subscription to use MCP features.
+Cursor is an AI-powered code editor with built-in support for MCP servers. To use the Evo MCP server in Cursor first [download and install it](https://cursor.com/download). 
+NOTE: Cursor requires a paid subscription to use MCP features.
 
 #### Configuration
 
-MCP server configurations can be added to Cursor in one of two places:
-- **User settings**. The MCP server will be accessible everywhere (recommended).
-- **Workspace settings**. The MCP server can only be accessed in designated Cursor workspaces.
-
-Run the supplied Python script to add the required settings. The script will ask if you want to modify the **user settings** or the **workspace settings**.
+Run the supplied Python script to add the required settings. The script will ask you a series of questions in the console.
 
 **If you set up Python with `uv`:**
 ```bash
-uv run python scripts/setup-cursor.py
+uv run python scripts/setup_mcp.py
 ```
 
 **If you set up Python with `pip`:**
 ```bash
-python scripts/setup-cursor.py
+python scripts/setup_mcp.py
 ```
 
-#### Manual method (user settings)
-1. Copy the settings found in `templates/cursor-mcp-config.json`.
+#### Manual method
+1. Copy the settings found in `templates/cursor-stdio-config.json`.
+  - For HTTP mode, use `templates/cursor-http-config.json` instead.
+  - Update the template URL host and port to match `MCP_HTTP_HOST` and `MCP_HTTP_PORT` in your `.env`, and ensure the HTTP server is running.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
 3. Search for "mcp". Select either **View: Open MCP Settings** to update the user settings.
   ![Cursor Command Palette](images/cursor-command-palette.png)
@@ -259,20 +336,9 @@ python scripts/setup-cursor.py
 
     ![Cursor MCP Add New Settings](images/cursor-mcp-add-new.png)
 
-5. Paste the settings you copied from the template and update the paths to match your installation. Save the file.
+5. Paste the settings you copied from the template, update the paths to match your local installation, and save the file. NOTE: The JSON template shows Windows file paths but the screenshot below shows macOS file paths. Follow the conventions that suit your operating system. 
   ![Cursor MCP Settings](images/cursor-settings.png)
-6. When prompted, enter agent type: `admin`, `data`, or `all`.
-7. The MCP server will start automatically when accessed by Cursor AI.
-
-#### Manual method (workspace settings)
-1. Copy the settings found in `templates/cursor-mcp-config.json`.
-2. Create a new folder in your workspace called **.cache** (be sure to include the period character). 
-3. Create a new file within this folder called **mcp.json**.
-4. Open **mcp.json**, paste the settings you copied from the template and update the paths to match your installation. Save the file.
-  ![Cursor MCP Settings](images/cursor-settings.png)
-
-5. When prompted, enter agent type: `admin`, `data`, or `all`
-6. The MCP server will start automatically when accessed by Cursor AI
+6. The MCP server will start automatically when accessed by Cursor AI.
 
 #### Verifying the integration
 
@@ -284,23 +350,101 @@ To verify that the Evo MCP server is correctly configured in Cursor:
   ![Cursor Verify Settings](images/cursor-verify-settings.png)
 
 
-## Using Evo MCP
+### Additional tips
 
-Tips for getting the best experience:
-- **Use a separate workspace**: Open a fresh VS Code or Cursor workspace just for connecting to the Evo MCP server (not the **evo-mcp** repo). GitHub Copilot may decide to bypass using MCP if it can see the MCP code directly in the workspace.
-- **Let VS Code/Cursor start the MCP server on demand**: You don't need to launch the Python script manually.
-- **Check your .env**: Ensure `EVO_CLIENT_ID` and `EVO_REDIRECT_URL` are set in your `.env` file before connecting.
+- **Use a separate workspace**: Create a new workspace that is separate to your clone of this repository. If your copilot/agent has access to the source files in this repository, it may decide to ignore the MCP server.
+- **STDIO mode starts on demand**: In `STDIO` mode, VS Code/Cursor will launch the MCP server when needed.
+- **HTTP mode needs a running server**: If you select `HTTP`, the server must already be running. The setup script can start it for you in the current terminal session so you can see live output.
+- **Check your environment variables**: Ensure `EVO_CLIENT_ID` and `EVO_REDIRECT_URL` are set in your `.env` file before connecting.
 - **Reload after changes**: If you edit settings or `.env` values, reload the window so the client picks up the new config.
 
 ---
 
 ## Advanced
 
-### Testing Evo MCP with a Google ADK agent
+### Testing with curl
+
+Running Evo MCP in streamable HTTP mode allows you to use `curl` to access the MCP tools.
+
+**Setup:**
+```bash
+# In .env or environment
+MCP_TRANSPORT=HTTP
+MCP_HTTP_HOST=localhost
+MCP_HTTP_PORT=5000
+```
+
+**Start the server:**
+
+If you ran `setup_mcp.py`, selected `HTTP`, and chose to start now, the script starts the server in the current terminal so you can see live logs.
+
+Otherwise, start it manually:
+```bash
+python src/mcp_tools.py
+```
+
+The server will start listening on `http://localhost:5000/mcp`.
+
+**Access tools using curl:**
+
+**macOS/Linux (bash/zsh)**
+```bash
+# 1) Initialize session and capture MCP session ID
+SESSION_ID=$(curl -sS -D - -o /dev/null \
+  -X POST http://localhost:5000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}' \
+  | awk 'BEGIN{IGNORECASE=1}/^mcp-session-id:/{print $2}' | tr -d '\r')
+
+# 2) List workspaces
+curl -sS -X POST http://localhost:5000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: ${SESSION_ID}" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_workspaces","arguments":{"name":"","deleted":false,"limit":50}}}'
+
+# 3) Create a workspace
+curl -sS -X POST http://localhost:5000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: ${SESSION_ID}" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_workspace","arguments":{"name":"My New Workspace","description":"Test workspace"}}}'
+```
+
+**Windows (PowerShell)**
+```powershell
+# 1) Initialize session and capture MCP session ID
+$initHeaders = curl.exe -sS -D - -o NUL `
+  -X POST http://localhost:5000/mcp `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json, text/event-stream" `
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
+
+$SESSION_ID = ($initHeaders | Select-String -Pattern '^mcp-session-id:\s*(.+)$' -CaseSensitive:$false).Matches[0].Groups[1].Value.Trim()
+
+# 2) List workspaces
+curl.exe -sS -X POST http://localhost:5000/mcp `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json, text/event-stream" `
+  -H "Mcp-Session-Id: $SESSION_ID" `
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_workspaces","arguments":{"name":"","deleted":false,"limit":50}}}'
+
+# 3) Create a workspace
+curl.exe -sS -X POST http://localhost:5000/mcp `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json, text/event-stream" `
+  -H "Mcp-Session-Id: $SESSION_ID" `
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_workspace","arguments":{"name":"My New Workspace","description":"Test workspace"}}}'
+```
+
+> Note: Streamable HTTP requires clients to send `Accept: application/json, text/event-stream`.
+
+### Testing with a Google ADK agent
 
 An example Google ADK agent is provided for testing the MCP server:
 
-**Prerequisites:**
+**Prerequisites**
 - Google Cloud SDK (`gcloud` CLI) installed and configured
 
   ```powershell
@@ -309,17 +453,17 @@ An example Google ADK agent is provided for testing the MCP server:
 
 - A GCP project with Vertex AI API enabled
 
-  **Add to `.env`:**
+**Add to `.env`**
 
-    ```bash
-    GOOGLE_CLOUD_PROJECT=your-project-id
-    GOOGLE_CLOUD_LOCATION=your-region
+```bash
+GOOGLE_CLOUD_PROJECT=your-project-id
+GOOGLE_CLOUD_LOCATION=your-region
 
-    # Passed through to the MCP server's `MCP_TOOL_FILTER` config.
-    EVO_AGENT_TYPE=all
-    ```
+# Passed through to the MCP server's `MCP_TOOL_FILTER` config.
+MCP_TOOL_FILTER=all
+```
 
-**Run:**
+**Run**
   ```powershell
   cd src\agents
   adk web
@@ -366,4 +510,4 @@ Before using an MCP Server, you should consider conducting your own independent 
 
 ## Acknowledgements
 
-Much of this document was inspired by the excellent guide written by [AWS Labs](https://github.com/awslabs/mcp).
+Much of this document was inspired by the excellent guides written by [FastMCP](https://gofastmcp.com) and [AWS Labs](https://github.com/awslabs/mcp).

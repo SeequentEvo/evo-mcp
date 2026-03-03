@@ -1,9 +1,0 @@
-{
-	"servers": {
-		"evo-mcp": {
-			"type": "stdio",
-			"command": "c:\\Dev\\evo-mcp\\venv\\Scripts\\python.exe",
-			"args": ["c:\\Dev\\evo-mcp\\src\\mcp_tools.py"],
-		}
-	}
-}

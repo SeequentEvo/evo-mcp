@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-
 A FastMCP server that provides tools for interacting with the Evo platform,
 including workspace management, object ops, and data transfer.
 
@@ -13,8 +12,16 @@ Configuration:
     - "data"    : Object query and management tools 
     - "all"       : All tools (default)
 
-The environment variable can be set in a .env file or passed directly to the MCP server as an input parameter.
-See the file 'vscode-mcp-config-example.json' for an example of passing environment variables to the MCP server.
+    Set MCP_TRANSPORT environment variable to choose transport mode:
+    - "stdio" (default): Standard input/output, used by VS Code, Cursor, Claude Desktop
+    - "http": Streamable HTTP, accessible via HTTP requests
+
+    For HTTP transport, configure:
+    - MCP_HTTP_HOST: Host to bind to (default: localhost)
+    - MCP_HTTP_PORT: Port to listen on (default: 5000)
+
+The environment variables can be set in a .env file or 
+passed directly to the MCP server as input parameters.
 """
 
 import os
@@ -29,7 +36,7 @@ from evo_mcp.tools import (
     register_general_tools,
     register_filesystem_tools,
     register_object_builder_tools,
-    register_instance_users_admin_tools,    
+    register_instance_users_admin_tools,
     register_data_analysis_tools,
 )
 
@@ -37,13 +44,13 @@ from evo_mcp.tools import (
 # Thsi can either be set via MCP inputs, or the .env file used by the agent example
 TOOL_FILTER = os.getenv("MCP_TOOL_FILTER", 
     os.getenv(
-        "MCP_AGENT_TYPE",  # Kept for backwards compatability
+        "MCP_AGENT_TYPE",  # Kept for backwards compatibility
         "all",
     )).lower()
 VALID_TOOL_FILTERS = ["admin", "data", "all"]
 
 if TOOL_FILTER not in VALID_TOOL_FILTERS:
-    logging.warning(f"Invalid MCP_TOOL_FILTER '{TOOL_FILTER}', defaulting to 'all'")
+    logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
     TOOL_FILTER = "all"
 
 # Initialize FastMCP server with agent type in name for clarity
@@ -61,18 +68,20 @@ def _get_objects_reference_content() -> str:
         with open(reference_path, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        logging.error(f"Objects reference file not found at {reference_path}")
+        logging.error("Objects reference file not found at %s", reference_path)
         return "Objects reference information is currently unavailable."
-    
-    
+
 
 # =============================================================================
 # Tools - Conditionally registered based on TOOL_FILTER
 # =============================================================================
 
-register_general_tools(mcp)  # Always register general tools
+# Always register general tools (workspace discovery, object queries, etc.)
+register_general_tools(mcp)
 
-if TOOL_FILTER in ["all", "admin"]:  #  "admin_agent"
+if TOOL_FILTER in ["all", "admin"]:
+    # Admin Agent: Workspace and instance management tools
+    # Includes: workspace creation, snapshots, duplication, permissions management
     register_admin_tools(mcp)
     register_instance_users_admin_tools(mcp)
 if TOOL_FILTER in ["all", "data"]: #  "data_agent"
@@ -80,6 +89,10 @@ if TOOL_FILTER in ["all", "data"]: #  "data_agent"
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
     register_data_analysis_tools(mcp)
+    if TOOL_FILTER == "data":
+        print("Evo MCP Server configured for Data Agent")
+    else:
+        print("Evo MCP Server configured - Data tools enabled")
 
 # =============================================================================
 # Resources (not currently supported in ADK)
@@ -288,5 +301,18 @@ if TOOL_FILTER in ["all", "data"]:
 # =============================================================================
 
 if __name__ == "__main__":
-    # run the server
-    mcp.run()
+    # Log startup information
+    logger = logging.getLogger(__name__)
+    logger.info("Starting Evo MCP Server in %s mode", TRANSPORT.upper())
+
+    # Run the server with selected transport mode
+    if TRANSPORT == "http":
+        logger.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
+        mcp.run(
+            transport="http",
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+        )
+    else:
+        # Default STDIO mode
+        mcp.run()
