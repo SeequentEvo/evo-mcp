@@ -1,28 +1,12 @@
 <p align="center"><a href="https://seequent.com" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="https://developer.seequent.com/img/seequent-logo-dark.svg" alt="Seequent logo" width="400" /><img src="https://developer.seequent.com/img/seequent-logo.svg" alt="Seequent logo" width="400" /></picture></a></p>
 
 <p align="center">
-  <a href="https://github.com/SeequentEvo/evo-mcp/actions/workflows/lint.yaml"><img src="https://github.com/SeequentEvo/evo-mcp/actions/workflows/lint.yaml/badge.svg" alt="Lint" /></a>
-</p>
-
-<p align="center">
     <a href="https://developer.seequent.com/" target="_blank">Seequent Developer Portal</a>
     &bull; <a href="https://community.seequent.com/group/19-evo" target="_blank">Seequent Community</a>
     &bull; <a href="https://seequent.com" target="_blank">Seequent website</a>
 </p>
 
 # Evo MCP 
-
-Run code quality checks locally with:
-
-```bash
-make lint
-```
-
-Auto-fix lint and formatting issues with:
-
-```bash
-make lint-fix
-```
 
 ## Table of contents
 
