@@ -1,12 +1,28 @@
 <p align="center"><a href="https://seequent.com" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="https://developer.seequent.com/img/seequent-logo-dark.svg" alt="Seequent logo" width="400" /><img src="https://developer.seequent.com/img/seequent-logo.svg" alt="Seequent logo" width="400" /></picture></a></p>
 
 <p align="center">
+  <a href="https://github.com/SeequentEvo/evo-mcp/actions/workflows/lint.yaml"><img src="https://github.com/SeequentEvo/evo-mcp/actions/workflows/lint.yaml/badge.svg" alt="Lint" /></a>
+</p>
+
+<p align="center">
     <a href="https://developer.seequent.com/" target="_blank">Seequent Developer Portal</a>
     &bull; <a href="https://community.seequent.com/group/19-evo" target="_blank">Seequent Community</a>
     &bull; <a href="https://seequent.com" target="_blank">Seequent website</a>
 </p>
 
 # Evo MCP 
+
+Run code quality checks locally with:
+
+```bash
+make lint
+```
+
+Auto-fix lint and formatting issues with:
+
+```bash
+make lint-fix
+```
 
 ## Table of contents
 
@@ -506,6 +522,36 @@ To add new MCP tools:
 2. Decorate with `@mcp.tool()` decorator
 3. Tools are auto-registered based on their module (general/admin/data) on server startup
 4. Test using VS Code integration or the ADK agent
+
+### Linting
+
+This repository uses Ruff for linting and formatting checks.
+
+Run lint checks:
+
+```bash
+make lint
+```
+
+Auto-fix lint and formatting issues:
+
+```bash
+make lint-fix
+```
+
+### Pre-commit
+
+Install pre-commit hooks:
+
+```bash
+uv run --extra dev pre-commit install
+```
+
+Run hooks on all files:
+
+```bash
+uv run --extra dev pre-commit run --all-files
+```
 
 ## Contributing
 
