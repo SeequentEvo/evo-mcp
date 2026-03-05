@@ -55,6 +55,14 @@ DEFAULT_HTTP_PORT = "5000"
 TOOL_FILTER_CHOICES = {"1": "all", "2": "admin", "3": "data"}
 AUTH_METHOD_CHOICES = {"1": "client_credentials", "2": "native_app"}
 
+def mask_value(value: str) -> str:
+    """Mask sensitive values for safe terminal output."""
+    if not value:
+        return ""
+    if len(value) <= 4:
+        return "*" * len(value)
+    return f"{value[:2]}{'*' * (len(value) - 4)}{value[-2:]}"
+
 
 def print_color(text: str, color: str = Colors.RESET):
     """Print colored text to terminal"""
@@ -258,7 +266,7 @@ def configure_env_settings(project_dir: Path) -> dict[str, str]:
     if new_values["AUTH_METHOD"] == "client_credentials":
         new_values["EVO_CLIENT_SECRET"] = prompt_for_env_value(
             "EVO_CLIENT_SECRET",
-            current_values.get("EVO_CLIENT_SECRET"),
+            mask_value(current_values.get("EVO_CLIENT_SECRET")),
             "Your Evo application client secret from the iTwin Developer Portal."
         )
     else:
