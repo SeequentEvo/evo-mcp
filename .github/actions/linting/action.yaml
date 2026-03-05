@@ -1,0 +1,15 @@
+name: "Linting"
+description: "Lint a uv managed python project"
+
+runs:
+  using: "composite"
+  steps:
+    - uses: ./.github/actions/install-uv
+
+    - name: Run Ruff check
+      shell: bash
+      run: uv run --extra dev ruff check
+
+    - name: Run Ruff format check
+      shell: bash
+      run: uv run --extra dev ruff format --check

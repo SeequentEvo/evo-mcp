@@ -320,7 +320,7 @@ def get_client_choice() -> ClientChoice:
     choice_list = ", ".join(sorted(choice_keys, key=int))
 
     choice = prompt_choice(
-        f"Enter your choice (default: 1): ",
+        "Enter your choice (default: 1): ",
         choice_keys,
         "1",
         f"Invalid choice. Please enter one of: {choice_list}.",
