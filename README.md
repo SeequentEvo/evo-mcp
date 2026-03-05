@@ -22,7 +22,7 @@
   - [Cursor](#cursor)
   - [Additional tips](#additional-tips)
 - [Advanced](#advanced)
-  - [Testing with curl](#testing-with-curl)
+  - [Testing with FastMCP CLI](#testing-with-fastmcp-cli)
   - [Testing with a Google ADK agent](#testing-with-a-google-adk-agent)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -200,14 +200,14 @@ Configure your client (VS Code, Cursor, etc.) to start the MCP server process. T
 
 ##### Streamable HTTP transport
 
-**Recommended for**: Testing, remote access, programmatic access via curl/scripts, and containerised deployments (Docker)
+**Recommended for**: Testing, remote access, programmatic access via FastMCP CLI/scripts, and containerised deployments (Docker)
 
 HTTP transport turns your MCP server into a web service accessible via a URL. This transport uses the Streamable HTTP protocol, which allows clients to connect over the network. Unlike STDIO where each client gets its own process, an HTTP server can handle multiple clients simultaneously.
 
 The Streamable HTTP protocol provides full bidirectional communication between client and server, supporting all MCP operations including streaming responses. This makes it the recommended choice for network-based deployments.
 
 **Advantages**
-- Can be accessed via curl, programming languages, or HTTP clients
+- Can be accessed via FastMCP CLI, programming languages, or HTTP clients
 - Useful for testing and debugging
 - Enables remote access to the server
 - Simplifies integration with custom tools and scripts
@@ -225,7 +225,7 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 | Using VS Code with Copilot | STDIO |
 | Using Cursor with AI | STDIO |
 | Using Claude Desktop | STDIO |
-| Testing tools with curl | Streamable HTTP |
+| Testing tools with FastMCP CLI | Streamable HTTP |
 | Remote server access | Streamable HTTP |
 | Custom script integration | Streamable HTTP |
 
@@ -390,9 +390,9 @@ To verify that the Evo MCP server is correctly configured in Cursor:
 
 ## Advanced
 
-### Testing with curl
+### Testing with FastMCP CLI
 
-Running Evo MCP in streamable HTTP mode allows you to use `curl` to access the MCP tools.
+Running Evo MCP in streamable HTTP mode allows you to use the `fastmcp` CLI to access MCP tools without manually crafting JSON-RPC payloads.
 
 **Setup:**
 ```bash
@@ -413,60 +413,26 @@ python src/mcp_tools.py
 
 The server will start listening on `http://localhost:5000/mcp`.
 
-**Access tools using curl:**
+**Access tools using FastMCP CLI:**
 
-**macOS/Linux (bash/zsh)**
 ```bash
-# 1) Initialize session and capture MCP session ID
-SESSION_ID=$(curl -sS -D - -o /dev/null \
-  -X POST http://localhost:5000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}' \
-  | awk 'BEGIN{IGNORECASE=1}/^mcp-session-id:/{print $2}' | tr -d '\r')
+# 1) List available tools on the server
+uv run fastmcp list http://localhost:5000/mcp --transport http
 
 # 2) List workspaces
-curl -sS -X POST http://localhost:5000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Mcp-Session-Id: ${SESSION_ID}" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_workspaces","arguments":{"name":"","deleted":false,"limit":50}}}'
+uv run fastmcp call http://localhost:5000/mcp list_workspaces \
+  --transport http \
+  --input-json '{"name":"","deleted":false,"limit":50}' \
+  --json
 
 # 3) Create a workspace
-curl -sS -X POST http://localhost:5000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Mcp-Session-Id: ${SESSION_ID}" \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_workspace","arguments":{"name":"My New Workspace","description":"Test workspace"}}}'
+uv run fastmcp call http://localhost:5000/mcp create_workspace \
+  --transport http \
+  --input-json '{"name":"My New Workspace","description":"Test workspace"}' \
+  --json
 ```
 
-**Windows (PowerShell)**
-```powershell
-# 1) Initialize session and capture MCP session ID
-$initHeaders = curl.exe -sS -D - -o NUL `
-  -X POST http://localhost:5000/mcp `
-  -H "Content-Type: application/json" `
-  -H "Accept: application/json, text/event-stream" `
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
-
-$SESSION_ID = ($initHeaders | Select-String -Pattern '^mcp-session-id:\s*(.+)$' -CaseSensitive:$false).Matches[0].Groups[1].Value.Trim()
-
-# 2) List workspaces
-curl.exe -sS -X POST http://localhost:5000/mcp `
-  -H "Content-Type: application/json" `
-  -H "Accept: application/json, text/event-stream" `
-  -H "Mcp-Session-Id: $SESSION_ID" `
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_workspaces","arguments":{"name":"","deleted":false,"limit":50}}}'
-
-# 3) Create a workspace
-curl.exe -sS -X POST http://localhost:5000/mcp `
-  -H "Content-Type: application/json" `
-  -H "Accept: application/json, text/event-stream" `
-  -H "Mcp-Session-Id: $SESSION_ID" `
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_workspace","arguments":{"name":"My New Workspace","description":"Test workspace"}}}'
-```
-
-> Note: Streamable HTTP requires clients to send `Accept: application/json, text/event-stream`.
+> Note: The FastMCP CLI handles MCP session setup automatically, so no manual `initialize` request or `Mcp-Session-Id` header handling is required.
 
 ### Testing with a Google ADK agent
 
