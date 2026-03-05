@@ -7,19 +7,14 @@ MCP tools for object management operations.
 """
 
 import json
-import logging
 from uuid import UUID
+from fastmcp import Context
+from fastmcp.utilities.logging import get_logger
 
 from evo_mcp.context import evo_context, ensure_initialized
 from evo_mcp.utils.evo_data_utils import extract_data_references
 
-# Set up logging to file for debugging
-logging.basicConfig(
-    filename='mcp_tools_debug.log',
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def register_data_tools(mcp):
@@ -29,7 +24,8 @@ def register_data_tools(mcp):
     async def create_object(
         workspace_id: str,
         path: str,
-        object_dict: dict
+        object_dict: dict,
+        ctx: Context | None = None,
     ) -> dict:
         """Create a new object in a workspace.
         
@@ -38,6 +34,8 @@ def register_data_tools(mcp):
             path: Object path
             object_dict: Object definition as JSON/dict
         """
+        if ctx:
+            await ctx.info("Creating object", extra={"workspace_id": workspace_id, "path": path})
         await ensure_initialized()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         
@@ -48,20 +46,26 @@ def register_data_tools(mcp):
         
         metadata = await object_client.create_geoscience_object(path, object_dict)
         
-        return {
+        result = {
             "id": str(metadata.id),
             "name": metadata.name,
             "path": metadata.path,
             "version_id": metadata.version_id,
             "created_at": metadata.created_at.isoformat() if metadata.created_at else None,
         }
+
+        if ctx:
+            await ctx.info("Object created", extra={"object_id": result["id"], "path": result["path"]})
+
+        return result
     
     @mcp.tool()
     async def get_object_content(
         workspace_id: str,
         object_id: str = "",
         object_path: str = "",
-        version: str = ""
+        version: str = "",
+        ctx: Context | None = None,
     ) -> dict:
         """Download complete object definition as JSON.
         
@@ -71,6 +75,16 @@ def register_data_tools(mcp):
             object_path: Object path
             version: Specific version ID
         """
+        if ctx:
+            await ctx.info(
+                "Getting object content",
+                extra={
+                    "workspace_id": workspace_id,
+                    "object_id": object_id or None,
+                    "object_path": object_path or None,
+                    "version": version or None,
+                },
+            )
         await ensure_initialized()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         
@@ -81,7 +95,7 @@ def register_data_tools(mcp):
         else:
             raise ValueError("Either object_id or object_path must be provided")
         
-        return {
+        result = {
             "metadata": {
                 "id": str(obj.metadata.id),
                 "name": obj.metadata.name,
@@ -92,12 +106,18 @@ def register_data_tools(mcp):
             "content": obj.as_dict()
         }
 
+        if ctx:
+            await ctx.info("Object content fetched", extra={"object_id": result["metadata"]["id"]})
+
+        return result
+
 
     @mcp.tool()
     async def get_object_versions(
         workspace_id: str,
         object_id: str = "",
-        object_path: str = ""
+        object_path: str = "",
+        ctx: Context | None = None,
     ) -> list[dict]:
         """List all versions of an object.
         
@@ -106,6 +126,11 @@ def register_data_tools(mcp):
             object_id: Object UUID (provide either this or object_path)
             object_path: Object path (provide either this or object_id)
         """
+        if ctx:
+            await ctx.info(
+                "Listing object versions",
+                extra={"workspace_id": workspace_id, "object_id": object_id or None, "object_path": object_path or None},
+            )
         await ensure_initialized()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         
@@ -116,7 +141,7 @@ def register_data_tools(mcp):
         else:
             raise ValueError("Either object_id or object_path must be provided")
         
-        return [
+        result = [
             {
                 "version_id": v.version_id,
                 "created_at": v.created_at.isoformat() if v.created_at else None,
@@ -125,11 +150,17 @@ def register_data_tools(mcp):
             for v in versions
         ]
 
+        if ctx:
+            await ctx.info("Object versions listed", extra={"returned_count": len(result)})
+
+        return result
+
     @mcp.tool()
     async def extract_data_references(
         workspace_id: str,
         object_id: str,
-        version: str = ""
+        version: str = "",
+        ctx: Context | None = None,
     ) -> list[str]:
         """Extract all data blob references from an object.
         
@@ -138,10 +169,18 @@ def register_data_tools(mcp):
             object_id: Object UUID
             version: Specific version ID (optional)
         """
+        if ctx:
+            await ctx.info(
+                "Extracting data references",
+                extra={"workspace_id": workspace_id, "object_id": object_id, "version": version or None},
+            )
         await ensure_initialized()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         
         obj = await object_client.download_object_by_id(UUID(object_id), version=version if version else None)
         data_refs = extract_data_references(obj.as_dict())
+
+        if ctx:
+            await ctx.info("Data references extracted", extra={"reference_count": len(data_refs)})
         
         return data_refs

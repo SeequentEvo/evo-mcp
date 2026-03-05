@@ -16,9 +16,7 @@ import jwt
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
-from datetime import datetime, timezone
 
-from dotenv import load_dotenv
 from evo.aio import AioTransport
 from evo.oauth import OAuthConnector, AuthorizationCodeAuthorizer, AccessTokenAuthorizer, EvoScopes
 from evo.discovery import DiscoveryAPIClient
@@ -26,16 +24,24 @@ from evo.common import APIConnector
 
 from evo.objects import ObjectAPIClient
 from evo.workspaces import WorkspaceAPIClient
+from evo_mcp.env import load_repo_env
 
 
-# Load environment variables from .env file
-# Look for .env in the project root (parent of src directory)
-env_path = Path(__file__).parent.parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
+# Load environment variables from .env in the repository root.
+load_repo_env()
 
 # Set up local logger for this module
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") == "1" else logging.INFO)
+_raw_log_level = os.environ.get("MCP_LOG_LEVEL")
+if _raw_log_level:
+    _context_log_level = _raw_log_level.upper()
+elif os.environ.get("DEBUG") == "1":
+    # Backward compatibility for older env files.
+    _context_log_level = "DEBUG"
+else:
+    _context_log_level = "INFO"
+
+logger.setLevel(getattr(logging, _context_log_level, logging.INFO))
 
 class EvoContext:
     """Maintains Evo SDK connection state and clients."""

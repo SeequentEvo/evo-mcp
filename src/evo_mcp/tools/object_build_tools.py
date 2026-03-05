@@ -17,12 +17,13 @@ All tools follow a similar pattern:
 4. Upload data and create objects in Evo workspace (if not dry_run)
 """
 
-import logging
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
 import pandas as pd
+from fastmcp import Context
+from fastmcp.utilities.logging import get_logger
 
 from evo.common.utils import Cache
 from evo_mcp.context import evo_context, ensure_initialized
@@ -37,7 +38,7 @@ from evo_schemas.objects.line_segments import LineSegments_V2_2_0
 from evo_schemas.objects.downhole_collection import DownholeCollection_V1_3_0
 from evo_schemas.objects.downhole_intervals import DownholeIntervals_V1_3_0
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def register_object_builder_tools(mcp):
@@ -57,6 +58,7 @@ def register_object_builder_tools(mcp):
         tags: dict = {},
         coordinate_reference_system: str = "unspecified",
         dry_run: bool = True,
+        ctx: Context | None = None,
     ) -> dict:
         """Build and create a Pointset object from a CSV file.
         
@@ -80,6 +82,17 @@ def register_object_builder_tools(mcp):
         Returns:
             Dict with validation results and object info
         """
+        if ctx:
+            await ctx.info(
+                "Building pointset",
+                extra={
+                    "workspace_id": workspace_id,
+                    "object_path": object_path,
+                    "dry_run": dry_run,
+                    "csv_file": csv_file,
+                },
+            )
+            await ctx.report_progress(progress=2, total=100)
         result = {"errors": [], "warnings": [], "data_summary": {}}
         
         # Load CSV
@@ -90,6 +103,8 @@ def register_object_builder_tools(mcp):
             df = pd.read_csv(csv_path)
             result["data_summary"]["rows"] = len(df)
             result["data_summary"]["columns"] = list(df.columns)
+            if ctx:
+                await ctx.report_progress(progress=15, total=100)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read CSV file: {e}"}
         
@@ -140,6 +155,8 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["specified_attributes"] = attr_cols
         
         if dry_run:
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
             return {
                 "status": "validation_passed",
                 "message": "Dry run passed. Set dry_run=False to create the object.",
@@ -154,6 +171,8 @@ def register_object_builder_tools(mcp):
         
         # Create the object
         await ensure_initialized()
+        if ctx:
+            await ctx.report_progress(progress=40, total=100)
         
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -175,6 +194,8 @@ def register_object_builder_tools(mcp):
             )
             
             obj_dict = obj.as_dict()
+            if ctx:
+                await ctx.report_progress(progress=55, total=100)
             
             # Validate by reconstructing
             try:
@@ -187,7 +208,11 @@ def register_object_builder_tools(mcp):
                 }
             
             await data_client.upload_referenced_data(obj_dict)
+            if ctx:
+                await ctx.report_progress(progress=90, total=100)
             metadata = await object_client.create_geoscience_object(object_path, obj_dict)
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
             
             return {
                 "status": "created",
@@ -200,6 +225,11 @@ def register_object_builder_tools(mcp):
             }
             
         except Exception as e:
+            if ctx:
+                await ctx.error(
+                    "Failed to create pointset",
+                    extra={"workspace_id": workspace_id, "object_path": object_path, "error": str(e)},
+                )
             logger.exception("Failed to create pointset")
             return {"status": "creation_failed", "error": str(e), "validation": result}
     
@@ -221,6 +251,7 @@ def register_object_builder_tools(mcp):
         tags: dict = {},
         coordinate_reference_system: str = "unspecified",
         dry_run: bool = True,
+        ctx: Context | None = None,
     ) -> dict:
         """Build and create a LineSegments object from CSV files.
         
@@ -252,6 +283,18 @@ def register_object_builder_tools(mcp):
         Returns:
             Dict with validation results and object info
         """
+        if ctx:
+            await ctx.info(
+                "Building line segments",
+                extra={
+                    "workspace_id": workspace_id,
+                    "object_path": object_path,
+                    "dry_run": dry_run,
+                    "vertices_file": vertices_file,
+                    "segments_file": segments_file,
+                },
+            )
+            await ctx.report_progress(progress=2, total=100)
         result = {"errors": [], "warnings": [], "data_summary": {}}
         
         # Load vertices
@@ -262,6 +305,8 @@ def register_object_builder_tools(mcp):
             vertices_df = pd.read_csv(vertices_path)
             result["data_summary"]["vertices"] = len(vertices_df)
             result["data_summary"]["vertex_columns"] = list(vertices_df.columns)
+            if ctx:
+                await ctx.report_progress(progress=10, total=100)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read vertices file: {e}"}
         
@@ -273,6 +318,8 @@ def register_object_builder_tools(mcp):
             segments_df = pd.read_csv(segments_path)
             result["data_summary"]["segments"] = len(segments_df)
             result["data_summary"]["segment_columns"] = list(segments_df.columns)
+            if ctx:
+                await ctx.report_progress(progress=20, total=100)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read segments file: {e}"}
         
@@ -329,6 +376,8 @@ def register_object_builder_tools(mcp):
             return {"status": "validation_failed", "validation": result}
         
         if dry_run:
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
             return {
                 "status": "validation_passed",
                 "message": "Dry run passed. Set dry_run=False to create the object.",
@@ -343,6 +392,8 @@ def register_object_builder_tools(mcp):
         
         # Create the object
         await ensure_initialized()
+        if ctx:
+            await ctx.report_progress(progress=40, total=100)
         
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -368,6 +419,8 @@ def register_object_builder_tools(mcp):
             )
             
             obj_dict = obj.as_dict()
+            if ctx:
+                await ctx.report_progress(progress=55, total=100)
             
             # Validate by reconstructing
             try:
@@ -380,7 +433,11 @@ def register_object_builder_tools(mcp):
                 }
             
             await data_client.upload_referenced_data(obj_dict)
+            if ctx:
+                await ctx.report_progress(progress=90, total=100)
             metadata = await object_client.create_geoscience_object(object_path, obj_dict)
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
             
             return {
                 "status": "created",
@@ -393,6 +450,11 @@ def register_object_builder_tools(mcp):
             }
             
         except Exception as e:
+            if ctx:
+                await ctx.error(
+                    "Failed to create line segments",
+                    extra={"workspace_id": workspace_id, "object_path": object_path, "error": str(e)},
+                )
             logger.exception("Failed to create line segments")
             return {"status": "creation_failed", "error": str(e), "validation": result}
     
@@ -418,6 +480,7 @@ def register_object_builder_tools(mcp):
         coordinate_reference_system: str = "unspecified",
         invert_z: bool = False,
         dry_run: bool = True,
+        ctx: Context | None = None,
     ) -> dict:
         """Build and create a DownholeCollection object from CSV files.
         
@@ -460,6 +523,19 @@ def register_object_builder_tools(mcp):
         Returns:
             Dict with validation results and object info (or creation result if not dry_run)
         """
+        if ctx:
+            await ctx.info(
+                "Building downhole collection",
+                extra={
+                    "workspace_id": workspace_id,
+                    "object_path": object_path,
+                    "dry_run": dry_run,
+                    "collar_file": collar_file,
+                    "survey_file": survey_file,
+                    "interval_file_count": len(interval_files),
+                },
+            )
+            await ctx.report_progress(progress=2, total=100)
         result = {"errors": [], "warnings": [], "data_summary": {}}
         
         # Load collar file
@@ -469,6 +545,8 @@ def register_object_builder_tools(mcp):
                 return {"status": "error", "error": f"Collar file not found: {collar_file}"}
             collar_df = pd.read_csv(collar_path)
             result["data_summary"]["collar_rows"] = len(collar_df)
+            if ctx:
+                await ctx.report_progress(progress=8, total=100)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read collar file: {e}"}
         
@@ -479,6 +557,8 @@ def register_object_builder_tools(mcp):
                 return {"status": "error", "error": f"Survey file not found: {survey_file}"}
             survey_df = pd.read_csv(survey_path)
             result["data_summary"]["survey_rows"] = len(survey_df)
+            if ctx:
+                await ctx.report_progress(progress=15, total=100)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read survey file: {e}"}
         
@@ -574,6 +654,9 @@ def register_object_builder_tools(mcp):
                     'attribute_columns': attr_cols,
                 })
                 result["data_summary"][f"interval_{cfg.get('name')}_rows"] = len(interval_df)
+                if ctx and interval_files:
+                    progress = 15 + int(((i + 1) / len(interval_files)) * 25)
+                    await ctx.report_progress(progress=progress, total=100)
             except Exception as e:
                 result["errors"].append(f"Failed to load interval file {i}: {e}")
         
@@ -582,6 +665,8 @@ def register_object_builder_tools(mcp):
         
         # Dry run - just return validation results
         if dry_run:
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
             return {
                 "status": "validation_passed",
                 "message": "Dry run passed. Set dry_run=False to create the object.",
@@ -596,6 +681,8 @@ def register_object_builder_tools(mcp):
         
         # Create the object
         await ensure_initialized()
+        if ctx:
+            await ctx.report_progress(progress=55, total=100)
         
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -625,6 +712,8 @@ def register_object_builder_tools(mcp):
             )
             
             obj_dict = obj.as_dict()
+            if ctx:
+                await ctx.report_progress(progress=70, total=100)
             
             # Validate by reconstructing
             try:
@@ -637,7 +726,11 @@ def register_object_builder_tools(mcp):
                 }
             
             await data_client.upload_referenced_data(obj_dict)
+            if ctx:
+                await ctx.report_progress(progress=92, total=100)
             metadata = await object_client.create_geoscience_object(object_path, obj_dict)
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
             
             return {
                 "status": "created",
@@ -650,6 +743,11 @@ def register_object_builder_tools(mcp):
             }
             
         except Exception as e:
+            if ctx:
+                await ctx.error(
+                    "Failed to create downhole collection",
+                    extra={"workspace_id": workspace_id, "object_path": object_path, "error": str(e)},
+                )
             logger.exception("Failed to create object")
             return {"status": "creation_failed", "error": str(e), "validation": result}
     
@@ -677,6 +775,7 @@ def register_object_builder_tools(mcp):
         tags: dict = {},
         coordinate_reference_system: str = "unspecified",
         dry_run: bool = True,
+        ctx: Context | None = None,
     ) -> dict:
         """Build and create a DownholeIntervals object from a CSV file.
         
@@ -714,6 +813,17 @@ def register_object_builder_tools(mcp):
         Returns:
             Dict with validation results and object info
         """
+        if ctx:
+            await ctx.info(
+                "Building downhole intervals",
+                extra={
+                    "workspace_id": workspace_id,
+                    "object_path": object_path,
+                    "dry_run": dry_run,
+                    "csv_file": csv_file,
+                },
+            )
+            await ctx.report_progress(progress=2, total=100)
         result = {"errors": [], "warnings": [], "data_summary": {}}
         
         # Load CSV
@@ -724,6 +834,8 @@ def register_object_builder_tools(mcp):
             df = pd.read_csv(csv_path)
             result["data_summary"]["rows"] = len(df)
             result["data_summary"]["columns"] = list(df.columns)
+            if ctx:
+                await ctx.report_progress(progress=15, total=100)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read CSV file: {e}"}
         
@@ -785,6 +897,8 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["specified_attributes"] = attr_cols
         
         if dry_run:
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
             return {
                 "status": "validation_passed",
                 "message": "Dry run passed. Set dry_run=False to create the object.",
@@ -801,6 +915,8 @@ def register_object_builder_tools(mcp):
         
         # Create the object
         await ensure_initialized()
+        if ctx:
+            await ctx.report_progress(progress=40, total=100)
         
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -832,6 +948,8 @@ def register_object_builder_tools(mcp):
             )
             
             obj_dict = obj.as_dict()
+            if ctx:
+                await ctx.report_progress(progress=55, total=100)
             
             # Validate by reconstructing
             try:
@@ -844,7 +962,11 @@ def register_object_builder_tools(mcp):
                 }
             
             await data_client.upload_referenced_data(obj_dict)
+            if ctx:
+                await ctx.report_progress(progress=90, total=100)
             metadata = await object_client.create_geoscience_object(object_path, obj_dict)
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
             
             return {
                 "status": "created",
@@ -857,5 +979,10 @@ def register_object_builder_tools(mcp):
             }
             
         except Exception as e:
+            if ctx:
+                await ctx.error(
+                    "Failed to create downhole intervals",
+                    extra={"workspace_id": workspace_id, "object_path": object_path, "error": str(e)},
+                )
             logger.exception("Failed to create downhole intervals")
             return {"status": "creation_failed", "error": str(e), "validation": result}
