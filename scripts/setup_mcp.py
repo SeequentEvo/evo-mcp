@@ -53,15 +53,15 @@ DEFAULT_REDIRECT_URL = "http://localhost:3000/signin-callback"
 DEFAULT_HTTP_HOST = "localhost"
 DEFAULT_HTTP_PORT = "5000"
 TOOL_FILTER_CHOICES = {"1": "all", "2": "admin", "3": "data"}
-AUTH_METHOD_CHOICES = {"1": "client_credentials", "2": "native_app"}
+AUTH_METHOD_CHOICES = {"1": "native_app", "2": "client_credentials"}
 
-def mask_value(value: str) -> str:
+def mask_value(value: str, visible: int = 3) -> str:
     """Mask sensitive values for safe terminal output."""
     if not value:
         return ""
-    if len(value) <= 4:
+    if len(value) <= visible * 2:
         return "*" * len(value)
-    return f"{value[:2]}{'*' * (len(value) - 4)}{value[-2:]}"
+    return f"{value[:visible]}{'*' * (len(value) - visible * 2)}{value[-visible:]}"
 
 
 def print_color(text: str, color: str = Colors.RESET):
@@ -127,8 +127,8 @@ def prompt_auth_method(current_value: str | None) -> str:
     """Prompt for MCP authentication method selection."""
     print()
     print("Select authentication method:")
-    print("1. client_credentials - Service-to-service, no user sign-in")
-    print("2. native_app - Interactive user sign-in")
+    print("1. native_app - Interactive user sign-in")
+    print("2. client_credentials - Service-to-service, no user sign-in")
     print()
 
     if current_value:
