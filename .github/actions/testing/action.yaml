@@ -1,0 +1,28 @@
+name: "Testing"
+description: "Run tests for evo-mcp with uv"
+
+inputs:
+  PYTHON_VERSION:
+    required: true
+    description: "Python version used for the test run"
+  PYTEST_ARGS:
+    required: false
+    description: "Additional arguments passed to pytest"
+    default: "-q -m unit"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install uv and Python
+      uses: astral-sh/setup-uv@v5
+      with:
+        python-version: ${{ inputs.PYTHON_VERSION }}
+        enable-cache: true
+
+    - name: Sync dependencies
+      shell: bash
+      run: uv sync --extra dev --frozen
+
+    - name: Run pytest
+      shell: bash
+      run: uv run python -m pytest ${{ inputs.PYTEST_ARGS }}

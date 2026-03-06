@@ -1,0 +1,11 @@
+name: Tests on pull request
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+
+jobs:
+  run-tests:
+    uses: ./.github/workflows/run-all-tests.yaml
