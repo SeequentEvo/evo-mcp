@@ -227,7 +227,7 @@ def configure_env_settings(project_dir: Path) -> dict[str, str]:
     new_values["EVO_CLIENT_ID"] = prompt_for_env_value(
         "EVO_CLIENT_ID",
         current_values.get("EVO_CLIENT_ID"),
-        "Your Evo application client ID from the iTwin Developer Portal."
+        "Your Evo application client ID from the iTwin Developer Portal.",
     )
 
     new_values["EVO_REDIRECT_URL"] = prompt_for_env_value(
@@ -354,7 +354,7 @@ def get_protocol_choice(
             "Invalid choice. Please enter 1 or 2.",
         )
         protocol = "stdio" if choice == "1" else "http"
-    
+
     env_values["MCP_TRANSPORT"] = protocol
 
     if protocol == "http":
@@ -482,10 +482,7 @@ def get_python_executable() -> str:
 
 def is_virtual_environment_active() -> bool:
     """Return True when setup is running inside a Python virtual environment."""
-    return (
-        sys.prefix != getattr(sys, "base_prefix", sys.prefix)
-        or bool(os.environ.get("VIRTUAL_ENV"))
-    )
+    return sys.prefix != getattr(sys, "base_prefix", sys.prefix) or bool(os.environ.get("VIRTUAL_ENV"))
 
 
 def resolve_python_executable(python_command: str) -> str | None:
@@ -709,4 +706,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

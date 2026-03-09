@@ -7,3 +7,10 @@ repos:
       - id: ruff-format
         name: Run formatter
         args: ["--check"]
+  - repo: local
+    hooks:
+      - id: python-license-headers
+        name: Fix Python license headers
+        entry: python scripts/check_python_license_headers.py --fix
+        language: system
+        types: [python]

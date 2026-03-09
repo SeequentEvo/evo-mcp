@@ -510,6 +510,7 @@ To add new MCP tools:
 ### Linting
 
 This repository uses Ruff for linting and formatting checks.
+Linting also verifies that Python files include the required SPDX license header.
 
 Run lint checks:
 
@@ -526,6 +527,8 @@ make lint-fix
 ### Pre-commit
 
 Install pre-commit hooks:
+
+The local pre-commit hook will also auto-insert missing SPDX headers in Python files.
 
 ```bash
 uv run --extra dev pre-commit install

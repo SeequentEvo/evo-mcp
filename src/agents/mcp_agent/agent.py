@@ -11,11 +11,11 @@ This agent uses ADK (Google Agent Development Kit) with the Evo MCP server.
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from google.adk.agents import LlmAgent, McpInstructionProvider
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams, StdioServerParameters
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 from google.adk.tools.openapi_tool.auth.auth_helpers import token_to_scheme_credential
-from dotenv import load_dotenv
 
 DEFAULT_STDIO_TIMEOUT_SECONDS = 600
 
@@ -35,9 +35,8 @@ MCP_SERVER_PATH = str(Path(__file__).parent.parent.parent / "mcp_tools.py")
 def _generate_dummy_auth():
     """Generate a dummy auth scheme and credential.
     This is just for demonstration purposes and should be replaced with real auth logic."""
-    return token_to_scheme_credential(
-        "apikey", "header", "apikey", "not a real key"
-    )
+    return token_to_scheme_credential("apikey", "header", "apikey", "not a real key")
+
 
 auth_scheme, auth_credential = _generate_dummy_auth()
 
@@ -59,7 +58,7 @@ for var in copy_env_vars:
 server_params = StdioServerParameters(
     command="python",
     args=[MCP_SERVER_PATH],
-    env=tool_env,    
+    env=tool_env,
 )
 
 connection_params = StdioConnectionParams(

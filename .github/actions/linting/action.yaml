@@ -13,3 +13,7 @@ runs:
     - name: Run Ruff format check
       shell: bash
       run: uv run --extra dev ruff format --check
+
+    - name: Check Python license headers
+      shell: bash
+      run: uv run python scripts/check_python_license_headers.py
