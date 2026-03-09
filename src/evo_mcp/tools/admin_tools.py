@@ -7,7 +7,7 @@ MCP tools for workspace management operations.
 """
 
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 from evo_mcp.context import evo_context, ensure_initialized
@@ -94,7 +94,7 @@ def register_admin_tools(mcp):
         all_objects = await object_client.list_all_objects()
         
         # Create snapshot
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         snapshot_name = snapshot_name or f"snapshot_{timestamp}"
         
         objects_snapshot = []
