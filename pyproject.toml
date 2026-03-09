@@ -12,7 +12,7 @@ dependencies = [
     "evo-schemas>=2025.9.2",
     "aiohttp>=3.13.2",
     "pyarrow>=14.0.0",
-    "python-dotenv">=1.2.0",
+    "python-dotenv>=1.2.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "tomli; python_version < '3.11'",
