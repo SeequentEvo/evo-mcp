@@ -44,6 +44,13 @@ This directory contains automated tests for the Evo MCP server.
 	- Verifies `select_instance` switches the active instance using discovery results.
 	- These tests use `AsyncMock` and `SimpleNamespace` instead of live SDK clients.
 
+- `unit/test_instance_users_admin_tools.py`: Covers the instance-user admin MCP tools in `instance_users_admin_tools.py`.
+	- Verifies paged user listing respects the requested `count` limit and maps user records into tool responses.
+	- Verifies instance role listing passthrough.
+	- Verifies add-user responses are mapped into invitation and member email lists.
+	- Verifies remove-user and update-role operations call the workspace client with the expected arguments.
+	- Verifies these tools fail clearly when no instance is selected.
+
 - `unit/test_object_build_tools_dry_run.py`: Covers dry-run validation paths for the object builder tools.
 	- `build_and_create_pointset`: success path and missing required coordinate columns.
 	- `build_and_create_line_segments`: success path and invalid segment index validation.
