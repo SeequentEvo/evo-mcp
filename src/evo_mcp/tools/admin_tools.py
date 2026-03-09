@@ -6,13 +6,14 @@
 MCP tools for workspace management operations.
 """
 
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime
 from fastmcp import Context
 from fastmcp.utilities.logging import get_logger
 
 
 from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.logging_utils import log_handled_failure, operation_extra
 from evo_mcp.utils.evo_data_utils import extract_data_references, copy_object_data
 
 logger = get_logger(__name__)
@@ -275,15 +276,18 @@ def register_admin_tools(mcp):
             schema_filter: Filter by object types (optional list)
             name_filter: Filter by object names (optional list)
         """
+        operation_id = str(uuid4())
+
         if ctx:
             await ctx.info(
                 "Duplicating workspace",
-                extra={
-                    "source_workspace_id": source_workspace_id,
-                    "target_name": target_name,
-                    "schema_filter_count": len(schema_filter),
-                    "name_filter_count": len(name_filter),
-                },
+                extra=operation_extra(
+                    operation_id,
+                    source_workspace_id=source_workspace_id,
+                    target_name=target_name,
+                    schema_filter_count=len(schema_filter),
+                    name_filter_count=len(name_filter),
+                ),
             )
             await ctx.report_progress(progress=5, total=100)
 
@@ -314,7 +318,11 @@ def register_admin_tools(mcp):
         if ctx:
             await ctx.info(
                 "Workspace duplication object selection complete",
-                extra={"selected_objects": total_objects, "source_total_objects": len(all_objects)},
+                extra=operation_extra(
+                    operation_id,
+                    selected_objects=total_objects,
+                    source_total_objects=len(all_objects),
+                ),
             )
             if total_objects == 0:
                 await ctx.report_progress(progress=100, total=100)
@@ -362,18 +370,35 @@ def register_admin_tools(mcp):
                 
             except Exception as e:
                 failed_count += 1
-                if ctx:
-                    await ctx.warning(
-                        "Failed to copy object while duplicating workspace",
-                        extra={"object_id": str(obj.id), "object_name": obj.name, "error": str(e)},
-                    )
-                logger.exception("Failed to copy object during workspace duplication")
+                await log_handled_failure(
+                    ctx,
+                    logger,
+                    "Failed to copy object while duplicating workspace",
+                    operation_id,
+                    e,
+                    ctx_level="warning",
+                    object_id=str(obj.id),
+                    object_name=obj.name,
+                    source_workspace_id=source_workspace_id,
+                    target_workspace_id=str(target_workspace.id),
+                )
                 # Continue with next object
 
         if ctx:
+            await ctx.info(
+                "Workspace duplication completed",
+                extra=operation_extra(
+                    operation_id,
+                    target_workspace_id=str(target_workspace.id),
+                    objects_copied=copied_count,
+                    objects_failed=failed_count,
+                    data_blobs_copied=len(cloned_data_ids),
+                ),
+            )
             await ctx.report_progress(progress=100, total=100)
         
         return {
+            "operation_id": operation_id,
             "target_workspace_id": str(target_workspace.id),
             "target_workspace_name": target_workspace.display_name,
             "objects_copied": copied_count,

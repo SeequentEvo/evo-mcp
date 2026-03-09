@@ -6,12 +6,13 @@
 MCP tools for general operations (health checks, object CRUD, etc).
 """
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastmcp import Context
 from fastmcp.utilities.logging import get_logger
 
 from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.logging_utils import log_handled_failure, operation_extra
 
 logger = get_logger(__name__)
 
@@ -195,15 +196,18 @@ def register_general_tools(mcp):
             deleted: Include deleted objects
             limit: Maximum number of results
         """
+        operation_id = str(uuid4())
+
         if ctx:
             await ctx.info(
                 "Listing objects",
-                extra={
-                    "workspace_id": workspace_id,
-                    "schema_id": schema_id or None,
-                    "deleted": deleted,
-                    "limit": limit,
-                },
+                extra=operation_extra(
+                    operation_id,
+                    workspace_id=workspace_id,
+                    schema_id=schema_id or None,
+                    deleted=deleted,
+                    limit=limit,
+                ),
             )
         
         try:
@@ -214,7 +218,7 @@ def register_general_tools(mcp):
                 await ctx.debug("Evo context initialized")
             
             if ctx:
-                await ctx.debug("Getting object client", extra={"workspace_id": workspace_id})
+                await ctx.debug("Getting object client", extra=operation_extra(operation_id, workspace_id=workspace_id))
             object_client = await evo_context.get_object_client(UUID(workspace_id))
             
             service_health = await object_client.get_service_health()
@@ -231,7 +235,10 @@ def register_general_tools(mcp):
             )
 
             if ctx:
-                await ctx.debug("Received objects from service", extra={"count": len(objects.items())})
+                await ctx.debug(
+                    "Received objects from service",
+                    extra=operation_extra(operation_id, count=len(objects.items())),
+                )
             
             result = [
                 {
@@ -246,20 +253,24 @@ def register_general_tools(mcp):
                 for obj in objects.items()
             ]
             if ctx:
-                await ctx.info("Object listing completed", extra={"returned_count": len(result)})
+                await ctx.info(
+                    "Object listing completed",
+                    extra=operation_extra(operation_id, returned_count=len(result)),
+                )
             return result
             
         except Exception as e:
-            if ctx:
-                await ctx.error(
-                    "Failed to list objects",
-                    extra={
-                        "workspace_id": workspace_id,
-                        "error_type": type(e).__name__,
-                        "error": str(e),
-                    },
-                )
-            logger.exception("Error in evo_list_objects")
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to list objects",
+                operation_id,
+                e,
+                workspace_id=workspace_id,
+                schema_id=schema_id or None,
+                deleted=deleted,
+                limit=limit,
+            )
             raise
 
     @mcp.tool()
