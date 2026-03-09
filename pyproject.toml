@@ -22,5 +22,22 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pre-commit>=4",
+    "ruff==0.15.4",
     "reuse",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+extend-select = ["I", "RUF022"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["evo_mcp"]
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: fast isolated tests with no external services",
+    "integration: tests that may call live Evo APIs",
 ]
