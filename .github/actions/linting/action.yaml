@@ -1,5 +1,5 @@
 name: "Linting"
-description: "Lint a uv managed python project"
+description: "Run Ruff and SPDX header checks for the Evo MCP project"
 
 runs:
   using: "composite"
