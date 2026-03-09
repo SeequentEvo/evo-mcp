@@ -20,6 +20,10 @@ Configuration:
     - MCP_HTTP_HOST: Host to bind to (default: localhost)
     - MCP_HTTP_PORT: Port to listen on (default: 5000)
 
+    Logging configuration:
+    - MCP_LOG_LEVEL: Python logging level (default: INFO)
+    - MCP_LOG_FILE: Optional log file path for server logs
+
 The environment variables can be set in a .env file or 
 passed directly to the MCP server as input parameters.
 """
@@ -28,7 +32,8 @@ import os
 import logging
 from pathlib import Path
 from fastmcp import FastMCP
-from fastmcp.utilities.logging import configure_logging
+from fastmcp.utilities.logging import configure_logging, get_logger
+from evo_mcp.env import load_repo_env
 
 from evo_mcp.tools import (
     register_admin_tools,
@@ -39,13 +44,28 @@ from evo_mcp.tools import (
     register_instance_users_admin_tools,
 )
 
+# Load environment variables from .env in the repo root.
+load_repo_env()
+
+# Use the actual FastMCP root logger so all fastmcp.* module loggers inherit
+# handlers (including optional file output).
+BASE_LOGGER = logging.getLogger("fastmcp")
+LOGGER = get_logger(__name__)
+VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+
 # Get transport mode from environment variable
 TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio").lower()
 VALID_TRANSPORTS = ["stdio", "http"]
 
 if TRANSPORT not in VALID_TRANSPORTS:
-    logging.warning("Invalid MCP_TRANSPORT '%s', defaulting to 'stdio'", TRANSPORT)
+    LOGGER.warning("Invalid MCP_TRANSPORT '%s', defaulting to 'stdio'", TRANSPORT)
     TRANSPORT = "stdio"
+
+# Get logging level from environment variable
+LOG_LEVEL_NAME = os.getenv("MCP_LOG_LEVEL", "INFO").upper()
+if LOG_LEVEL_NAME not in VALID_LOG_LEVELS:
+    LOGGER.warning("Invalid MCP_LOG_LEVEL '%s', defaulting to 'INFO'", LOG_LEVEL_NAME)
+    LOG_LEVEL_NAME = "INFO"
 
 # Get HTTP configuration if using HTTP transport
 if TRANSPORT == "http":
@@ -62,7 +82,7 @@ TOOL_FILTER = os.getenv("MCP_TOOL_FILTER",
 VALID_TOOL_FILTERS = ["admin", "data", "all"]
 
 if TOOL_FILTER not in VALID_TOOL_FILTERS:
-    logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
+    LOGGER.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
     TOOL_FILTER = "all"
 
 # Initialize FastMCP server with agent type in name for clarity
@@ -71,7 +91,30 @@ mcp = FastMCP(server_name)
 
 # Show more traceback frame for now, we may want to disabled the rich
 # traceback formatting entirely too.
-configure_logging(tracebacks_max_frames=20)
+configure_logging(
+    logger=BASE_LOGGER,
+    level=LOG_LEVEL_NAME,
+    tracebacks_max_frames=20,
+)
+
+LOG_FILE = os.getenv("MCP_LOG_FILE", "").strip()
+if LOG_FILE:
+    try:
+        log_path = Path(LOG_FILE).expanduser()
+        if not log_path.is_absolute():
+            log_path = (Path(__file__).parent.parent / log_path).resolve()
+        if log_path.parent and not log_path.parent.exists():
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        file_handler = logging.FileHandler(log_path, encoding="utf-8")
+        file_handler.setLevel(getattr(logging, LOG_LEVEL_NAME, logging.INFO))
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+        )
+        BASE_LOGGER.addHandler(file_handler)
+        LOGGER.info("File logging enabled: %s", log_path)
+    except Exception as e:
+        LOGGER.warning("Failed to configure MCP_LOG_FILE '%s': %s", LOG_FILE, e)
 
 def _get_objects_reference_content() -> str:
     """Load the objects reference content from a markdown file."""
@@ -80,7 +123,7 @@ def _get_objects_reference_content() -> str:
         with open(reference_path, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        logging.error("Objects reference file not found at %s", reference_path)
+        LOGGER.error("Objects reference file not found at %s", reference_path)
         return "Objects reference information is currently unavailable."
 
 
@@ -101,9 +144,9 @@ if TOOL_FILTER in ["all", "data"]: #  "data_agent"
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
     if TOOL_FILTER == "data":
-        print("Evo MCP Server configured for Data Agent")
+        LOGGER.info("Evo MCP Server configured for Data Agent")
     else:
-        print("Evo MCP Server configured - Data tools enabled")
+        LOGGER.info("Evo MCP Server configured - Data tools enabled")
 
 # =============================================================================
 # Resources (not currently supported in ADK)
@@ -125,7 +168,7 @@ def get_objects_reference() -> str:
 # =============================================================================
 
 if TOOL_FILTER == "all":
-    print("Registering prompt for all tool types.")
+    LOGGER.info("Registering prompt for all tool types.")
     @mcp.prompt(name="all_prompt")
     def all_prompt() -> str:
         """All prompt that encompasses the functionality of all tool without a filter applied."""
@@ -313,12 +356,11 @@ if TOOL_FILTER in ["all", "data"]:
 
 if __name__ == "__main__":
     # Log startup information
-    logger = logging.getLogger(__name__)
-    logger.info("Starting Evo MCP Server in %s mode", TRANSPORT.upper())
+    LOGGER.info("Starting Evo MCP Server in %s mode", TRANSPORT.upper())
 
     # Run the server with selected transport mode
     if TRANSPORT == "http":
-        logger.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
+        LOGGER.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
         mcp.run(
             transport="http",
             host=HTTP_HOST,

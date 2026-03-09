@@ -20,13 +20,13 @@ All builders follow the same pattern:
 4. Validate against the schema before returning
 """
 
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Type, TypeVar
 
 import pandas as pd
 import numpy as np
 import pyarrow as pa
+from fastmcp.utilities.logging import get_logger
 
 from evo_schemas.components import (
     BoundingBox_V1_0_1,
@@ -73,7 +73,7 @@ from evo_schemas.objects.downhole_collection import (
 from evo_schemas.objects.downhole_intervals import DownholeIntervals_V1_3_0
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # Type variable for schema classes

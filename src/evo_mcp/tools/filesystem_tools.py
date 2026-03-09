@@ -17,6 +17,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
+from fastmcp import Context
 
 
 def _get_data_directory() -> Path:
@@ -38,7 +39,8 @@ def register_filesystem_tools(mcp):
 
     @mcp.tool()
     async def configure_local_data_directory(
-        directory_path: str = ""
+        directory_path: str = "",
+        ctx: Context | None = None,
     ) -> dict:
         """Get or set the local data directory configuration.
         
@@ -48,6 +50,11 @@ def register_filesystem_tools(mcp):
         Args:
             directory_path: New directory path to configure (leave empty to just check current)
         """
+        if ctx:
+            await ctx.info(
+                "Configuring local data directory",
+                extra={"directory_path": directory_path or None},
+            )
         current_dir = _get_data_directory()
         
         if directory_path:
@@ -80,7 +87,8 @@ def register_filesystem_tools(mcp):
     @mcp.tool()
     async def list_local_data_files(
         file_pattern: str = "*.csv",
-        recursive: bool = True
+        recursive: bool = True,
+        ctx: Context | None = None,
     ) -> dict:
         """List data files in the configured local data directory.
         
@@ -88,6 +96,13 @@ def register_filesystem_tools(mcp):
             file_pattern: Glob pattern for files (default: *.csv)
             recursive: Search subdirectories (default: True)
         """
+        if ctx:
+            await ctx.info(
+                "Listing local data files",
+                extra={"file_pattern": file_pattern, "recursive": recursive},
+            )
+            await ctx.report_progress(progress=15, total=100)
+
         data_dir = _get_data_directory()
         
         if not data_dir.exists():
@@ -100,6 +115,8 @@ def register_filesystem_tools(mcp):
             files = list(data_dir.rglob(file_pattern))
         else:
             files = list(data_dir.glob(file_pattern))
+        if ctx:
+            await ctx.report_progress(progress=70, total=100)
         
         file_info = []
         for f in files:
@@ -111,6 +128,9 @@ def register_filesystem_tools(mcp):
                 "size_bytes": stat.st_size,
                 "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
             })
+
+        if ctx:
+            await ctx.report_progress(progress=100, total=100)
         
         return {
             "data_directory": str(data_dir),
@@ -127,7 +147,8 @@ def register_filesystem_tools(mcp):
     @mcp.tool()
     async def preview_csv_file(
         file_path: str,
-        max_rows: int = 10
+        max_rows: int = 10,
+        ctx: Context | None = None,
     ) -> dict:
         """Preview contents of a CSV file.
         
@@ -135,6 +156,12 @@ def register_filesystem_tools(mcp):
             file_path: Path to CSV file (absolute or relative to data directory)
             max_rows: Maximum rows to preview
         """
+        if ctx:
+            await ctx.info(
+                "Previewing CSV file",
+                extra={"file_path": file_path, "max_rows": max_rows},
+            )
+            await ctx.report_progress(progress=10, total=100)
         
         # Resolve path
         file_path = Path(file_path)
@@ -149,6 +176,8 @@ def register_filesystem_tools(mcp):
         
         try:
             df = pd.read_csv(file_path)
+            if ctx:
+                await ctx.report_progress(progress=60, total=100)
             
             # Get column info
             columns = []
@@ -167,6 +196,9 @@ def register_filesystem_tools(mcp):
             
             # Sample data
             sample = df.head(max_rows).to_dict(orient='records')
+
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
             
             return {
                 "file_path": str(file_path),
@@ -176,6 +208,11 @@ def register_filesystem_tools(mcp):
                 "sample_data": sample,
             }
         except Exception as e:
+            if ctx:
+                await ctx.error(
+                    "Failed to preview CSV file",
+                    extra={"file_path": str(file_path), "error": str(e)},
+                )
             return {
                 "error": str(e),
                 "status": "parse_error"
