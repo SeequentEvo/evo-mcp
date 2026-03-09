@@ -25,6 +25,13 @@ This directory contains automated tests for the Evo MCP server.
 	- Verifies `get_access_token_from_cache()` returns a valid JWT and rejects an expired JWT.
 	- These tests stay local to a temporary directory and do not perform OAuth or network calls.
 
+- `unit/test_admin_tools.py`: Covers the workspace-management MCP tools in `admin_tools.py`.
+	- Verifies workspace creation response mapping.
+	- Verifies workspace summary schema counting.
+	- Verifies workspace snapshot generation, including optional blob reference collection and download-failure fallback.
+	- Verifies object copy behavior, including blob copy orchestration and UUID clearing before create.
+	- Verifies whole-workspace duplication filters objects correctly and tracks copy failures.
+
 - `unit/test_filesystem_tools.py`: Covers the local CSV/data directory tools in `filesystem_tools.py`.
 	- Exercises invalid directory configuration handling.
 	- Verifies recursive file discovery under `EVO_LOCAL_DATA_DIR`.
@@ -71,6 +78,11 @@ This directory contains automated tests for the Evo MCP server.
 	- Verifies object listing for a real workspace.
 	- Verifies object metadata lookup by path when the selected workspace contains at least one object.
 	- These tests remain opt-in and skip gracefully when the account has no accessible workspaces or no objects in the selected workspace.
+
+- `integration/test_live_admin_tools.py`: Read-only live coverage for safe admin-tool flows.
+	- Verifies workspace summary aggregation against a real workspace.
+	- Verifies snapshot generation without blob expansion for a real workspace.
+	- Avoids mutating admin operations such as workspace creation, copying, or duplication.
 
 ## Adding tests
 
