@@ -127,8 +127,8 @@ def prompt_auth_method(current_value: str | None) -> str:
     """Prompt for MCP authentication method selection."""
     print()
     print("Select authentication method:")
-    print("1. native_app - Interactive user sign-in")
-    print("2. client_credentials - Service-to-service, no user sign-in")
+    print("1. Interactive user sign-in (native_app)")
+    print("2. Service-to-service, no user sign-in (client_credentials)")
     print()
 
     if current_value:
