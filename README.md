@@ -232,13 +232,26 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 
 #### 5. Configure your environment
 
+Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app credentials as described below.
+
 ##### Evo app credentials
 
-You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
+You first need to create an **app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
 
-Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app credentials:
+###### Authorization methods and application types
+Two application types are supported by the Evo MCP server: native and service apps. The authentication method can be specified in the setup script when prompted, or by setting the `AUTH_METHOD` environment variable in `.env` to either `native_app` or `client_credentials`.
+For either app type, fill in the required credentials in your `.env` file as described below.
+
+1. Service apps will require no user interaction to authenticate to Evo, however, the app needs to be granted access to your Evo instance and workspaces. Recommended for automation, CI/CD, and background services where user interaction is not possible or desired.
+
 ```bash
-EVO_CLIENT_ID=your-client-id
+EVO_CLIENT_ID=your-client-id #e.g. service-xxxxxx
+EVO_CLIENT_SECRET=your-client-secret
+```
+
+2. Native apps will require the user to sign in interactively through a browser, allowing access to any Evo instance and workspaces to which the logged on user has access.  Recommended for local development with a user account.
+```bash
+EVO_CLIENT_ID=your-client-id #e.g. native-xxxxxx
 EVO_REDIRECT_URL=your-redirect-url
 ```
 
