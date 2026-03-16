@@ -25,6 +25,8 @@
   - [Testing with curl](#testing-with-curl)
   - [Testing with a Google ADK agent](#testing-with-a-google-adk-agent)
 - [Development](#development)
+  - [Adding new tools](#adding-new-tools)
+  - [Testing](#testing)
 - [Contributing](#contributing)
 - [Code of conduct](#code-of-conduct)
 - [License](#license)
@@ -517,11 +519,42 @@ Browse to http://localhost:8000 to interact with the agent.
 
 ## Development
 
+### Adding new tools
+
 To add new MCP tools:
 1. Add tool function to appropriate module in `src/evo_mcp/tools/`
 2. Decorate with `@mcp.tool()` decorator
 3. Tools are auto-registered based on their module (general/admin/data) on server startup
 4. Test using VS Code integration or the ADK agent
+
+### Testing
+
+The project includes both unit and integration test suites under `tests/`.
+
+- Unit tests (`tests/unit/`) are isolated and do not call live Evo services.
+- Integration tests (`tests/integration/`) are optional and can call live Evo APIs.
+
+Run tests from the repository root:
+
+```bash
+# All tests (integration tests are skipped by default)
+uv run python -m pytest -q
+
+# Unit tests only
+uv run python -m pytest -q -m unit
+
+# Integration tests only
+uv run python -m pytest -q -m integration
+```
+
+To run live integration tests, set these environment variables:
+
+- `RUN_EVO_LIVE_TESTS=1`
+- `EVO_CLIENT_ID`
+- `EVO_REDIRECT_URL`
+- `EVO_DISCOVERY_URL`
+
+See `tests/README.md` for full details on test structure, markers, and CI workflow files.
 
 ## Contributing
 
