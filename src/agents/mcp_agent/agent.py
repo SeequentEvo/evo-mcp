@@ -81,11 +81,12 @@ mcp_toolset = McpToolset(
     auth_credential=auth_credential,
 )
 
+
 root_agent = LlmAgent(
     model=MODEL,
     name="evo_sdk_agent",
     description="You are a generic agent that receives instructions, tools from an MCP server.",
-    global_instruction="IMPORTANT you MUST show your reasoning before calling a tool, and present the plan before performing a workflow.",
+    global_instruction="IMPORTANT you MUST show your reasoning before calling a tool, and present the plan before performing a workflow. If you are unsure about what to do, STOP and ask for clarification.",
     instruction=mcp_instruction,
     # planner=PlanReActPlanner(),
     tools=[mcp_toolset],
