@@ -9,8 +9,17 @@ repos:
         args: ["--check"]
   - repo: local
     hooks:
-      - id: python-license-headers
-        name: Fix Python license headers
-        entry: python scripts/check_python_license_headers.py --fix
+      - id: reuse-license-headers
+        name: Annotate SPDX license headers with reuse
+        entry: uv
         language: system
+        args:
+          - run
+          - --extra
+          - dev
+          - reuse
+          - annotate
+          - --skip-existing
+          - --copyright=Bentley Systems, Incorporated
+          - --license=Apache-2.0
         types: [python]

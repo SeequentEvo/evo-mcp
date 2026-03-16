@@ -16,4 +16,9 @@ runs:
 
     - name: Check Python license headers
       shell: bash
-      run: uv run python scripts/check_python_license_headers.py
+      run: |
+        mapfile -t python_files < <(find src scripts -type f -name '*.py')
+        if ! uv run --extra dev reuse lint-file "${python_files[@]}"; then
+          echo "::error::License headers need updating. Run 'make lint-fix' to apply reuse annotations."
+          exit 1
+        fi
