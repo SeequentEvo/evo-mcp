@@ -232,15 +232,31 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 
 #### 5. Configure your environment
 
+Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app credentials as described below.
+
 ##### Evo app credentials
 
 You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
 
-Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app credentials:
+Fill in your app credentials in the `.env` file:
 ```bash
 EVO_CLIENT_ID=your-client-id
 EVO_REDIRECT_URL=your-redirect-url
 ```
+
+When you first use the server it will open your browser so you can sign in with your Bentley account. This gives the server access to any Evo instance and workspace your account has access to.
+
+##### Alternative: Service authentication (for automation/CI)
+
+If you need to run the server without interactive sign-in (e.g. automation, CI/CD, or background services), you can use a **service app** instead. Create a service app in the iTwin Developer Portal and set the following in your `.env` file:
+
+```bash
+AUTH_METHOD=client_credentials
+EVO_CLIENT_ID=your-service-client-id
+EVO_CLIENT_SECRET=your-service-client-secret
+```
+
+Note: The service app must be explicitly granted access to your Evo instance and workspaces.
 
 ##### MCP transport mode (optional)
 
