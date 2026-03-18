@@ -79,23 +79,12 @@ def register_admin_tools(mcp):
                 ext = "(no extension)"
             extension_counts[ext] = extension_counts.get(ext, 0) + 1
         
-        # Build file list with details
-        files_list = [
-            {
-                "id": str(file.id),
-                "name": file.name,
-                "path": file.path
-            }
-            for file in all_files
-        ]
-        
         return {
             "workspace_id": str(workspace_id),
             "total_objects": len(all_objects),
             "objects_by_schema": schema_counts,
             "total_files": len(all_files),
-            "files_by_extension": extension_counts,
-            "files": files_list,
+            "files_by_extension": extension_counts
         }
 
     @mcp.tool()

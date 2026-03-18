@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Bentley Systems, Incorporated
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 MCP tools for file operations in Evo workspaces.
 
@@ -216,7 +220,10 @@ def register_file_tools(mcp):
             {
                 "id": str(file.id),
                 "name": file.name,
-                "path": file.path
+                "path": file.path,
+                "size": file.size,
+                "version_id": file.version_id,
+                "created_at": file.created_at.isoformat() if file.created_at else None,
             }
             for file in all_files
         ]
