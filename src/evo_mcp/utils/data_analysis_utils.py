@@ -187,7 +187,7 @@ async def download_downhole_intervals_data(obj) -> pd.DataFrame:
     """Download interval data from a DownholeIntervals object as a DataFrame.
     
     Args:
-        obj: The downloaded evo object (DownholeIntervals type)
+        obj: The downloaded Evo object (DownholeIntervals type)
         
     Returns:
         DataFrame with hole_id, from, to, and attribute columns
