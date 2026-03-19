@@ -31,7 +31,7 @@ async def _get_interval_dataframe(obj, obj_dict: dict, collection_name: str) -> 
     """Helper to get interval DataFrame from either object type.
     
     Args:
-        obj: The downloaded evo object
+        obj: The downloaded Evo object
         obj_dict: Object dictionary
         collection_name: Collection name (use 'intervals' for DownholeIntervals)
         
