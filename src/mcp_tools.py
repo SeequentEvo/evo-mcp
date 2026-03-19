@@ -9,8 +9,8 @@ including workspace management, object ops, and data transfer.
 Configuration:
     Set MCP_TOOL_FILTER environment variable to filter tools and prompts:
     - "admin" : Workspace management tools 
-    - "data"    : Object query and management tools 
-    - "all"       : All tools (default)
+    - "data"  : Object query, file operations, and management tools
+    - "all"   : All tools (default)
 
     Set MCP_TRANSPORT environment variable to choose transport mode:
     - "stdio" (default): Standard input/output, used by VS Code, Cursor, Claude Desktop
@@ -36,7 +36,8 @@ from evo_mcp.tools import (
     register_general_tools,
     register_filesystem_tools,
     register_object_builder_tools,
-    register_instance_users_admin_tools,
+    register_file_tools,
+    register_instance_users_admin_tools
 )
 
 # Get transport mode from environment variable
@@ -100,6 +101,7 @@ if TOOL_FILTER in ["all", "data"]: #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
+    register_file_tools(mcp)
     if TOOL_FILTER == "data":
         print("Evo MCP Server configured for Data Agent")
     else:
