@@ -95,7 +95,7 @@ async def download_interval_data(
     """Download interval data from a collection as a DataFrame.
     
     Args:
-        obj: The downloaded evo object
+        obj: The downloaded Evo object
         collection_name: Name of the interval collection (e.g., 'assay')
         hole_id_jmespath: JMESPath to hole ID lookup
         
