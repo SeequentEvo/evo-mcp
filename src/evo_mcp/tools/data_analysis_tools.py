@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 async def _get_interval_dataframe(obj, obj_dict: dict, collection_name: str) -> pd.DataFrame:
-    """Helper to get interval DataFrame from either object type.
+    """Helper to get interval DataFrame from a supported object type.
     
     Args:
         obj: The downloaded Evo object
