@@ -45,7 +45,7 @@ async def _resolve_categorical_attribute(obj, attr_jmespath: str) -> pd.Series:
     This mirrors the pattern used by ``object_builders.build_category_attribute``.
 
     Args:
-        obj: The downloaded evo object
+        obj: The downloaded Evo object
         attr_jmespath: JMESPath to the categorical attribute root
             (e.g. ``"collections[0].from_to.attributes[2]"``)
 
