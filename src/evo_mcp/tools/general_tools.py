@@ -6,32 +6,32 @@
 MCP tools for general operations (health checks, object CRUD, etc).
 """
 
-import logging
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastmcp import Context
+from fastmcp.utilities.logging import get_logger
 
 from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.logging_utils import log_handled_failure, operation_extra
 
-# Set up logging to file for debugging
-logging.basicConfig(
-    filename='mcp_tools_debug.log',
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def register_general_tools(mcp):
     """Register all general tools with the FastMCP server."""
     
     @mcp.tool()
-    async def workspace_health_check(workspace_id: str = "") -> dict:
+    async def workspace_health_check(
+        workspace_id: str = "",
+        ctx: Context | None = None,
+    ) -> dict:
         """Check health status of Evo services.
         
         Args:
             workspace_id: Workspace UUID to check object service (optional)
         """
+        if ctx:
+            await ctx.info("Running workspace health check", extra={"workspace_id": workspace_id or None})
         results = {}
         
         if evo_context.workspace_client:
@@ -49,6 +49,9 @@ def register_general_tools(mcp):
                 "service": object_health.service,
                 "status": object_health.status,
             }
+
+        if ctx:
+            await ctx.info("Workspace health check complete", extra={"services": list(results.keys())})
         
         return results
 
@@ -56,7 +59,8 @@ def register_general_tools(mcp):
     async def list_workspaces(
         name: str = "",
         deleted: bool = False,
-        limit: int = 50
+        limit: int = 50,
+        ctx: Context | None = None,
     ) -> list[dict]:
         """List workspaces with optional filtering by name or deleted status.
         
@@ -65,15 +69,54 @@ def register_general_tools(mcp):
             deleted: Include deleted workspaces
             limit: Maximum number of results
         """
+        if limit <= 0:
+            raise ValueError("limit must be greater than 0")
+
+        if ctx:
+            await ctx.info(
+                "Listing workspaces",
+                extra={"filter_name": name or None, "deleted": deleted, "limit": limit},
+            )
         await ensure_initialized()
+
+        requested_limit = limit
+        max_page_size = 100
+        remaining = requested_limit
+        offset = 0
+        workspace_items = []
+        pages_fetched = 0
+
+        # Workspace service enforces a maximum page size of 100.
+        while remaining > 0:
+            page_limit = min(max_page_size, remaining)
+            workspaces_page = await evo_context.workspace_client.list_workspaces(
+                name=name if name else None,
+                deleted=deleted,
+                limit=page_limit,
+                offset=offset,
+            )
+
+            page_items = workspaces_page.items()
+            if not page_items:
+                break
+
+            workspace_items.extend(page_items)
+            pages_fetched += 1
+
+            fetched_count = len(page_items)
+            remaining -= fetched_count
+            offset += fetched_count
+
+            if offset >= workspaces_page.total:
+                break
+
+        if ctx and pages_fetched > 1:
+            await ctx.debug(
+                "Workspace listing required multiple pages",
+                extra={"pages_fetched": pages_fetched, "requested_limit": requested_limit},
+            )
         
-        workspaces = await evo_context.workspace_client.list_workspaces(
-            name=name if name else None,
-            deleted=deleted,
-            limit=limit
-        )
-        
-        return [
+        result = [
             {
                 "id": str(ws.id),
                 "name": ws.display_name,
@@ -82,13 +125,19 @@ def register_general_tools(mcp):
                 "created_at": ws.created_at.isoformat() if ws.created_at else None,
                 "updated_at": ws.updated_at.isoformat() if ws.updated_at else None,
             }
-            for ws in workspaces.items()
+            for ws in workspace_items
         ]
+
+        if ctx:
+            await ctx.info("Workspace listing complete", extra={"returned_count": len(result)})
+
+        return result
 
     @mcp.tool()
     async def get_workspace(
         workspace_id: str = "",
-        workspace_name: str = ""
+        workspace_name: str = "",
+        ctx: Context | None = None,
     ) -> dict:
         """Get workspace details by ID or name.
         
@@ -96,6 +145,11 @@ def register_general_tools(mcp):
             workspace_id: Workspace UUID (provide either this or workspace_name)
             workspace_name: Workspace name (provide either this or workspace_id)
         """
+        if ctx:
+            await ctx.info(
+                "Getting workspace details",
+                extra={"workspace_id": workspace_id or None, "workspace_name": workspace_name or None},
+            )
         await ensure_initialized()
         
         if workspace_id:
@@ -109,7 +163,7 @@ def register_general_tools(mcp):
         else:
             raise ValueError("Either workspace_id or workspace_name must be provided")
         
-        return {
+        result = {
             "id": str(workspace.id),
             "name": workspace.display_name,
             "description": workspace.description,
@@ -120,13 +174,19 @@ def register_general_tools(mcp):
             "default_coordinate_system": workspace.default_coordinate_system,
             "labels": workspace.labels,
         }
+
+        if ctx:
+            await ctx.info("Workspace details fetched", extra={"workspace_id": result["id"]})
+
+        return result
     
     @mcp.tool()
     async def list_objects(
         workspace_id: str,
         schema_id: str = "",
         deleted: bool = False,
-        limit: int = 100
+        limit: int = 100,
+        ctx: Context | None = None,
     ) -> list[dict]:
         """List objects in a workspace with optional filtering.
         
@@ -136,29 +196,49 @@ def register_general_tools(mcp):
             deleted: Include deleted objects
             limit: Maximum number of results
         """
-        logger.info(f"evo_list_objects called with workspace_id={workspace_id}, schema_id={schema_id}")
+        operation_id = str(uuid4())
+
+        if ctx:
+            await ctx.info(
+                "Listing objects",
+                extra=operation_extra(
+                    operation_id,
+                    workspace_id=workspace_id,
+                    schema_id=schema_id or None,
+                    deleted=deleted,
+                    limit=limit,
+                ),
+            )
         
         try:
-            logger.debug("Calling ensure_initialized()")
+            if ctx:
+                await ctx.debug("Initializing Evo context")
             await ensure_initialized()
-            logger.debug("ensure_initialized() completed successfully")
+            if ctx:
+                await ctx.debug("Evo context initialized")
             
-            logger.debug(f"Getting object client for workspace {workspace_id}")
+            if ctx:
+                await ctx.debug("Getting object client", extra=operation_extra(operation_id, workspace_id=workspace_id))
             object_client = await evo_context.get_object_client(UUID(workspace_id))
-            logger.debug(f"Got object_client: {object_client}")
             
             service_health = await object_client.get_service_health()
             service_health.raise_for_status()
-            logger.debug("Object client health check passed")
+            if ctx:
+                await ctx.debug("Object client health check passed")
             
-            logger.debug("Calling list_objects()")
+            if ctx:
+                await ctx.debug("Fetching objects from service")
             objects = await object_client.list_objects(
                 schema_id=None, # [schema_id] if schema_id else None,
                 deleted=deleted,
                 limit=limit
             )
 
-            logger.debug(f"list_objects() returned {len(objects.items())} objects")
+            if ctx:
+                await ctx.debug(
+                    "Received objects from service",
+                    extra=operation_extra(operation_id, count=len(objects.items())),
+                )
             
             result = [
                 {
@@ -172,11 +252,25 @@ def register_general_tools(mcp):
                 }
                 for obj in objects.items()
             ]
-            logger.info(f"evo_list_objects completed successfully with {len(result)} objects")
+            if ctx:
+                await ctx.info(
+                    "Object listing completed",
+                    extra=operation_extra(operation_id, returned_count=len(result)),
+                )
             return result
             
         except Exception as e:
-            logger.error(f"Error in evo_list_objects: {type(e).__name__}: {str(e)}", exc_info=True)
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to list objects",
+                operation_id,
+                e,
+                workspace_id=workspace_id,
+                schema_id=schema_id or None,
+                deleted=deleted,
+                limit=limit,
+            )
             raise
 
     @mcp.tool()
@@ -184,7 +278,8 @@ def register_general_tools(mcp):
         workspace_id: str,
         object_id: str = "",
         object_path: str = "",
-        version: str = ""
+        version: str = "",
+        ctx: Context | None = None,
     ) -> dict:
         """Get object metadata by ID or path.
         
@@ -194,6 +289,16 @@ def register_general_tools(mcp):
             object_path: Object path (provide either this or object_id)
             version: Specific version ID (optional)
         """
+        if ctx:
+            await ctx.info(
+                "Getting object metadata",
+                extra={
+                    "workspace_id": workspace_id,
+                    "object_id": object_id or None,
+                    "object_path": object_path or None,
+                    "version": version or None,
+                },
+            )
         await ensure_initialized()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         
@@ -204,7 +309,7 @@ def register_general_tools(mcp):
         else:
             raise ValueError("Either object_id or object_path must be provided")
         
-        return {
+        result = {
             "id": str(obj.metadata.id),
             "name": obj.metadata.name,
             "path": obj.metadata.path,
@@ -213,6 +318,11 @@ def register_general_tools(mcp):
             "created_at": obj.metadata.created_at.isoformat() if obj.metadata.created_at else None,
             #"updated_at": obj.metadata.updated_at.isoformat() if obj.metadata.updated_at else None,
         }
+
+        if ctx:
+            await ctx.info("Object metadata fetched", extra={"object_id": result["id"]})
+
+        return result
 
 
     @mcp.tool()
@@ -223,7 +333,7 @@ def register_general_tools(mcp):
         await ensure_initialized()
 
         if evo_context.org_id:
-            await ctx.info(f"Selected instance ID {evo_context.org_id}")
+            await ctx.info("Current Evo instance selected", extra={"instance_id": str(evo_context.org_id)})
         instances = await evo_context.discovery_client.list_organizations()
         return instances
 
@@ -231,6 +341,7 @@ def register_general_tools(mcp):
     async def select_instance(
         instance_name: str | None = None,
         instance_id: UUID | None = None,
+        ctx: Context | None = None,
     ) -> dict | None:
         """Select an instance to connect to.
 
@@ -245,10 +356,24 @@ def register_general_tools(mcp):
         """
         await ensure_initialized()
 
+        if ctx:
+            await ctx.info(
+                "Selecting Evo instance",
+                extra={
+                    "instance_name": instance_name,
+                    "instance_id": str(instance_id) if instance_id else None,
+                },
+            )
+
         instances = await evo_context.discovery_client.list_organizations()
         for instance in instances:
             if instance.id == instance_id or instance.display_name == instance_name:
                 await evo_context.switch_instance(instance.id, instance.hubs[0].url)
+                if ctx:
+                    await ctx.info(
+                        "Selected Evo instance",
+                        extra={"instance_id": str(instance.id), "instance_name": instance.display_name},
+                    )
                 return instance
 
         raise ValueError(

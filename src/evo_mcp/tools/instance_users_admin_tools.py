@@ -1,11 +1,12 @@
 import functools
 from uuid import UUID
 from typing import Callable
-
-from evo.workspaces.endpoints import InstanceUsersApi
-from evo.workspaces.endpoints.models import AddInstanceUsersRequest, UserRoleMapping
+from fastmcp import Context
+from fastmcp.utilities.logging import get_logger
 
 from evo_mcp.context import evo_context, ensure_initialized
+
+logger = get_logger(__name__)
 
 
 def register_instance_users_admin_tools(mcp):
@@ -21,6 +22,7 @@ def register_instance_users_admin_tools(mcp):
     @mcp.tool()
     async def get_users_in_instance(
         count: int | None = 10000,
+        ctx: Context | None = None,
     ) -> list[dict]:
         """Get all users in the currently selected instance.
        
@@ -37,6 +39,10 @@ def register_instance_users_admin_tools(mcp):
         Returns:
             A list of users in the instance, their names, email addresses and roles.
         """
+        if ctx:
+            await ctx.info("Listing users in instance", extra={"count": count})
+            await ctx.report_progress(progress=10, total=100)
+
         workspace_client = await get_workspace_client()
 
         async def read_pages_from_api(func: Callable, up_to: int | None = None, limit: int = 100):
@@ -69,6 +75,10 @@ def register_instance_users_admin_tools(mcp):
             ),
             up_to=count,
         )
+
+        if ctx:
+            await ctx.report_progress(progress=100, total=100)
+            await ctx.info("Listed users in instance", extra={"returned_count": len(instance_users)})
         
         return [
             {
@@ -82,17 +92,23 @@ def register_instance_users_admin_tools(mcp):
     
     @mcp.tool()
     async def list_roles_in_instance(
+        ctx: Context | None = None,
     ) -> list[dict]:
         """List the roles available in the instance."""
+        if ctx:
+            await ctx.info("Listing roles in instance")
         workspace_client = await get_workspace_client()
 
         instance_roles_response = await workspace_client.list_instance_roles()
+        if ctx:
+            await ctx.info("Listed roles in instance", extra={"role_count": len(instance_roles_response)})
         return instance_roles_response
 
     @mcp.tool()
     async def add_users_to_instance(
         user_emails: list[str],
         role_ids: list[UUID],
+        ctx: Context | None = None,
     ) -> dict|str:
         """Add one or more users to the selected instance.
         If the user is external, an invitation will be sent.
@@ -117,14 +133,28 @@ def register_instance_users_admin_tools(mcp):
             Invitations are for external users who would need to accept the invitation to join the instance.
             Members are for users who are already part of the organization.
         """
+        if ctx:
+            await ctx.info(
+                "Adding users to instance",
+                extra={"user_count": len(user_emails), "role_count": len(role_ids)},
+            )
+            await ctx.report_progress(progress=20, total=100)
+
         workspace_client = await get_workspace_client()
         
         users = {email : role_ids for email in user_emails}
 
         response = await workspace_client.add_users_to_instance(users=users)
+        if ctx:
+            await ctx.report_progress(progress=100, total=100)
 
         invitations = response.invitations or []
         members = response.members or []
+        if ctx:
+            await ctx.info(
+                "Users added to instance",
+                extra={"invitations_sent": len(invitations), "members_added": len(members)},
+            )
         return {
             "invitations_sent": [invitation.email for invitation in invitations],
             "members_added": [member.email for member in members],
@@ -133,7 +163,8 @@ def register_instance_users_admin_tools(mcp):
     @mcp.tool()
     async def remove_user_from_instance(
         user_email: str,
-        user_id: UUID 
+        user_id: UUID,
+        ctx: Context | None = None,
     ) -> dict|str:
         """Remove a user from the selected instance. This will revoke the user's access to the instance.
         Only an instance admin or owner can remove users from the instance. If a Forbidden error is returned from remove_instance_user(), 
@@ -146,9 +177,18 @@ def register_instance_users_admin_tools(mcp):
             user_id: The user ID of the user to remove from the instance. Must
                 match an entry returned from the `get_users_in_instance` tool.
         """
+        if ctx:
+            await ctx.info(
+                "Removing user from instance",
+                extra={"user_email": user_email, "user_id": str(user_id)},
+            )
+
         workspace_client = await get_workspace_client()
 
         await workspace_client.remove_instance_user(user_id=user_id)
+
+        if ctx:
+            await ctx.info("Removed user from instance", extra={"user_email": user_email})
 
         return {
             "user_removed": user_email,
@@ -159,6 +199,7 @@ def register_instance_users_admin_tools(mcp):
         user_email: str,
         user_id: UUID,
         role_ids: list[UUID],
+        ctx: Context | None = None,
     ) -> dict|str:
         """Update the role of a user in the instance. This will change the user's access level in the instance.
         Only an instance admin or owner can update user roles in the instance. If a Forbidden error is returned from update_instance_user_roles(), 
@@ -177,9 +218,18 @@ def register_instance_users_admin_tools(mcp):
                 The default role is the "Evo user" role for the selected
                 instance.
         """
+        if ctx:
+            await ctx.info(
+                "Updating user role in instance",
+                extra={"user_email": user_email, "user_id": str(user_id), "role_count": len(role_ids)},
+            )
+
         workspace_client = await get_workspace_client()
 
         await workspace_client.update_instance_user_roles(user_id=user_id, roles=role_ids)
+
+        if ctx:
+            await ctx.info("Updated user role in instance", extra={"user_email": user_email})
 
         return {
             "user_role_updated": user_email,
