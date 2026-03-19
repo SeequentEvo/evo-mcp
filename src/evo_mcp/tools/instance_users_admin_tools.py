@@ -1,11 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Bentley Systems, Incorporated
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import functools
-from uuid import UUID
 from typing import Callable
+from uuid import UUID
 
-from evo.workspaces.endpoints import InstanceUsersApi
-from evo.workspaces.endpoints.models import AddInstanceUsersRequest, UserRoleMapping
-
-from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.context import ensure_initialized, evo_context
 
 
 def register_instance_users_admin_tools(mcp):
@@ -17,13 +18,13 @@ def register_instance_users_admin_tools(mcp):
             return workspace_client
         else:
             raise ValueError("Please ensure you are connected to an instance.")
-  
+
     @mcp.tool()
     async def get_users_in_instance(
         count: int | None = 10000,
     ) -> list[dict]:
         """Get all users in the currently selected instance.
-       
+
         This tool will allow an admin to see:
             * who has access to the instance,
             * who does not have access to the instance,
@@ -64,25 +65,22 @@ def register_instance_users_admin_tools(mcp):
             return ret
 
         instance_users = await read_pages_from_api(
-            functools.partial(
-                workspace_client.list_instance_users
-            ),
+            functools.partial(workspace_client.list_instance_users),
             up_to=count,
         )
-        
+
         return [
             {
                 "user_id": user.user_id,
                 "email": user.email,
                 "name": user.full_name,
-                "roles": [role.name for role in user.roles]
+                "roles": [role.name for role in user.roles],
             }
             for user in instance_users
         ]
-    
+
     @mcp.tool()
-    async def list_roles_in_instance(
-    ) -> list[dict]:
+    async def list_roles_in_instance() -> list[dict]:
         """List the roles available in the instance."""
         workspace_client = await get_workspace_client()
 
@@ -93,15 +91,15 @@ def register_instance_users_admin_tools(mcp):
     async def add_users_to_instance(
         user_emails: list[str],
         role_ids: list[UUID],
-    ) -> dict|str:
+    ) -> dict | str:
         """Add one or more users to the selected instance.
         If the user is external, an invitation will be sent.
 
-        Only an instance admin or owner can add users to the instance. If a Forbidden error is returned from add_users_to_instance(), 
+        Only an instance admin or owner can add users to the instance. If a Forbidden error is returned from add_users_to_instance(),
         inform the user of the tool that they do not have the required permissions to add users to the instance.
         If a user is already in the instance, an error will be returned - give the error details to the user of the tool
         and ask the user if they wish to update the role of this user. If role update is requested, use `update_user_role_in_instance` tool instead.
-        This will help in cases where the user is already in the instance but with a different role, 
+        This will help in cases where the user is already in the instance but with a different role,
         and we want to update the role of the user instead of adding the user again.
         With one request, assign the same role to multiple users by accepting a list of user emails and a list of role IDs.
 
@@ -118,8 +116,8 @@ def register_instance_users_admin_tools(mcp):
             Members are for users who are already part of the organization.
         """
         workspace_client = await get_workspace_client()
-        
-        users = {email : role_ids for email in user_emails}
+
+        users = {email: role_ids for email in user_emails}
 
         response = await workspace_client.add_users_to_instance(users=users)
 
@@ -131,17 +129,14 @@ def register_instance_users_admin_tools(mcp):
         }
 
     @mcp.tool()
-    async def remove_user_from_instance(
-        user_email: str,
-        user_id: UUID 
-    ) -> dict|str:
+    async def remove_user_from_instance(user_email: str, user_id: UUID) -> dict | str:
         """Remove a user from the selected instance. This will revoke the user's access to the instance.
-        Only an instance admin or owner can remove users from the instance. If a Forbidden error is returned from remove_instance_user(), 
-        inform the user of the tool that they do not have the required permissions to remove users from the instance. 
+        Only an instance admin or owner can remove users from the instance. If a Forbidden error is returned from remove_instance_user(),
+        inform the user of the tool that they do not have the required permissions to remove users from the instance.
         Args:
             user_email: The email address of the user to remove from the instance.
             Do not assume the email address from first name or other information, it should be provided by the user of the tool.
-            Prompt the user to provide the email address if not provided. 
+            Prompt the user to provide the email address if not provided.
 
             user_id: The user ID of the user to remove from the instance. Must
                 match an entry returned from the `get_users_in_instance` tool.
@@ -159,15 +154,15 @@ def register_instance_users_admin_tools(mcp):
         user_email: str,
         user_id: UUID,
         role_ids: list[UUID],
-    ) -> dict|str:
+    ) -> dict | str:
         """Update the role of a user in the instance. This will change the user's access level in the instance.
-        Only an instance admin or owner can update user roles in the instance. If a Forbidden error is returned from update_instance_user_roles(), 
+        Only an instance admin or owner can update user roles in the instance. If a Forbidden error is returned from update_instance_user_roles(),
         inform the user of the tool that they do not have the required permissions to update user roles in the instance.
 
         Args:
             user_email: The email address of the user to update the role of.
             Do not assume the email address from first name or other information, it should be provided by the user of the tool.
-            Prompt the user to provide the email address if not provided. 
+            Prompt the user to provide the email address if not provided.
 
             user_id: The user ID of the user to update the role of. Must match
                 an entry returned by the `get_users_in_instance` tool.
@@ -185,5 +180,3 @@ def register_instance_users_admin_tools(mcp):
             "user_role_updated": user_email,
             "new_roles": role_ids,
         }
-
-  
