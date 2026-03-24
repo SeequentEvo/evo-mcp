@@ -53,6 +53,15 @@ DEFAULT_REDIRECT_URL = "http://localhost:3000/signin-callback"
 DEFAULT_HTTP_HOST = "localhost"
 DEFAULT_HTTP_PORT = "5000"
 TOOL_FILTER_CHOICES = {"1": "all", "2": "admin", "3": "data"}
+AUTH_METHOD_CHOICES = {"1": "native_app", "2": "client_credentials"}
+
+def mask_value(value: str, visible: int = 3) -> str:
+    """Mask sensitive values for safe terminal output."""
+    if not value:
+        return ""
+    if len(value) <= visible * 2:
+        return "*" * len(value)
+    return f"{value[:visible]}{'*' * (len(value) - visible * 2)}{value[-visible:]}"
 
 
 def print_color(text: str, color: str = Colors.RESET):
@@ -113,6 +122,27 @@ def prompt_with_confirmation(label: str, current_value: str, default: str) -> st
     if is_confirmed():
         return current_value
     return input(f"Enter {label} (default: {default}): ").strip() or default
+
+def prompt_auth_method(current_value: str | None) -> str:
+    """Prompt for MCP authentication method selection."""
+    print()
+    print("Select authentication method:")
+    print("1. Sign in with your browser (recommended)")
+    print("2. Service account — no user sign-in (for automation/CI)")
+    print()
+
+    if current_value:
+        print(f"Current value: {current_value}")
+        if is_confirmed():
+            return current_value
+
+    choice = prompt_choice(
+        "Enter your choice [1-2] (default: 1): ",
+        set(AUTH_METHOD_CHOICES.keys()),
+        "1",
+        "Invalid choice. Please enter 1 or 2.",
+    )
+    return AUTH_METHOD_CHOICES[choice]
 
 
 def prompt_tool_filter(current_value: str | None) -> str:
@@ -224,18 +254,28 @@ def configure_env_settings(project_dir: Path) -> dict[str, str]:
 
     new_values = {}
 
+    new_values["AUTH_METHOD"] = prompt_auth_method(current_values.get("AUTH_METHOD"))
+
     new_values["EVO_CLIENT_ID"] = prompt_for_env_value(
         "EVO_CLIENT_ID",
         current_values.get("EVO_CLIENT_ID"),
         "Your Evo application client ID from the iTwin Developer Portal."
     )
 
-    new_values["EVO_REDIRECT_URL"] = prompt_for_env_value(
-        "EVO_REDIRECT_URL",
-        current_values.get("EVO_REDIRECT_URL"),
-        "Your Evo application redirect URL from the iTwin Developer Portal.",
-        DEFAULT_REDIRECT_URL,
-    )
+
+    if new_values["AUTH_METHOD"] == "client_credentials":
+        new_values["EVO_CLIENT_SECRET"] = prompt_for_env_value(
+            "EVO_CLIENT_SECRET",
+            mask_value(current_values.get("EVO_CLIENT_SECRET")),
+            "Your Evo application client secret from the iTwin Developer Portal."
+        )
+    else:
+        new_values["EVO_REDIRECT_URL"] = prompt_for_env_value(
+            "EVO_REDIRECT_URL",
+            current_values.get("EVO_REDIRECT_URL"),
+            "Your Evo application redirect URL from the iTwin Developer Portal.",
+            DEFAULT_REDIRECT_URL,
+        )
 
     new_values["MCP_TOOL_FILTER"] = prompt_tool_filter(current_values.get("MCP_TOOL_FILTER", "all"))
 

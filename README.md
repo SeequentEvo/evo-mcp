@@ -57,7 +57,35 @@ The server comes packaged with many tools written by Seequent, but it is fully e
 
 ### Server architecture
 
-MCP Client (VS Code / ADK Agent / etc) <-> MCP Server (FastMCP + Evo SDK) <-> Evo APIs
+```mermaid
+flowchart LR
+    Clients["🖥️ MCP Clients<br/>VS Code · Cursor<br/>Claude Desktop · ADK"]
+    Clients -- stdio / streamable HTTP --> Server
+    Server -- HTTPS --> APIs
+
+    subgraph Server[Evo MCP Server]
+        Tools[Tool Modules<br/>General · Admin<br/>Data · Filesystem]
+        Filter[MCP_TOOL_FILTER]
+        Context[EvoContext<br/>OAuth · Tokens]
+        Tools --> Filter --> Context
+    end
+
+    subgraph APIs[Evo APIs]
+        Discovery[Discovery]
+        Workspace[Workspace]
+        Object[Object]
+    end
+```
+
+### Key components
+
+| Component | Description |
+|-----------|-------------|
+| **MCP clients** | Any MCP-compatible application connects to the server over `STDIO` or `streamable HTTP`. |
+| **FastMCP server** | The core server runtime that handles MCP protocol, tool registration, and request routing. |
+| **Tool modules** | Tools are grouped by category and conditionally registered based on the `MCP_TOOL_FILTER` setting. General tools are always loaded. |
+| **EvoContext** | Manages OAuth authentication (with token caching), Evo SDK client initialization, and organization/hub selection. Initialization is lazy — it happens on the first tool call, triggering a browser-based login if needed. |
+| **Evo APIs** | The Evo SDK packages (block model, geoscience object, workspace) communicate with Seequent Evo over HTTPS. |
 
 ## Getting started
 
@@ -204,15 +232,31 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 
 #### 5. Configure your environment
 
+Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app credentials as described below.
+
 ##### Evo app credentials
 
-You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
+You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account to access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
 
-Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app credentials:
+Fill in your app credentials in the `.env` file:
 ```bash
 EVO_CLIENT_ID=your-client-id
 EVO_REDIRECT_URL=your-redirect-url
 ```
+
+When you first use the server it will open your browser so you can sign in with your Bentley account. This gives the server access to any Evo instance and workspace your account has access to.
+
+##### Alternative: Service authentication (for automation/CI)
+
+If you need to run the server without interactive sign-in (e.g. automation, CI/CD, or background services), you can use a **service app** instead. Create a service app in the iTwin Developer Portal and set the following in your `.env` file:
+
+```bash
+AUTH_METHOD=client_credentials
+EVO_CLIENT_ID=your-service-client-id
+EVO_CLIENT_SECRET=your-service-client-secret
+```
+
+Note: The service app must be explicitly granted access to your Evo instance and workspaces.
 
 ##### MCP transport mode (optional)
 
@@ -329,7 +373,7 @@ python scripts/setup_mcp.py
   - For HTTP mode, use `templates/cursor-http-config.json` instead.
   - Update the template URL host and port to match `MCP_HTTP_HOST` and `MCP_HTTP_PORT` in your `.env`, and ensure the HTTP server is running.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
-3. Search for "mcp". Select either **View: Open MCP Settings** to update the user settings.
+3. Search for "mcp". Select **View: Open MCP Settings** to update the user settings.
   ![Cursor Command Palette](images/cursor-command-palette.png)
 
 4. Click the **Add Custom MCP** button.
