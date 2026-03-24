@@ -223,7 +223,11 @@ def register_file_tools(mcp):
                 "path": file.path,
                 "size": file.size,
                 "version_id": file.version_id,
-                "created_at": file.created_at.isoformat() if file.created_at else None,
+                "created_at": file.created_at,
+                "created_by": file.created_by,
+                "modified_by": file.modified_by,
+                "modified_at": file.modified_at,
+                "url": file.url,
             }
             for file in all_files
         ]
