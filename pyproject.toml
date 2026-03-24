@@ -7,9 +7,11 @@ requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=3.0.2",
     "google-adk==1.22.1",
-    "evo-objects>=0.3.3",
-    "evo-sdk-common>=0.5.13",
+    "evo-compute>=0.0.2",
+    "evo-objects>=0.4.0",
+    "evo-sdk-common>=0.5.21",
     "evo-schemas>=2025.9.2",
+    "evo-widgets>=0.2.0",
     "aiohttp>=3.13.2",
     "pyarrow>=14.0.0",
     "pandas>=2.0.0",
