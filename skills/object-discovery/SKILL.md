@@ -46,6 +46,11 @@ For kriging workflows, also include a lightweight `kriging_parameters_seed` map:
 - `target_attribute` (if known)
 - `point_set_attribute` (if known)
 
+And include a `kriging_run_seed` shape for direct handoff:
+
+- `workspace_id`
+- `scenarios` (initialize as a non-empty list when attributes are known)
+
 If attribute names are unknown, include `attribute_follow_up_required: true` and ask for the exact source attribute name before execution.
 
 Each candidate should include:
@@ -65,7 +70,7 @@ Each candidate should include:
 - Return discoveries in a form that can feed directly into downstream tool calls.
 - Infer role/type compatibility from `schema_id`.
 - Prefer the newest relevant candidate when multiple objects share name/path hints, using `version_id` and recency metadata.
-- Prefer role names that align with `KrigingToolParameters` fields.
+- Prefer role names that align with `KrigingParameters` and `kriging_run(workspace_id, scenarios)` inputs.
 
 ## Example
 

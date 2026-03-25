@@ -85,6 +85,34 @@ VariogramObjectId = Annotated[
 ]
 
 
+def _normalize_kriging_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Normalize payload shape for MCP round-trips.
+
+    - Canonicalize field names expected by `kriging_run`:
+      `search` -> `neighborhood`, `method` -> `kriging_method`.
+    - SearchNeighborhood serialization emits `ellipsoid_ranges`, while
+      Ellipsoid construction expects `ranges`.
+    """
+    if "search" in payload and "neighborhood" not in payload:
+        payload["neighborhood"] = payload.pop("search")
+
+    if "method" in payload and "kriging_method" not in payload:
+        payload["kriging_method"] = payload.pop("method")
+
+    neighborhood = payload.get("neighborhood")
+    if not isinstance(neighborhood, dict):
+        return payload
+
+    ellipsoid = neighborhood.get("ellipsoid")
+    if not isinstance(ellipsoid, dict):
+        return payload
+
+    if "ellipsoid_ranges" in ellipsoid and "ranges" not in ellipsoid:
+        ellipsoid["ranges"] = ellipsoid.pop("ellipsoid_ranges")
+
+    return payload
+
+
 async def _get_workspace_environment(workspace_id: str) -> Any:
     await ensure_initialized()
 
@@ -114,7 +142,7 @@ def register_compute_tools(mcp) -> None:
     """Register compute-related tools with the FastMCP server."""
 
     @mcp.tool()
-    async def kriging_run(
+    async def kriging_build_parameters(
         workspace_id: str,
         target_object_id: TargetObjectId,
         target_attribute: TargetAttributeName,
@@ -126,7 +154,7 @@ def register_compute_tools(mcp) -> None:
         target_region_filter: RegionFilter | None = None,
         block_discretisation: BlockDiscretisation | None = None,
     ) -> dict[str, Any]:
-        """Run a kriging compute task from primitive inputs.
+        """Build a validated kriging payload from primitive inputs.
 
         Args:
             workspace_id: Workspace UUID where the task should run.
@@ -141,21 +169,17 @@ def register_compute_tools(mcp) -> None:
             block_discretisation: Optional sub-block discretisation settings.
 
         Returns:
-            A compact summary of the compute result with target identifiers for follow-up work.
+            A validated payload object suitable for kriging_run.
         """
         environment = await _get_workspace_environment(workspace_id)
         context = StaticContext.from_environment(environment, evo_context.connector)
-
         source_object, target_object, variogram_object = await asyncio.gather(
             object_from_uuid(context, point_set_object_id),
             object_from_uuid(context, target_object_id),
             object_from_uuid(context, variogram_object_id),
         )
-
-        # Use typed attributes so compute receives canonical attribute expressions.
         source_attribute = source_object.attributes[point_set_attribute]
-
-        compute_parameters = KrigingParameters(
+        payload = KrigingParameters(
             source=Source(object=source_object, attribute=source_attribute),
             target=Target.new_attribute(target_object, target_attribute),
             variogram=variogram_object,
@@ -165,11 +189,19 @@ def register_compute_tools(mcp) -> None:
             block_discretisation=block_discretisation,
         )
 
-        result = await run_compute(context, compute_parameters, preview=True)
+        return _normalize_kriging_payload(payload.model_dump(mode="json"))
 
+    def _format_single_result(
+        result: Any,
+        scenario: KrigingParameters,
+        environment: Any,
+    ) -> dict[str, Any]:
+        target_reference = str(scenario.target.object)
+        target_object_id = target_reference.rstrip("/").split("/")[-1].split("?")[0]
         links = _build_links_from_metadata(environment, target_object_id)
-        requested_attribute = target_attribute
-
+        requested_attribute = getattr(
+            scenario.target.attribute, "name", result.attribute_name
+        )
         return {
             "status": "success",
             "message": result.message,
@@ -184,7 +216,7 @@ def register_compute_tools(mcp) -> None:
                     "hub_url": environment.hub_url,
                 },
                 "attribute": {
-                    "operation": compute_parameters.target.attribute.operation,
+                    "operation": scenario.target.attribute.operation,
                     "name": result.attribute_name,
                     "requested": requested_attribute,
                 },
@@ -194,4 +226,34 @@ def register_compute_tools(mcp) -> None:
                 "portal_url": links["portal_url"],
                 "viewer_url": links["viewer_url"],
             },
+        }
+
+    @mcp.tool()
+    async def kriging_run(
+        workspace_id: str,
+        scenarios: list[KrigingParameters],
+    ) -> dict[str, Any]:
+        """Run one or more kriging compute tasks in parallel.
+
+        Args:
+            workspace_id: Workspace UUID where all tasks should run.
+            scenarios: List of KrigingParameters objects, as built by kriging_build_parameters.
+
+        Returns:
+            A list of result summaries in the same order as the input scenarios.
+        """
+        if len(scenarios) == 0:
+            raise ValueError("Must specify at least one scenario.")
+
+        environment = await _get_workspace_environment(workspace_id)
+        context = StaticContext.from_environment(environment, evo_context.connector)
+
+        results = await run_compute(context, scenarios, preview=True)
+        return {
+            "status": "success",
+            "scenarios_completed": len(results),
+            "results": [
+                _format_single_result(r, scenario, environment)
+                for r, scenario in zip(results, scenarios)
+            ],
         }
