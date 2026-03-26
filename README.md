@@ -431,6 +431,8 @@ The server will start listening on `http://localhost:5000/mcp`.
 
 **Access tools using FastMCP CLI:**
 
+For simple arguments, prefer `key=value` parameters; use `--input-json` for more complex or nested inputs.
+
 ```bash
 # 1) List available tools on the server
 uv run fastmcp list http://localhost:5000/mcp --transport http
@@ -438,13 +440,16 @@ uv run fastmcp list http://localhost:5000/mcp --transport http
 # 2) List workspaces
 uv run fastmcp call http://localhost:5000/mcp list_workspaces \
   --transport http \
-  --input-json '{"name":"","deleted":false,"limit":50}' \
+  name="" \
+  deleted=false \
+  limit=50 \
   --json
 
 # 3) Create a workspace
 uv run fastmcp call http://localhost:5000/mcp create_workspace \
   --transport http \
-  --input-json '{"name":"My New Workspace","description":"Test workspace"}' \
+  name="My New Workspace" \
+  description="Test workspace" \
   --json
 ```
 
