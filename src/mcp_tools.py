@@ -30,6 +30,82 @@ from pathlib import Path
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import configure_logging
 
+# ---------------------------------------------------------------------------
+# Monkey-patch: RFC 8252 §7.3 loopback redirect URI port matching
+# ---------------------------------------------------------------------------
+# FastMCP's redirect_validation treats "http://localhost/callback" (no port) as
+# port 80, which rejects dynamic-port loopback URIs like
+# "http://localhost:56053/callback".  Per RFC 8252 §7.3 the authorization
+# server MUST allow any port for loopback redirect URIs.
+#
+# Claude Code's CIMD declares redirect_uris without a port, so we patch the
+# matching function to treat a missing port on loopback patterns as a wildcard.
+# This patch can be removed once FastMCP ships a fix upstream.
+# ---------------------------------------------------------------------------
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _apply_loopback_redirect_patch() -> None:
+    """Patch fastmcp redirect-URI matching for RFC 8252 loopback compliance."""
+    from fastmcp.server.auth import redirect_validation as _rv
+    from fastmcp.server.auth.oauth_proxy import models as _models
+
+    _original_match_port = _rv._match_port
+
+    def _patched_match_port(
+        uri_port: "str | None",
+        pattern_port: "str | None",
+        uri_scheme: str,
+        *,
+        _pattern_host: "str | None" = None,
+    ) -> bool:
+        # RFC 8252 §7.3: loopback pattern with no explicit port → any port
+        if (
+            pattern_port is None
+            and _pattern_host is not None
+            and _pattern_host.lower() in _LOOPBACK_HOSTS
+        ):
+            return True
+        return _original_match_port(uri_port, pattern_port, uri_scheme)
+
+    _original_matches = _rv.matches_allowed_pattern
+
+    def _patched_matches_allowed_pattern(uri: str, pattern: str) -> bool:
+        from urllib.parse import urlparse as _urlparse
+
+        try:
+            uri_parsed = _urlparse(uri)
+            pattern_parsed = _urlparse(pattern)
+        except ValueError:
+            return _original_matches(uri, pattern)
+
+        if uri_parsed.username is not None or uri_parsed.password is not None:
+            return False
+
+        if uri_parsed.scheme.lower() != pattern_parsed.scheme.lower():
+            return False
+
+        uri_host, uri_port = _rv._parse_host_port(uri_parsed.netloc)
+        pattern_host, pattern_port = _rv._parse_host_port(pattern_parsed.netloc)
+
+        if not _rv._match_host(uri_host, pattern_host):
+            return False
+
+        if not _patched_match_port(
+            uri_port, pattern_port, uri_parsed.scheme.lower(),
+            _pattern_host=pattern_host,
+        ):
+            return False
+
+        return _rv._match_path(uri_parsed.path, pattern_parsed.path)
+
+    # Patch both the module-level function and the reference inside models.py
+    _rv.matches_allowed_pattern = _patched_matches_allowed_pattern
+    _models.matches_allowed_pattern = _patched_matches_allowed_pattern
+
+
+_apply_loopback_redirect_patch()
+
 from evo_mcp.tools import (
     register_admin_tools,
     # register_data_tools,
@@ -48,9 +124,38 @@ if TRANSPORT not in VALID_TRANSPORTS:
     TRANSPORT = "stdio"
 
 # Get HTTP configuration if using HTTP transport
-if TRANSPORT == "http":
-    HTTP_HOST = os.getenv("MCP_HTTP_HOST", "localhost")
-    HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
+HTTP_HOST = os.getenv("MCP_HTTP_HOST", "localhost")
+HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
+
+# Whether to enable OAuth authentication for HTTP transport.
+# When enabled, the server acts as an OIDC proxy: MCP clients authenticate
+# via an OAuth browser flow (Dynamic Client Registration + PKCE), and the
+# server validates each request's token before forwarding it to Evo APIs.
+# This enables client-delegated auth — each connected client authenticates
+# independently and sees only the instances/workspaces their account has access to.
+#
+# Disable if:
+#   - The server is behind a reverse proxy that already enforces auth
+#   - You are doing local development and don't want to deal with OAuth
+#   - You want server-managed auth (set AUTH_METHOD=client_credentials or
+#     native_app and let the server handle authentication)
+#
+# Defaults to False. Set to true only when MCP_TRANSPORT=http.
+_delegated_auth_env = os.getenv("CLIENT_DELEGATED_AUTH", "").lower()
+if _delegated_auth_env in ("1", "true", "yes"):
+    CLIENT_DELEGATED_AUTH = True
+elif _delegated_auth_env in ("0", "false", "no"):
+    CLIENT_DELEGATED_AUTH = False
+else:
+    CLIENT_DELEGATED_AUTH = False  # default: off unless explicitly enabled
+
+if CLIENT_DELEGATED_AUTH and TRANSPORT != "http":
+    logging.warning(
+        "CLIENT_DELEGATED_AUTH=true has no effect with MCP_TRANSPORT='%s' — "
+        "OAuth authentication is only supported with HTTP transport. Ignoring.",
+        TRANSPORT,
+    )
+    CLIENT_DELEGATED_AUTH = False
 
 # Get agent type from environment variable
 # This can either be set via MCP inputs, or the .env file used by the agent example
@@ -65,9 +170,77 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
     TOOL_FILTER = "all"
 
+
+def _create_auth_provider():
+    """Create an OIDCProxy auth provider for HTTP transport.
+
+    Uses Bentley IMS as the upstream OIDC provider. The proxy handles
+    Dynamic Client Registration for MCP clients and proxies the OAuth
+    authorization code flow to Bentley IMS.
+
+    The upstream callback URL (where IMS redirects after login) is:
+        {MCP_HTTP_HOST}:{MCP_HTTP_PORT}{MCP_AUTH_CALLBACK_PATH}
+    This must be registered as an allowed redirect URI in the IMS application.
+    It is NOT the same as EVO_REDIRECT_URL, which is only used in STDIO mode.
+
+    Returns None if CLIENT_DELEGATED_AUTH is False or required configuration is missing.
+    """
+    if not CLIENT_DELEGATED_AUTH:
+        return None
+
+    client_id = os.getenv("EVO_CLIENT_ID")
+    client_secret = os.getenv("EVO_CLIENT_SECRET", "")
+    issuer_url = os.getenv("ISSUER_URL", "https://ims.bentley.com")
+    config_url = f"{issuer_url}/.well-known/openid-configuration"
+
+    # Derive the callback path from EVO_REDIRECT_URL so the same URL registered
+    # in the IMS application works for both STDIO and HTTP+OIDCProxy modes.
+    # e.g. http://localhost:3000/signin-callback → /signin-callback
+    # Falls back to /auth/callback if EVO_REDIRECT_URL is not set.
+    redirect_url = os.getenv("EVO_REDIRECT_URL", "")
+    if redirect_url:
+        from urllib.parse import urlparse as _urlparse
+        _parsed = _urlparse(redirect_url)
+        callback_path = _parsed.path or "/auth/callback"
+    else:
+        callback_path = "/auth/callback"
+
+    if not client_id:
+        logging.warning(
+            "CLIENT_DELEGATED_AUTH is set but EVO_CLIENT_ID is not — "
+            "HTTP server will run without authentication. "
+            "Set EVO_CLIENT_ID (and EVO_CLIENT_SECRET for confidential clients) to enable auth."
+        )
+        return None
+
+    from fastmcp.server.auth.oidc_proxy import OIDCProxy
+    from evo.oauth import EvoScopes
+
+    # If no client_secret is provided, assume a native (public) app using PKCE.
+    # Set token_endpoint_auth_method="none" so the proxy doesn't try to send
+    # client credentials to the token endpoint.
+    has_secret = bool(client_secret)
+
+    # Request Evo scopes in the upstream authorization request so they appear
+    # on the IMS consent page and are included in the issued token.
+    evo_scopes = f"openid {EvoScopes.all_evo}"
+
+    return OIDCProxy(
+        config_url=config_url,
+        client_id=client_id,
+        client_secret=client_secret or "unused",
+        token_endpoint_auth_method=None if has_secret else "none",
+        base_url=f"http://{HTTP_HOST}:{HTTP_PORT}",
+        redirect_path=callback_path,
+        require_authorization_consent=False,
+        extra_authorize_params={"scope": evo_scopes},
+    )
+
+
 # Initialize FastMCP server with agent type in name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
-mcp = FastMCP(server_name)
+auth_provider = _create_auth_provider()
+mcp = FastMCP(server_name, auth=auth_provider)
 
 # Show more traceback frame for now, we may want to disabled the rich
 # traceback formatting entirely too.
@@ -318,11 +491,98 @@ if __name__ == "__main__":
 
     # Run the server with selected transport mode
     if TRANSPORT == "http":
+        import json as _json
+        from starlette.middleware import Middleware
+        from starlette.types import ASGIApp, Receive, Scope, Send
+
+        class AuthMetadataPatchMiddleware:
+            """Patches the OAuth metadata to advertise 'none' as a supported
+            token endpoint auth method, which is required for public MCP
+            clients (like VS Code) that don't have a client secret.
+
+            The MCP SDK hardcodes only ["client_secret_post", "client_secret_basic"],
+            but the OIDCProxy's DCR endpoint actually accepts "none".
+            """
+
+            def __init__(self, app: ASGIApp) -> None:
+                self.app = app
+
+            async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+                if scope["type"] != "http":
+                    await self.app(scope, receive, send)
+                    return
+
+                path = scope.get("path", "")
+                method = scope.get("method", "?")
+                print(f"[req] {method} {path}", flush=True)
+
+                if not path.startswith("/.well-known/oauth-authorization-server"):
+                    await self.app(scope, receive, send)
+                    return
+
+                # Capture response body, patch token_endpoint_auth_methods_supported
+                response_body = bytearray()
+                response_started = False
+                original_headers = []
+                original_status = 200
+
+                async def capture_send(message):
+                    nonlocal response_started, original_headers, original_status
+                    if message["type"] == "http.response.start":
+                        response_started = True
+                        original_status = message.get("status", 200)
+                        original_headers = list(message.get("headers", []))
+                    elif message["type"] == "http.response.body":
+                        response_body.extend(message.get("body", b""))
+
+                await self.app(scope, receive, capture_send)
+
+                try:
+                    data = _json.loads(bytes(response_body))
+                    methods = data.get("token_endpoint_auth_methods_supported", [])
+                    if "none" not in methods:
+                        methods.append("none")
+                        data["token_endpoint_auth_methods_supported"] = methods
+                    patched = _json.dumps(data).encode()
+
+                    # Update content-length header
+                    new_headers = [
+                        (k, v) for k, v in original_headers
+                        if k != b"content-length"
+                    ]
+                    new_headers.append(
+                        (b"content-length", str(len(patched)).encode())
+                    )
+
+                    await send({
+                        "type": "http.response.start",
+                        "status": original_status,
+                        "headers": new_headers,
+                    })
+                    await send({
+                        "type": "http.response.body",
+                        "body": patched,
+                    })
+                    print(f"[req] Patched auth metadata: added 'none' to token_endpoint_auth_methods_supported", flush=True)
+                except Exception:
+                    # If parsing fails, send original response unchanged
+                    await send({
+                        "type": "http.response.start",
+                        "status": original_status,
+                        "headers": original_headers,
+                    })
+                    await send({
+                        "type": "http.response.body",
+                        "body": bytes(response_body),
+                    })
+
         logger.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
         mcp.run(
             transport="http",
             host=HTTP_HOST,
             port=HTTP_PORT,
+            log_level="debug",
+            middleware=[Middleware(AuthMetadataPatchMiddleware)],
         )
     else:
         # Default STDIO mode

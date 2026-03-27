@@ -6,6 +6,7 @@
 MCP tools for general operations (health checks, object CRUD, etc).
 """
 
+import hashlib
 import logging
 from uuid import UUID
 
@@ -222,8 +223,11 @@ def register_general_tools(mcp):
         """List instances the user has access to."""
         await ensure_initialized()
 
-        if evo_context.org_id:
-            await ctx.info(f"Selected instance ID {evo_context.org_id}")
+        token = evo_context._get_fastmcp_access_token()
+        token_hint = hashlib.sha256(token.encode()).hexdigest()[:12] if token else "STDIO/cached"
+        logger.debug("list_my_instances: token_hash=%s, org_id=%s", token_hint, evo_context.org_id)
+        await ctx.info(f"Session token hash: {token_hint}, org: {evo_context.org_id}")
+
         instances = await evo_context.discovery_client.list_organizations()
         return instances
 

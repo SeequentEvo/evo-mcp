@@ -200,11 +200,11 @@ Configure your client (VS Code, Cursor, etc.) to start the MCP server process. T
 
 ##### Streamable HTTP transport
 
-**Recommended for**: Testing, remote access, programmatic access via curl/scripts, and containerised deployments (Docker)
+**Recommended for**: Testing, remote access, programmatic access via curl/scripts, containerised deployments (Docker), and client-delegated shared deployments
 
 HTTP transport turns your MCP server into a web service accessible via a URL. This transport uses the Streamable HTTP protocol, which allows clients to connect over the network. Unlike STDIO where each client gets its own process, an HTTP server can handle multiple clients simultaneously.
 
-The Streamable HTTP protocol provides full bidirectional communication between client and server, supporting all MCP operations including streaming responses. This makes it the recommended choice for network-based deployments.
+The Streamable HTTP protocol provides full bidirectional communication between client and server, supporting all MCP operations including streaming responses. Combined with `CLIENT_DELEGATED_AUTH=true`, HTTP transport supports multiple concurrent user sessions each authenticating with their own Bentley account.
 
 **Advantages**
 - Can be accessed via curl, programming languages, or HTTP clients
@@ -213,6 +213,7 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 - Simplifies integration with custom tools and scripts
 - Ideal for containerised deployments (Docker, Kubernetes)
 - Works well in cloud environments and microservices architectures
+- Supports concurrent user sessions when `CLIENT_DELEGATED_AUTH=true`
 
 **Limitations**
 - Requires separate server process management
@@ -220,14 +221,16 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 
 ##### Common use cases
 
-| Use case | Recommended mode |
-|----------|-----------------|
-| Using VS Code with Copilot | STDIO |
-| Using Cursor with AI | STDIO |
-| Using Claude Desktop | STDIO |
-| Testing tools with curl | Streamable HTTP |
-| Remote server access | Streamable HTTP |
-| Custom script integration | Streamable HTTP |
+| Use case | Recommended transport | `CLIENT_DELEGATED_AUTH` |
+|----------|----------------------|-------------------|
+| Using VS Code with Copilot | STDIO | `false` |
+| Using Cursor with AI | STDIO | `false` |
+| Using Claude Desktop | STDIO | `false` |
+| Testing tools with curl | HTTP | `false` |
+| Remote server access | HTTP | `false` |
+| Custom script integration | HTTP | `false` |
+| Client-delegated shared server | HTTP | `true` |
+| Containerised / Docker deployment | HTTP | `true` (recommended) |
 
 
 #### 5. Configure your environment
@@ -246,7 +249,8 @@ EVO_REDIRECT_URL=your-redirect-url
 
 When you first use the server it will open your browser so you can sign in with your Bentley account. This gives the server access to any Evo instance and workspace your account has access to.
 
-##### Alternative: Service authentication (for automation/CI)
+<details>
+<summary><strong>Alternative: Service authentication (for automation/CI)</strong></summary>
 
 If you need to run the server without interactive sign-in (e.g. automation, CI/CD, or background services), you can use a **service app** instead. Create a service app in the iTwin Developer Portal and set the following in your `.env` file:
 
@@ -258,21 +262,41 @@ EVO_CLIENT_SECRET=your-service-client-secret
 
 Note: The service app must be explicitly granted access to your Evo instance and workspaces.
 
+</details>
+
+##### Authentication and transport modes
+
+How authentication works is controlled by three settings: `MCP_TRANSPORT`, `AUTH_METHOD`, and `CLIENT_DELEGATED_AUTH`.
+
+| `MCP_TRANSPORT` | `CLIENT_DELEGATED_AUTH` | `AUTH_METHOD` | Behaviour | Client-delegated |
+|---|---|---|---|:-:|
+| `stdio` | ignored | `native_app` | Server opens a browser for sign-in on first use. Token cached per process. | ❌ |
+| `stdio` | ignored | `client_credentials` | Server fetches a service token automatically. No browser interaction. | ❌ |
+| `http` | `false` (default) | `native_app` | Server opens a browser for sign-in on first use. All HTTP clients share the same token. | ❌ |
+| `http` | `false` (default) | `client_credentials` | Server fetches a service token automatically. All HTTP clients share the same token. | ❌ |
+| `http` | `true` | `native_app` | Each MCP client authenticates independently via OAuth browser flow (OIDCProxy). `AUTH_METHOD` is not used. | ✅ |
+
+> **Server-managed auth** (`CLIENT_DELEGATED_AUTH=false`, default): The MCP server is the OAuth client — it authenticates with Bentley IMS on its own, either via a browser sign-in (`AUTH_METHOD=native_app`) or automatically (`AUTH_METHOD=client_credentials`). All connecting AI clients share a single Evo identity and session. The token is cached on disk between restarts.
+
+> **Client-delegated auth** (`CLIENT_DELEGATED_AUTH=true`, HTTP + `native_app` only): The MCP server acts as an OAuth authorization server. Each connecting AI client (VS Code, Cursor, etc.) is directed through its own browser-based sign-in via OIDCProxy. Every client holds its own Bearer token, passed in the `Authorization` header of each MCP request. The server maintains a separate Evo session per token — each user sees only the Evo instances and workspaces their own Bentley account has access to.
+
+> **Note**: `CLIENT_DELEGATED_AUTH=true` is only valid with `MCP_TRANSPORT=http` and `AUTH_METHOD=native_app`.
+
 ##### MCP transport mode (optional)
 
 The Evo MCP server supports two transport modes: **STDIO** and **streamable HTTP**. By default, the server runs in **STDIO** mode which is recommended for local development.
 
 Set `MCP_TRANSPORT` environment variable in `.env` to choose the transport mode:
-- `STDIO` - Standard input/output (default)
-- `HTTP` - Streamable HTTP
+- `stdio` - Standard input/output (default)
+- `http` - Streamable HTTP
 
 ```bash
-MCP_TRANSPORT=STDIO
+MCP_TRANSPORT=stdio
 ```
 
 If using HTTP mode, also configure the host and port:
 ```bash
-MCP_TRANSPORT=HTTP
+MCP_TRANSPORT=http
 MCP_HTTP_HOST=localhost
 MCP_HTTP_PORT=5000
 ```
