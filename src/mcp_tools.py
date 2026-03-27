@@ -29,82 +29,8 @@ import logging
 from pathlib import Path
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import configure_logging
+from evo_mcp.client_auth import create_auth_provider
 
-# ---------------------------------------------------------------------------
-# Monkey-patch: RFC 8252 §7.3 loopback redirect URI port matching
-# ---------------------------------------------------------------------------
-# FastMCP's redirect_validation treats "http://localhost/callback" (no port) as
-# port 80, which rejects dynamic-port loopback URIs like
-# "http://localhost:56053/callback".  Per RFC 8252 §7.3 the authorization
-# server MUST allow any port for loopback redirect URIs.
-#
-# Claude Code's CIMD declares redirect_uris without a port, so we patch the
-# matching function to treat a missing port on loopback patterns as a wildcard.
-# This patch can be removed once FastMCP ships a fix upstream.
-# ---------------------------------------------------------------------------
-_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
-
-
-def _apply_loopback_redirect_patch() -> None:
-    """Patch fastmcp redirect-URI matching for RFC 8252 loopback compliance."""
-    from fastmcp.server.auth import redirect_validation as _rv
-    from fastmcp.server.auth.oauth_proxy import models as _models
-
-    _original_match_port = _rv._match_port
-
-    def _patched_match_port(
-        uri_port: "str | None",
-        pattern_port: "str | None",
-        uri_scheme: str,
-        *,
-        _pattern_host: "str | None" = None,
-    ) -> bool:
-        # RFC 8252 §7.3: loopback pattern with no explicit port → any port
-        if (
-            pattern_port is None
-            and _pattern_host is not None
-            and _pattern_host.lower() in _LOOPBACK_HOSTS
-        ):
-            return True
-        return _original_match_port(uri_port, pattern_port, uri_scheme)
-
-    _original_matches = _rv.matches_allowed_pattern
-
-    def _patched_matches_allowed_pattern(uri: str, pattern: str) -> bool:
-        from urllib.parse import urlparse as _urlparse
-
-        try:
-            uri_parsed = _urlparse(uri)
-            pattern_parsed = _urlparse(pattern)
-        except ValueError:
-            return _original_matches(uri, pattern)
-
-        if uri_parsed.username is not None or uri_parsed.password is not None:
-            return False
-
-        if uri_parsed.scheme.lower() != pattern_parsed.scheme.lower():
-            return False
-
-        uri_host, uri_port = _rv._parse_host_port(uri_parsed.netloc)
-        pattern_host, pattern_port = _rv._parse_host_port(pattern_parsed.netloc)
-
-        if not _rv._match_host(uri_host, pattern_host):
-            return False
-
-        if not _patched_match_port(
-            uri_port, pattern_port, uri_parsed.scheme.lower(),
-            _pattern_host=pattern_host,
-        ):
-            return False
-
-        return _rv._match_path(uri_parsed.path, pattern_parsed.path)
-
-    # Patch both the module-level function and the reference inside models.py
-    _rv.matches_allowed_pattern = _patched_matches_allowed_pattern
-    _models.matches_allowed_pattern = _patched_matches_allowed_pattern
-
-
-_apply_loopback_redirect_patch()
 
 from evo_mcp.tools import (
     register_admin_tools,
@@ -142,11 +68,9 @@ HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
 #     native_app and let the server handle authentication)
 #
 # Defaults to False. Set to true only when MCP_TRANSPORT=http.
-_delegated_auth_env = os.getenv("CLIENT_DELEGATED_AUTH", "").lower()
-if _delegated_auth_env in ("1", "true", "yes"):
+
+if os.getenv("CLIENT_DELEGATED_AUTH", "").lower()in ("1", "true", "yes"):
     CLIENT_DELEGATED_AUTH = True
-elif _delegated_auth_env in ("0", "false", "no"):
-    CLIENT_DELEGATED_AUTH = False
 else:
     CLIENT_DELEGATED_AUTH = False  # default: off unless explicitly enabled
 
@@ -172,75 +96,12 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
     TOOL_FILTER = "all"
 
 
-def _create_auth_provider():
-    """Create an OIDCProxy auth provider for HTTP transport.
 
-    Uses Bentley IMS as the upstream OIDC provider. The proxy handles
-    Dynamic Client Registration for MCP clients and proxies the OAuth
-    authorization code flow to Bentley IMS.
-
-    The upstream callback URL (where IMS redirects after login) is:
-        {MCP_HTTP_HOST}:{MCP_HTTP_PORT}{MCP_AUTH_CALLBACK_PATH}
-    This must be registered as an allowed redirect URI in the IMS application.
-    It is NOT the same as EVO_REDIRECT_URL, which is only used in STDIO mode.
-
-    Returns None if CLIENT_DELEGATED_AUTH is False or required configuration is missing.
-    """
-    if not CLIENT_DELEGATED_AUTH:
-        return None
-
-    client_id = os.getenv("EVO_CLIENT_ID")
-    client_secret = os.getenv("EVO_CLIENT_SECRET", "")
-    issuer_url = os.getenv("ISSUER_URL", "https://ims.bentley.com")
-    config_url = f"{issuer_url}/.well-known/openid-configuration"
-
-    # Derive the callback path from EVO_REDIRECT_URL so the same URL registered
-    # in the IMS application works for both STDIO and HTTP+OIDCProxy modes.
-    # e.g. http://localhost:3000/signin-callback → /signin-callback
-    # Falls back to /auth/callback if EVO_REDIRECT_URL is not set.
-    redirect_url = os.getenv("EVO_REDIRECT_URL", "")
-    if redirect_url:
-        from urllib.parse import urlparse as _urlparse
-        _parsed = _urlparse(redirect_url)
-        callback_path = _parsed.path or "/auth/callback"
-    else:
-        callback_path = "/auth/callback"
-
-    if not client_id:
-        logging.warning(
-            "CLIENT_DELEGATED_AUTH is set but EVO_CLIENT_ID is not — "
-            "HTTP server will run without authentication. "
-            "Set EVO_CLIENT_ID (and EVO_CLIENT_SECRET for confidential clients) to enable auth."
-        )
-        return None
-
-    from fastmcp.server.auth.oidc_proxy import OIDCProxy
-    from evo.oauth import EvoScopes
-
-    # If no client_secret is provided, assume a native (public) app using PKCE.
-    # Set token_endpoint_auth_method="none" so the proxy doesn't try to send
-    # client credentials to the token endpoint.
-    has_secret = bool(client_secret)
-
-    # Request Evo scopes in the upstream authorization request so they appear
-    # on the IMS consent page and are included in the issued token.
-    evo_scopes = f"openid {EvoScopes.all_evo}"
-
-    return OIDCProxy(
-        config_url=config_url,
-        client_id=client_id,
-        client_secret=client_secret or "unused",
-        token_endpoint_auth_method=None if has_secret else "none",
-        base_url=f"http://{HTTP_HOST}:{HTTP_PORT}",
-        redirect_path=callback_path,
-        require_authorization_consent=False,
-        extra_authorize_params={"scope": evo_scopes},
-    )
 
 
 # Initialize FastMCP server with agent type in name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
-auth_provider = _create_auth_provider()
+auth_provider = create_auth_provider(f"http://{HTTP_HOST}:{HTTP_PORT}") if CLIENT_DELEGATED_AUTH else None
 mcp = FastMCP(server_name, auth=auth_provider)
 
 # Show more traceback frame for now, we may want to disabled the rich
