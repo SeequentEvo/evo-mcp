@@ -1,0 +1,41 @@
+{
+  "skill_name": "evo-kriging-run",
+  "setup": {
+    "steps": [
+      {"step": 0, "tool": "reset_staging", "args": {}},
+      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills/evo-kriging-run/evals/fixtures.json"]}}
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Run ordinary kriging using EKR WP Assay Samples as the source (CU_pct attribute), EKR CU Kriging Estimate as the target block model, EKR CU_pct Variogram as the variogram, and the default search neighborhood (major=500, semi_major=360, minor=200, max_samples=16, min_samples=4). Write the estimate to an attribute called 'OK_estimate'.",
+      "expected_output": "Kriging parameters are built from the published objects and kriging executes successfully. Results include target attribute name OK_estimate and portal/viewer links.",
+      "category": "single-scenario-happy-path"
+    },
+    {
+      "id": 2,
+      "prompt": "Run simple kriging with mean=0.5 using EKR WP Assay Samples (CU_pct), EKR CU Kriging Estimate, EKR CU_pct Variogram, and the default search neighborhood. Write the estimate to 'SK_estimate'.",
+      "expected_output": "Simple kriging with mean=0.5 executes successfully. Result includes the SK_estimate attribute on the target block model.",
+      "category": "simple-kriging-method"
+    },
+    {
+      "id": 3,
+      "prompt": "Compare ordinary vs simple kriging: build two scenarios using EKR WP Assay Samples (CU_pct), EKR CU Kriging Estimate, EKR CU_pct Variogram, and the default neighborhood, targeting 'OK_compare' and 'SK_compare' respectively. Run both in a single batch.",
+      "expected_output": "Two scenarios are built and executed in a single batch call. Results contain two entries in input order — first OK_compare, then SK_compare.",
+      "category": "scenario-variations-method-comparison"
+    },
+    {
+      "id": 4,
+      "prompt": "Test error handling: try running kriging with an empty scenario list, then try building kriging parameters with a point set object ID that does not exist in the workspace.",
+      "expected_output": "Two distinct errors are returned: empty scenarios rejected, and a non-existent object ID causes a resolution failure.",
+      "category": "error-handling"
+    },
+    {
+      "id": 5,
+      "prompt": "Build three kriging scenarios all using EKR WP Assay Samples (CU_pct), EKR CU Kriging Estimate, and EKR CU_pct Variogram. Use a default neighborhood (major=500, semi_major=360, minor=200, max_samples=16) for the first two and a broader neighborhood (major=750, semi_major=540, minor=300, max_samples=24) for the third. Target attributes 'Au_OK', 'Au_SK', and 'Au_broad'. Run all three in one batch.",
+      "expected_output": "Three scenarios are built and executed in a single batch call. Results contain three entries in input order matching Au_OK, Au_SK, and Au_broad.",
+      "category": "multi-attribute-batch"
+    }
+  ]
+}

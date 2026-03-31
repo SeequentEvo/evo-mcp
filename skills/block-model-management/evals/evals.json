@@ -1,0 +1,41 @@
+{
+  "skill_name": "block-model-management",
+  "setup": {
+    "steps": [
+      {"step": 0, "tool": "reset_staging", "args": {}},
+      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills/block-model-management/evals/fixtures.json"], "fixture_names": ["standard_block_model"]}}
+    ]
+  },
+  "evals":[
+    {
+      "id": 1,
+      "prompt": "Design a regular block model from explicit extents: x 1000–3000, y 2000–3500, z 100–500, block sizes 25/25/10, name 'Domain BM', path '/blockmodels/domain_bm.json'. Return total blocks and the resulting bounding box.",
+      "expected_output": "Block model is created with a valid derived grid showing origin, block counts, block sizes, and total blocks.",
+      "category": "local-explicit-extents"
+    },
+    {
+      "id": 2,
+      "prompt": "Design a block model with anisotropic padding: x 0–100, y 0–80, z −50 to 50, block sizes 10/10/5, padding x=20, y=5, z=10. Report the requested and resulting bounding boxes.",
+      "expected_output": "Requested bounding box reflects padding. Resulting grid bounding box covers padded extents.",
+      "category": "explicit-extents-with-padding"
+    },
+    {
+      "id": 3,
+      "prompt": "Design a block model named 'QA BM' with extents x 10–18, y 20–35, z 30–54, block sizes 2/3/4, CRS EPSG:28354. Then get the definition details to validate and summarize.",
+      "expected_output": "Block model is created. Definition details show total blocks, resulting bounding box, and normalized coordinate reference system.",
+      "category": "local-payload-inspection"
+    },
+    {
+      "id": 4,
+      "prompt": "Test validation: try to create a block model with block_size_z=0, then try again with x_min=50 and x_max=10. Return both errors.",
+      "expected_output": "Two validation errors are surfaced: non-positive block size and invalid min/max extents.",
+      "category": "local-validation-errors"
+    },
+    {
+      "id": 5,
+      "prompt": "Use the 'BM Test Block Model' as the source object. Get its bounding box, then design a new block model from those extents with block sizes 20/20/5 and padding 10/10/2. Get the definition details of the result.",
+      "expected_output": "Bounding box derived from BM Test Block Model. New block model created from padded extents. Definition details return a valid grid summary.",
+      "category": "source-bounds-two-step"
+    }
+  ]
+}

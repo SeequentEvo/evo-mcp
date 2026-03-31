@@ -1,0 +1,73 @@
+{
+  "standard_point_set": {
+    "seed_mode": "staged",
+    "object_type": "point_set",
+    "name": "VCU Test Point Set",
+    "description": "Five-point grade sample set in UTM Zone 50N",
+    "coordinate_reference_system": "EPSG:32650",
+    "data": {
+      "coordinates": {
+        "x": [1000.0, 1010.0, 1020.0, 1030.0, 1040.0],
+        "y": [2000.0, 2010.0, 2020.0, 2030.0, 2040.0],
+        "z": [300.0, 310.0, 320.0, 330.0, 340.0]
+      },
+      "attributes": {
+        "GRADE": [0.45, 0.52, 0.38, 0.61, 0.47]
+      }
+    }
+  },
+  "standard_block_model": {
+    "seed_mode": "staged",
+    "object_type": "block_model",
+    "name": "VCU Test Block Model",
+    "description": "5x4x3 block model in UTM Zone 50N",
+    "coordinate_reference_system": "EPSG:32650",
+    "origin": {"x": 1000.0, "y": 2000.0, "z": 300.0},
+    "n_blocks": {"nx": 5, "ny": 4, "nz": 3},
+    "block_size": {"dx": 10.0, "dy": 10.0, "dz": 10.0}
+  },
+  "nad27_samples": {
+    "seed_mode": "staged",
+    "object_type": "point_set",
+    "name": "VCU NAD27 Samples",
+    "description": "Grade samples registered in NAD27 geographic CRS",
+    "coordinate_reference_system": "EPSG:4267",
+    "data": {
+      "coordinates": {
+        "x": [1000.0, 1010.0, 1020.0, 1030.0, 1040.0],
+        "y": [2000.0, 2010.0, 2020.0, 2030.0, 2040.0],
+        "z": [300.0, 310.0, 320.0, 330.0, 340.0]
+      },
+      "attributes": {
+        "GRADE": [0.45, 0.52, 0.38, 0.61, 0.47]
+      }
+    }
+  },
+  "utm50s_block_model": {
+    "seed_mode": "staged",
+    "object_type": "block_model",
+    "name": "VCU UTM Zone 50 Block Model",
+    "description": "Block model registered in UTM Zone 50S",
+    "coordinate_reference_system": "EPSG:32750",
+    "origin": {"x": 1000.0, "y": 2000.0, "z": 300.0},
+    "n_blocks": {"nx": 5, "ny": 4, "nz": 3},
+    "block_size": {"dx": 10.0, "dy": 10.0, "dz": 10.0}
+  },
+  "no_crs_samples": {
+    "seed_mode": "staged",
+    "object_type": "point_set",
+    "name": "VCU Unspecified CRS Samples",
+    "description": "Grade samples with no coordinate reference system defined",
+    "coordinate_reference_system": "unspecified",
+    "data": {
+      "coordinates": {
+        "x": [1000.0, 1010.0, 1020.0, 1030.0, 1040.0],
+        "y": [2000.0, 2010.0, 2020.0, 2030.0, 2040.0],
+        "z": [300.0, 310.0, 320.0, 330.0, 340.0]
+      },
+      "attributes": {
+        "GRADE": [0.45, 0.52, 0.38, 0.61, 0.47]
+      }
+    }
+  }
+}

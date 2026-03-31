@@ -1,11 +1,11 @@
 ---
-name: object-discovery
+name: evo-object-discovery
 description: Discover existing Evo geoscience objects for downstream workflows. Use this whenever the user needs to find existing objects by workspace, schema type, name hint, or path hint.
 ---
 
 # Object Discovery
 
-Use this skill to locate existing Evo objects with MCP tools before any domain-specific orchestration.
+Use this skill to locate existing Evo objects with MCP tools before any domain-specific workflow.
 
 ## Goals
 
@@ -23,11 +23,13 @@ Use this skill to locate existing Evo objects with MCP tools before any domain-s
 5. If needed, call `get_object(...)` on the strongest matches.
 6. Return a concise shortlist grouped by intended role.
 
-Role mapping for kriging:
+## Object Type Reference
 
-- source: `pointset`
-- variogram: `variogram`
-- target: `block-model` or `regular-3d-grid`
+| Schema type | Typical role |
+|---|---|
+| `pointset` | Sample source data |
+| `variogram` | Spatial continuity model |
+| `block-model` / `regular-3d-grid` | Estimation or analysis target |
 
 ## Preferred Output
 
@@ -37,21 +39,6 @@ Return results grouped by role with enough detail for follow-up tool calls:
 - `requested_types`
 - `candidates`
 - `ambiguities`
-
-For kriging workflows, also include a lightweight `kriging_parameters_seed` map:
-
-- `target_object_id`
-- `point_set_object_id`
-- `variogram_object_id`
-- `target_attribute` (if known)
-- `point_set_attribute` (if known)
-
-And include a `kriging_run_seed` shape for direct handoff:
-
-- `workspace_id`
-- `scenarios` (initialize as a non-empty list when attributes are known)
-
-If attribute names are unknown, include `attribute_follow_up_required: true` and ask for the exact source attribute name before execution.
 
 Each candidate should include:
 
@@ -66,12 +53,10 @@ Each candidate should include:
 - Prefer existing MCP tools over inventing server-side search behavior.
 - Be explicit when multiple matches remain.
 - Do not guess the final object if the workspace contains plausible alternatives.
-- Look for pointsets, variograms, block models, and regular grids.
 - Return discoveries in a form that can feed directly into downstream tool calls.
 - Infer role/type compatibility from `schema_id`.
 - Prefer the newest relevant candidate when multiple objects share name/path hints, using `version_id` and recency metadata.
-- Prefer role names that align with `KrigingParameters` and `kriging_run(workspace_id, scenarios)` inputs.
 
 ## Example
 
-If the user asks for a pointset named like `Ag_LMS1`, list objects in the workspace, keep only pointset-like schemas, then return the best matches with IDs, names, paths, schema IDs, and version IDs.
+If the user asks for a point set named like `Ag_LMS1`, list objects in the workspace, keep only pointset-like schemas, then return the best matches with IDs, names, paths, schema IDs, and version IDs.

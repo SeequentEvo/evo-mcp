@@ -1,0 +1,73 @@
+{
+  "standard_variogram": {
+    "seed_mode": "workspace",
+    "object_type": "variogram",
+    "name": "EOD Test Variogram",
+    "description": "Single-structure spherical variogram for eval use",
+    "sill": 1.1,
+    "nugget": 0.1,
+    "is_rotation_fixed": false,
+    "structures": [
+      {
+        "variogram_type": "spherical",
+        "contribution": 1.0,
+        "anisotropy": {
+          "ellipsoid_ranges": {
+            "major": 200.0,
+            "semi_major": 150.0,
+            "minor": 100.0
+          },
+          "rotation": {
+            "dip_azimuth": 0.0,
+            "dip": 0.0,
+            "pitch": 0.0
+          }
+        }
+      }
+    ]
+  },
+  "standard_point_set": {
+    "seed_mode": "workspace",
+    "object_type": "point_set",
+    "name": "EOD Test Point Set",
+    "description": "Five-point grade sample set for eval use",
+    "coordinate_reference_system": "EPSG:32650",
+    "data": {
+      "coordinates": {
+        "x": [1000.0, 1010.0, 1020.0, 1030.0, 1040.0],
+        "y": [2000.0, 2010.0, 2020.0, 2030.0, 2040.0],
+        "z": [300.0, 310.0, 320.0, 330.0, 340.0]
+      },
+      "attributes": {
+        "GRADE": [0.45, 0.52, 0.38, 0.61, 0.47]
+      }
+    }
+  },
+  "standard_block_model": {
+    "seed_mode": "workspace",
+    "object_type": "block_model",
+    "name": "EOD Test Block Model",
+    "description": "5x4x3 block model at 10m resolution for eval use",
+    "coordinate_reference_system": "EPSG:32650",
+    "origin": {"x": 1000.0, "y": 2000.0, "z": 300.0},
+    "n_blocks": {"nx": 5, "ny": 4, "nz": 3},
+    "block_size": {"dx": 10.0, "dy": 10.0, "dz": 10.0}
+  },
+  "assay_grades": {
+    "seed_mode": "workspace",
+    "object_type": "point_set",
+    "name": "EOD Assay Grades",
+    "description": "Assay grade sample points for fuzzy-search eval",
+    "coordinate_reference_system": "EPSG:32650",
+    "data": {
+      "coordinates": {
+        "x": [444800.0, 444820.0, 444840.0, 444860.0, 444880.0],
+        "y": [493000.0, 493020.0, 493040.0, 493060.0, 493080.0],
+        "z": [2400.0, 2410.0, 2420.0, 2430.0, 2440.0]
+      },
+      "attributes": {
+        "CU_pct": [0.45, 0.52, 0.38, 0.61, 0.47]
+      }
+    }
+  }
+}

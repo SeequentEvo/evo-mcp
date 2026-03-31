@@ -25,7 +25,7 @@ Use this skill when the user wants to:
 
 ## Workflow
 
-1. Use the `object-discovery` skill if source, variogram, or target objects are not already resolved.
+1. Use the `evo-object-discovery` skill if source, variogram, or target objects are not already resolved.
 2. Confirm `workspace_id`, target object and target attribute, source pointset object and source attribute, and variogram.
 3. Confirm primitive inputs: target object UUID + target attribute name, source pointset UUID + source attribute name, and variogram UUID.
 4. Call `kriging_build_parameters` with primitive IDs and typed search/method inputs.

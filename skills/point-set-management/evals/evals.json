@@ -1,0 +1,38 @@
+{
+  "skill_name": "point-set-management",
+  "setup": {
+    "steps": []
+  },
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Build a point set from skills/point-set-management/evals/samples.csv with columns Easting/Northing/RL for coordinates, auto-detect attributes, and summarize it.",
+      "expected_output": "Point set is created with a summary reporting point_count=10 and attribute names including GRADE and LITHOLOGY.",
+      "category": "happy-path-local-build-and-summary"
+    },
+    {
+      "id": 2,
+      "prompt": "Build a point set from skills/point-set-management/evals/samples_with_invalid.csv using Easting/Northing/RL for coordinates with coordinate_cleaning='drop_invalid', then summarize it and report how many rows were dropped.",
+      "expected_output": "Summary shows fewer than 7 rows due to dropped invalid coordinate rows. dropped_invalid_coordinate_rows is greater than 0.",
+      "category": "coordinate-cleaning-drop-invalid"
+    },
+    {
+      "id": 3,
+      "prompt": "Build a point set from skills/point-set-management/evals/samples.csv using Easting/Northing/RL for coordinates, then get the attribute details to identify numeric versus non-numeric attributes and null counts.",
+      "expected_output": "Attribute details return per-attribute dtype, is_numeric, null_count, and preview_values. GRADE is numeric, LITHOLOGY is non-numeric.",
+      "category": "local-attribute-inspection"
+    },
+    {
+      "id": 4,
+      "prompt": "Build a point set from skills/point-set-management/evals/samples.csv specifying Easting as x_column and Northing as y_column but omitting the z_column.",
+      "expected_output": "The request fails with a validation error indicating that the Z coordinate column is missing.",
+      "category": "error-handling-missing-z-column"
+    },
+    {
+      "id": 5,
+      "prompt": "Build a point set from skills/point-set-management/evals/samples_with_invalid.csv using Easting/Northing/RL for coordinates with coordinate_cleaning='keep_invalid'.",
+      "expected_output": "The request fails with a validation error indicating that 'keep_invalid' is not a valid coordinate cleaning mode.",
+      "category": "error-handling-invalid-cleaning-mode"
+    }
+  ]
+}
