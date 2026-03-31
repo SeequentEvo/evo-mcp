@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Annotated, Any
+from typing import Any
 from uuid import UUID
 
 
@@ -32,57 +32,17 @@ from evo.compute.tasks.kriging import (
     RegionFilter,
     SimpleKriging,
 )
-from pydantic import Field
 from evo_mcp.context import ensure_initialized, evo_context
+from evo_mcp.utils.tool_support import (
+    PointSetAttributeName,
+    PointSetObjectId,
+    TargetAttributeName,
+    TargetObjectId,
+    VariogramObjectId,
+)
 
 
 logger = logging.getLogger(__name__)
-
-
-TargetObjectId = Annotated[
-    str,
-    Field(
-        description=(
-            "UUID of the target object for kriging output. This should identify an "
-            "existing BlockModel or Regular3DGrid in the provided workspace."
-        ),
-    ),
-]
-
-PointSetAttributeName = Annotated[
-    str,
-    Field(
-        description=(
-            "Existing numeric source attribute name on the point set object, "
-            "for example 'CU_pct'."
-        )
-    ),
-]
-
-PointSetObjectId = Annotated[
-    str,
-    Field(
-        description=(
-            "UUID of the source PointSet object containing known sample values."
-        ),
-    ),
-]
-
-TargetAttributeName = Annotated[
-    str,
-    Field(
-        description=(
-            "Target attribute name to create on the target object for kriging results."
-        )
-    ),
-]
-
-VariogramObjectId = Annotated[
-    str,
-    Field(
-        description=("UUID of the variogram object to use for kriging."),
-    ),
-]
 
 
 def _normalize_kriging_payload(payload: dict[str, Any]) -> dict[str, Any]:

@@ -1,0 +1,209 @@
+# SPDX-FileCopyrightText: 2026 Bentley Systems, Incorporated
+#
+# SPDX-License-Identifier: Apache-2.0
+
+"""Shared support helpers for Evo MCP tool modules."""
+
+from __future__ import annotations
+
+from typing import Annotated, Any
+from uuid import UUID
+
+from evo.common import StaticContext
+from evo.common.utils import Cache
+from evo.objects.typed import EpsgCode
+from evo.widgets import get_portal_url, get_viewer_url
+from pydantic import Field
+
+from evo_mcp.context import ensure_initialized, evo_context
+
+
+TargetObjectId = Annotated[
+    str,
+    Field(
+        description=(
+            "UUID of the target object for an estimation or spatial-validation workflow. "
+            "For kriging, this should identify an existing BlockModel or Regular3DGrid in the provided workspace."
+        ),
+    ),
+]
+
+PointSetAttributeName = Annotated[
+    str,
+    Field(
+        description=(
+            "Existing numeric source attribute name on the point set object, "
+            "for example 'CU_pct'."
+        )
+    ),
+]
+
+PointSetObjectId = Annotated[
+    str,
+    Field(
+        description=(
+            "UUID of the source PointSet object containing known sample values."
+        ),
+    ),
+]
+
+TargetAttributeName = Annotated[
+    str,
+    Field(
+        description=(
+            "Target attribute name to create or update on the target object for estimation results."
+        )
+    ),
+]
+
+VariogramObjectId = Annotated[
+    str,
+    Field(
+        description=("UUID of the variogram object to use for kriging."),
+    ),
+]
+
+
+def require_object_role(
+    obj: Any,
+    expected_types: type[Any] | tuple[type[Any], ...],
+    role: str,
+    expected_label: str,
+) -> None:
+    if isinstance(obj, expected_types):
+        return
+
+    actual_type = type(obj).__name__
+    raise ValueError(f"{role} object must be {expected_label}; got {actual_type}.")
+
+
+def extract_crs(obj: Any) -> Any:
+    if hasattr(obj, "coordinate_reference_system"):
+        return getattr(obj, "coordinate_reference_system")
+
+    if hasattr(obj, "as_dict"):
+        document = obj.as_dict()
+        return document.get("coordinate_reference_system")
+
+    return None
+
+
+def format_crs(crs: Any) -> str:
+    if crs is None or crs == "unspecified":
+        return "unspecified"
+
+    if isinstance(crs, EpsgCode):
+        return str(crs)
+
+    if isinstance(crs, str):
+        return crs.strip() or "unspecified"
+
+    if isinstance(crs, dict):
+        if "epsg_code" in crs:
+            return f"EPSG:{crs['epsg_code']}"
+        if "ogc_wkt" in crs:
+            return str(crs["ogc_wkt"]).strip() or "unspecified"
+
+    return str(crs)
+
+
+def compare_crs(source_crs: Any, target_crs: Any) -> str:
+    source_label = format_crs(source_crs)
+    target_label = format_crs(target_crs)
+
+    if source_label == "unspecified" or target_label == "unspecified":
+        return "unknown"
+
+    if source_label == target_label:
+        return "compatible"
+
+    return "mismatch"
+
+
+def schema_label(obj: Any) -> str | None:
+    metadata = getattr(obj, "metadata", None)
+    schema_id = getattr(metadata, "schema_id", None)
+    sub_classification = getattr(schema_id, "sub_classification", None)
+    if sub_classification:
+        return str(sub_classification)
+    return None
+
+
+async def get_workspace_environment(workspace_id: str) -> Any:
+    await ensure_initialized()
+
+    workspace_uuid = UUID(workspace_id)
+    workspace = await evo_context.workspace_client.get_workspace(workspace_uuid)
+    return workspace.get_environment()
+
+
+def build_workspace_context(environment: Any) -> StaticContext:
+    return StaticContext.from_environment(
+        environment,
+        evo_context.connector,
+        Cache(evo_context.cache_path),
+    )
+
+
+async def get_workspace_context(workspace_id: str) -> StaticContext:
+    environment = await get_workspace_environment(workspace_id)
+    return build_workspace_context(environment)
+
+
+def build_links_from_metadata(environment: Any, object_id: str) -> dict[str, str]:
+    return {
+        "portal_url": get_portal_url(
+            org_id=str(environment.org_id),
+            workspace_id=str(environment.workspace_id),
+            object_id=object_id,
+            hub_url=environment.hub_url,
+        ),
+        "viewer_url": get_viewer_url(
+            org_id=str(environment.org_id),
+            workspace_id=str(environment.workspace_id),
+            object_ids=object_id,
+            hub_url=environment.hub_url,
+        ),
+    }
+
+
+def normalize_crs(
+    coordinate_reference_system: str | None,
+    *,
+    none_value: str | None = "unspecified",
+) -> str | None:
+    """Normalize a CRS string.
+
+    Returns *none_value* for ``None``, empty, or ``"unspecified"`` inputs.
+    Canonicalizes ``EPSG:`` prefixes.
+    """
+    if coordinate_reference_system is None:
+        return none_value
+
+    normalized = coordinate_reference_system.strip()
+    if not normalized or normalized == "unspecified":
+        return none_value
+
+    if normalized.upper().startswith("EPSG:"):
+        return f"EPSG:{normalized.split(':', 1)[1].strip()}"
+
+    return normalized
+
+
+__all__ = [
+    "TargetObjectId",
+    "PointSetAttributeName",
+    "PointSetObjectId",
+    "TargetAttributeName",
+    "VariogramObjectId",
+    "require_object_role",
+    "extract_crs",
+    "format_crs",
+    "compare_crs",
+    "schema_label",
+    "get_workspace_environment",
+    "build_workspace_context",
+    "get_workspace_context",
+    "build_links_from_metadata",
+    "normalize_crs",
+]
