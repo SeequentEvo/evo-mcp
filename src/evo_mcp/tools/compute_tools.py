@@ -131,6 +131,16 @@ def register_compute_tools(mcp) -> None:
         Returns:
             A validated payload object suitable for kriging_run.
         """
+        if not point_set_attribute or not point_set_attribute.strip():
+            raise ValueError(
+                "point_set_attribute must be a non-empty string. "
+                "Specify the attribute name on the point set to use as the estimation input (e.g. 'CU_pct')."
+            )
+        if not target_attribute or not target_attribute.strip():
+            raise ValueError(
+                "target_attribute must be a non-empty string. "
+                "Specify the name of the attribute to create on the target block model (e.g. 'OK_estimate')."
+            )
         environment = await _get_workspace_environment(workspace_id)
         context = StaticContext.from_environment(environment, evo_context.connector)
         source_object, target_object, variogram_object = await asyncio.gather(
