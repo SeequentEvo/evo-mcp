@@ -1,5 +1,5 @@
 {
-  "wp_assay_samples": {
+  "ekr_wp_assay_samples": {
     "seed_mode": "workspace",
     "object_type": "point_set",
     "name": "EKR WP Assay Samples",
@@ -18,7 +18,7 @@
       }
     }
   },
-  "cu_pct_variogram": {
+  "ekr_cu_pct_variogram": {
     "seed_mode": "workspace",
     "object_type": "variogram",
     "name": "EKR CU_pct Variogram",
@@ -61,7 +61,7 @@
       }
     ]
   },
-  "cu_kriging_estimate": {
+  "ekr_cu_kriging_estimate": {
     "seed_mode": "workspace",
     "object_type": "regular_block_model",
     "name": "EKR CU Kriging Estimate",

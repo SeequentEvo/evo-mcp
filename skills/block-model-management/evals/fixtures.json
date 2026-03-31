@@ -1,5 +1,5 @@
 {
-  "standard_block_model": {
+  "bm_standard_block_model": {
     "seed_mode": "staged",
     "object_type": "regular_block_model",
     "name": "BM Test Block Model",

@@ -1,5 +1,5 @@
 {
-  "standard_point_set": {
+  "eov_standard_point_set": {
     "seed_mode": "workspace",
     "object_type": "point_set",
     "name": "EOV Test Point Set",
@@ -16,7 +16,7 @@
       }
     }
   },
-  "standard_block_model": {
+  "eov_standard_block_model": {
     "seed_mode": "workspace",
     "object_type": "regular_block_model",
     "name": "EOV Test Block Model",
@@ -31,13 +31,15 @@
     "object_type": "variogram",
     "name": "EOV Test Variogram",
     "description": "Single-structure spherical variogram for visualisation routing eval",
+    "sill": 1.1,
+    "is_rotation_fixed": false,
     "structures": [
       {
         "variogram_type": "spherical",
         "contribution": 1.0,
         "anisotropy": {
           "ellipsoid_ranges": {"major": 200.0, "semi_major": 150.0, "minor": 100.0},
-          "rotation": {"dip_azimuth": 0.0, "pitch": 0.0, "plunge": 0.0}
+          "rotation": {"dip_azimuth": 0.0, "dip": 0.0, "pitch": 0.0}
         }
       }
     ],

@@ -1,5 +1,5 @@
 {
-  "standard_point_set": {
+  "vcu_standard_point_set": {
     "seed_mode": "staged",
     "object_type": "point_set",
     "name": "VCU Test Point Set",
@@ -16,7 +16,7 @@
       }
     }
   },
-  "standard_block_model": {
+  "vcu_standard_block_model": {
     "seed_mode": "staged",
     "object_type": "regular_block_model",
     "name": "VCU Test Block Model",

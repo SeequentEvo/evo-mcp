@@ -1,5 +1,5 @@
 {
-  "standard_variogram": {
+  "vm_standard_variogram": {
     "seed_mode": "staged",
     "object_type": "variogram",
     "name": "VM Test Variogram",

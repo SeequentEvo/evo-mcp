@@ -1,5 +1,5 @@
 {
-  "standard_variogram": {
+  "eod_standard_variogram": {
     "seed_mode": "workspace",
     "object_type": "variogram",
     "name": "EOD Test Variogram",
@@ -26,7 +26,7 @@
       }
     ]
   },
-  "standard_point_set": {
+  "eod_standard_point_set": {
     "seed_mode": "workspace",
     "object_type": "point_set",
     "name": "EOD Test Point Set",
@@ -43,7 +43,7 @@
       }
     }
   },
-  "standard_block_model": {
+  "eod_standard_block_model": {
     "seed_mode": "workspace",
     "object_type": "regular_block_model",
     "name": "EOD Test Block Model",
