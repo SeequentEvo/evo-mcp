@@ -47,7 +47,7 @@
   },
   "estimate_target": {
     "seed_mode": "both",
-    "object_type": "block_model",
+    "object_type": "regular_block_model",
     "name": "KO Estimate Target",
     "description": "Block model for kriging estimation",
     "coordinate_reference_system": "EPSG:32650",

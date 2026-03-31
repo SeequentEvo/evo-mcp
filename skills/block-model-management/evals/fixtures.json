@@ -1,7 +1,7 @@
 {
   "standard_block_model": {
     "seed_mode": "staged",
-    "object_type": "block_model",
+    "object_type": "regular_block_model",
     "name": "BM Test Block Model",
     "description": "5x4x3 block model at 10m resolution for eval use",
     "coordinate_reference_system": "EPSG:32650",

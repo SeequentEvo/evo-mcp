@@ -18,7 +18,7 @@
   },
   "standard_block_model": {
     "seed_mode": "staged",
-    "object_type": "block_model",
+    "object_type": "regular_block_model",
     "name": "VCU Test Block Model",
     "description": "5x4x3 block model in UTM Zone 50N",
     "coordinate_reference_system": "EPSG:32650",
@@ -45,7 +45,7 @@
   },
   "utm50s_block_model": {
     "seed_mode": "staged",
-    "object_type": "block_model",
+    "object_type": "regular_block_model",
     "name": "VCU UTM Zone 50 Block Model",
     "description": "Block model registered in UTM Zone 50S",
     "coordinate_reference_system": "EPSG:32750",

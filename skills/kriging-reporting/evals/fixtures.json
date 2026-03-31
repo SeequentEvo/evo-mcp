@@ -63,7 +63,7 @@
   },
   "cu_kriging_estimate": {
     "seed_mode": "both",
-    "object_type": "block_model",
+    "object_type": "regular_block_model",
     "name": "KR CU Kriging Estimate",
     "description": "Block model for copper kriging estimation",
     "coordinate_reference_system": "EPSG:32650",
