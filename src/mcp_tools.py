@@ -342,7 +342,7 @@ if TOOL_FILTER in ["all", "data"]:
     
 
 # Note: Evo context initialization happens lazily on first tool call
-# via ensure_initialized() because OAuth requires browser interaction
+# via get_evo_context() because OAuth requires browser interaction
 # =============================================================================
 # Main Entry Point
 # =============================================================================

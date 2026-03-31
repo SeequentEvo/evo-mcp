@@ -10,7 +10,7 @@ import json
 import logging
 from uuid import UUID
 
-from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.context import get_evo_context
 from evo_mcp.utils.evo_data_utils import extract_data_references
 
 # Set up logging to file for debugging
@@ -38,7 +38,7 @@ def register_data_tools(mcp):
             path: Object path
             object_dict: Object definition as JSON/dict
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         
         # Ensure no UUID is set for new objects
@@ -71,7 +71,7 @@ def register_data_tools(mcp):
             object_path: Object path
             version: Specific version ID
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         
         if object_id:
@@ -106,7 +106,7 @@ def register_data_tools(mcp):
             object_id: Object UUID (provide either this or object_path)
             object_path: Object path (provide either this or object_id)
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         
         if object_id:
@@ -138,7 +138,7 @@ def register_data_tools(mcp):
             object_id: Object UUID
             version: Specific version ID (optional)
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         
         obj = await object_client.download_object_by_id(UUID(object_id), version=version if version else None)

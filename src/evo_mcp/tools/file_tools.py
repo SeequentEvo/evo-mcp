@@ -20,7 +20,7 @@ import os
 from pathlib import Path
 from uuid import UUID
 
-from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.context import get_evo_context
 
 logger = logging.getLogger(__name__)
 from evo_mcp.tools.filesystem_tools import _get_data_directory
@@ -45,7 +45,7 @@ def register_file_tools(mcp):
         Returns:
             File metadata including id, path, and version
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         
         local_path = Path(local_file_path)
         if not local_path.exists():
@@ -99,7 +99,7 @@ def register_file_tools(mcp):
         Returns:
             List of file versions with version_id and created_at
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         
         # Ensure file_path starts with /
         if not file_path.startswith("/"):
@@ -141,7 +141,7 @@ def register_file_tools(mcp):
         Returns:
             Download status with local file path
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         
         # Get local data directory (falls back to directory's data folder if EVO_LOCAL_DATA_DIR not set)
         data_dir = _get_data_directory()
@@ -204,7 +204,7 @@ def register_file_tools(mcp):
         Returns:
             List of files with id, name, and path
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         
         file_client = await evo_context.get_file_client(UUID(workspace_id))
         
