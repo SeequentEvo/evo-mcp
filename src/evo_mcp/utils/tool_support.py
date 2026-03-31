@@ -18,44 +18,6 @@ from pydantic import Field
 from evo_mcp.context import ensure_initialized, evo_context
 
 
-TargetObjectId = Annotated[
-    str,
-    Field(
-        description=(
-            "UUID of the target object for an estimation or spatial-validation workflow. "
-            "For kriging, this should identify an existing BlockModel or Regular3DGrid in the provided workspace."
-        ),
-    ),
-]
-
-PointSetAttributeName = Annotated[
-    str,
-    Field(
-        description=(
-            "Existing numeric source attribute name on the point set object, "
-            "for example 'CU_pct'."
-        )
-    ),
-]
-
-PointSetObjectId = Annotated[
-    str,
-    Field(
-        description=(
-            "UUID of the source PointSet object containing known sample values."
-        ),
-    ),
-]
-
-TargetAttributeName = Annotated[
-    str,
-    Field(
-        description=(
-            "Target attribute name to create or update on the target object for estimation results."
-        )
-    ),
-]
-
 VariogramObjectId = Annotated[
     str,
     Field(
@@ -75,6 +37,13 @@ def require_object_role(
 
     actual_type = type(obj).__name__
     raise ValueError(f"{role} object must be {expected_label}; got {actual_type}.")
+
+
+def coerce_float(value: Any, field_name: str) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be numeric; got {value!r}.") from exc
 
 
 def extract_crs(obj: Any) -> Any:
@@ -107,19 +76,6 @@ def format_crs(crs: Any) -> str:
     return str(crs)
 
 
-def compare_crs(source_crs: Any, target_crs: Any) -> str:
-    source_label = format_crs(source_crs)
-    target_label = format_crs(target_crs)
-
-    if source_label == "unspecified" or target_label == "unspecified":
-        return "unknown"
-
-    if source_label == target_label:
-        return "compatible"
-
-    return "mismatch"
-
-
 def schema_label(obj: Any) -> str | None:
     metadata = getattr(obj, "metadata", None)
     schema_id = getattr(metadata, "schema_id", None)
@@ -137,17 +93,13 @@ async def get_workspace_environment(workspace_id: str) -> Any:
     return workspace.get_environment()
 
 
-def build_workspace_context(environment: Any) -> StaticContext:
+async def get_workspace_context(workspace_id: str) -> StaticContext:
+    environment = await get_workspace_environment(workspace_id)
     return StaticContext.from_environment(
         environment,
         evo_context.connector,
         Cache(evo_context.cache_path),
     )
-
-
-async def get_workspace_context(workspace_id: str) -> StaticContext:
-    environment = await get_workspace_environment(workspace_id)
-    return build_workspace_context(environment)
 
 
 def build_links_from_metadata(environment: Any, object_id: str) -> dict[str, str]:
@@ -191,18 +143,13 @@ def normalize_crs(
 
 
 __all__ = [
-    "TargetObjectId",
-    "PointSetAttributeName",
-    "PointSetObjectId",
-    "TargetAttributeName",
     "VariogramObjectId",
     "require_object_role",
+    "coerce_float",
     "extract_crs",
     "format_crs",
-    "compare_crs",
     "schema_label",
     "get_workspace_environment",
-    "build_workspace_context",
     "get_workspace_context",
     "build_links_from_metadata",
     "normalize_crs",

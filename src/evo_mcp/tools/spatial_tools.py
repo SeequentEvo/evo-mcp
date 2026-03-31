@@ -14,10 +14,22 @@ from typing import Any
 
 from evo_mcp.session import object_registry, ResolutionError
 from evo_mcp.utils.tool_support import (
-    compare_crs,
     extract_crs,
     format_crs,
 )
+
+
+def _compare_crs(source_crs: Any, target_crs: Any) -> str:
+    source_label = format_crs(source_crs)
+    target_label = format_crs(target_crs)
+
+    if source_label == "unspecified" or target_label == "unspecified":
+        return "unknown"
+
+    if source_label == target_label:
+        return "compatible"
+
+    return "mismatch"
 
 
 def register_spatial_tools(mcp) -> None:
@@ -63,7 +75,7 @@ def register_spatial_tools(mcp) -> None:
 
         source_crs = extract_crs(source_payload)
         target_crs = extract_crs(target_payload)
-        status = compare_crs(source_crs, target_crs)
+        status = _compare_crs(source_crs, target_crs)
 
         if status == "compatible":
             message = "Source and target CRS match."

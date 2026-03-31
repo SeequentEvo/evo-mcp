@@ -21,6 +21,7 @@ from evo_mcp.session import object_registry, ResolutionError
 from evo_mcp.staging.errors import StageError
 from evo_mcp.utils.tool_support import (
     VariogramObjectId,
+    coerce_float,
     get_workspace_context,
     require_object_role,
 )
@@ -37,14 +38,6 @@ def _resolve_scale_factor(
     if preset == "broad":
         return 3.0
     return scale_factor
-
-
-def _coerce_float(value: Any, field_name: str) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be numeric; got {value!r}.") from exc
-
 
 def _select_local_structure(
     structures: list[dict[str, Any]],
@@ -64,7 +57,7 @@ def _select_local_structure(
     if selection_mode == "largest_major":
         selected_index = max(
             range(len(structures)),
-            key=lambda index: _coerce_float(
+            key=lambda index: coerce_float(
                 structures[index]
                 .get("anisotropy", {})
                 .get("ellipsoid_ranges", {})
@@ -169,14 +162,14 @@ def register_search_neighborhood_tools(mcp) -> None:
             ranges = selected_structure.get("anisotropy", {}).get(
                 "ellipsoid_ranges", {}
             )
-            major_value = _coerce_float(
+            major_value = coerce_float(
                 ranges.get("major"), "anisotropy.ellipsoid_ranges.major"
             )
-            semi_major_value = _coerce_float(
+            semi_major_value = coerce_float(
                 ranges.get("semi_major"),
                 "anisotropy.ellipsoid_ranges.semi_major",
             )
-            minor_value = _coerce_float(
+            minor_value = coerce_float(
                 ranges.get("minor"), "anisotropy.ellipsoid_ranges.minor"
             )
             if min(major_value, semi_major_value, minor_value) <= 0:
@@ -191,11 +184,11 @@ def register_search_neighborhood_tools(mcp) -> None:
                 minor=minor_value * resolved_scale_factor,
             )
             base_rotation = Rotation(
-                dip_azimuth=_coerce_float(
+                dip_azimuth=coerce_float(
                     rotation.get("dip_azimuth", 0.0), "anisotropy.rotation.dip_azimuth"
                 ),
-                dip=_coerce_float(rotation.get("dip", 0.0), "anisotropy.rotation.dip"),
-                pitch=_coerce_float(
+                dip=coerce_float(rotation.get("dip", 0.0), "anisotropy.rotation.dip"),
+                pitch=coerce_float(
                     rotation.get("pitch", 0.0), "anisotropy.rotation.pitch"
                 ),
             )

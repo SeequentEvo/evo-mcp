@@ -8,17 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
-from uuid import UUID
+from typing import Annotated, Any
+
+from pydantic import Field
 
 
 from evo.common import StaticContext
 from evo.objects.typed import object_from_uuid
-from evo.widgets import (
-    format_task_result_with_target,
-    get_portal_url,
-    get_viewer_url,
-)
+from evo.widgets import format_task_result_with_target
 from evo.compute.tasks import run as run_compute
 from evo.compute.tasks.common import (
     SearchNeighborhood,
@@ -32,14 +29,50 @@ from evo.compute.tasks.kriging import (
     RegionFilter,
     SimpleKriging,
 )
-from evo_mcp.context import ensure_initialized, evo_context
+from evo_mcp.context import evo_context
 from evo_mcp.utils.tool_support import (
-    PointSetAttributeName,
-    PointSetObjectId,
-    TargetAttributeName,
-    TargetObjectId,
     VariogramObjectId,
+    get_workspace_environment,
+    build_links_from_metadata,
 )
+
+TargetObjectId = Annotated[
+    str,
+    Field(
+        description=(
+            "UUID of the target object for an estimation or spatial-validation workflow. "
+            "For kriging, this should identify an existing BlockModel or Regular3DGrid in the provided workspace."
+        ),
+    ),
+]
+
+PointSetAttributeName = Annotated[
+    str,
+    Field(
+        description=(
+            "Existing numeric source attribute name on the point set object, "
+            "for example 'CU_pct'."
+        )
+    ),
+]
+
+PointSetObjectId = Annotated[
+    str,
+    Field(
+        description=(
+            "UUID of the source PointSet object containing known sample values."
+        ),
+    ),
+]
+
+TargetAttributeName = Annotated[
+    str,
+    Field(
+        description=(
+            "Target attribute name to create or update on the target object for estimation results."
+        )
+    ),
+]
 
 
 logger = logging.getLogger(__name__)
@@ -71,31 +104,6 @@ def _normalize_kriging_payload(payload: dict[str, Any]) -> dict[str, Any]:
         ellipsoid["ranges"] = ellipsoid.pop("ellipsoid_ranges")
 
     return payload
-
-
-async def _get_workspace_environment(workspace_id: str) -> Any:
-    await ensure_initialized()
-
-    workspace_uuid = UUID(workspace_id)
-    workspace = await evo_context.workspace_client.get_workspace(workspace_uuid)
-    return workspace.get_environment()
-
-
-def _build_links_from_metadata(environment: Any, object_id: str) -> dict[str, str]:
-    return {
-        "portal_url": get_portal_url(
-            org_id=str(environment.org_id),
-            workspace_id=str(environment.workspace_id),
-            object_id=object_id,
-            hub_url=environment.hub_url,
-        ),
-        "viewer_url": get_viewer_url(
-            org_id=str(environment.org_id),
-            workspace_id=str(environment.workspace_id),
-            object_ids=object_id,
-            hub_url=environment.hub_url,
-        ),
-    }
 
 
 def register_compute_tools(mcp) -> None:
@@ -141,7 +149,7 @@ def register_compute_tools(mcp) -> None:
                 "target_attribute must be a non-empty string. "
                 "Specify the name of the attribute to create on the target block model (e.g. 'OK_estimate')."
             )
-        environment = await _get_workspace_environment(workspace_id)
+        environment = await get_workspace_environment(workspace_id)
         context = StaticContext.from_environment(environment, evo_context.connector)
         source_object, target_object, variogram_object = await asyncio.gather(
             object_from_uuid(context, point_set_object_id),
@@ -168,7 +176,7 @@ def register_compute_tools(mcp) -> None:
     ) -> dict[str, Any]:
         target_reference = str(scenario.target.object)
         target_object_id = target_reference.rstrip("/").split("/")[-1].split("?")[0]
-        links = _build_links_from_metadata(environment, target_object_id)
+        links = build_links_from_metadata(environment, target_object_id)
         requested_attribute = getattr(
             scenario.target.attribute, "name", result.attribute_name
         )
@@ -215,7 +223,7 @@ def register_compute_tools(mcp) -> None:
         if len(scenarios) == 0:
             raise ValueError("Must specify at least one scenario.")
 
-        environment = await _get_workspace_environment(workspace_id)
+        environment = await get_workspace_environment(workspace_id)
         context = StaticContext.from_environment(environment, evo_context.connector)
 
         results = await run_compute(context, scenarios, preview=True)

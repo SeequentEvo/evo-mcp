@@ -26,16 +26,9 @@ from evo_mcp.session import object_registry, ResolutionError
 from evo_mcp.staging.errors import StageError
 from evo_mcp.staging.service import staging_service
 from evo_mcp.utils.tool_support import (
+    coerce_float,
     normalize_crs,
 )
-
-
-def _coerce_float(value: Any, field_name: str) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be numeric; got {value!r}.") from exc
-
 
 def _coerce_int(value: Any, field_name: str) -> int:
     try:
