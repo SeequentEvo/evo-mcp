@@ -1,17 +1,19 @@
 ---
 name: validate-crs-and-units
-description: Validate CRS compatibility between two spatial objects before neighborhood design or execution.
+description: Validates coordinate reference system compatibility between geoscience objects.
 ---
 
 # Validate CRS And Units
 
 Use this skill after the source and target are resolved and before search-neighborhood design.
 
-## Goals
+## Trigger Conditions
 
-- compare source and target CRS
-- surface the compatibility status clearly
-- block or pause execution when spatial assumptions are unsafe
+Use this skill when the user needs to:
+
+- compare source and target CRS before spatial estimation
+- verify coordinate reference system compatibility between objects
+- gate a workflow on spatial compatibility checks
 
 ## Workflow
 
@@ -48,3 +50,9 @@ Where `next_action` is one of:
 - `continue`
 - `confirm`
 - `stop`
+
+## Error Handling
+
+- Object not found in session: report that the object name could not be resolved and suggest checking staging.
+- CRS not defined on an object: return `unknown` status and require user confirmation before proceeding.
+- Both objects missing CRS: return `unknown` status and warn that spatial compatibility cannot be verified.

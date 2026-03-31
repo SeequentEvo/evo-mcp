@@ -1,0 +1,41 @@
+{
+  "skill_name": "evo-object-visualisation",
+  "setup": {
+    "steps": [
+      {"step": 0, "tool": "reset_staging", "args": {}},
+      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills/evo-object-visualisation/evals/fixtures.json"]}}
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Generate a combined viewer link for my two objects so I can see them together.",
+      "expected_output": "A combined Evo Viewer URL is returned that includes both objects, along with individual portal links for each object.",
+      "category": "multi-object-viewer-happy-path"
+    },
+    {
+      "id": 2,
+      "prompt": "Show me the portal link for the EOV Test Block Model.",
+      "expected_output": "A portal URL is returned for the specified block model object.",
+      "category": "single-object-portal-link"
+    },
+    {
+      "id": 3,
+      "prompt": "Generate viewer links without specifying any object IDs.",
+      "expected_output": "The request fails with a validation error indicating that at least one object ID must be provided.",
+      "category": "error-handling-no-objects"
+    },
+    {
+      "id": 4,
+      "prompt": "I want to see my variogram model in the Evo Viewer — can you give me a link?",
+      "expected_output": "The system explains that variograms are not supported in the Evo Viewer and directs the user to use the variogram-management skill for plotly-based 3D ellipsoid and 2D curve visualization.",
+      "category": "variogram-viewer-routing"
+    },
+    {
+      "id": 5,
+      "prompt": "Show me my EOV Test Block Model and my variogram together — I want to see them side by side.",
+      "expected_output": "The system generates an Evo Viewer link for the block model and explains that the variogram cannot be shown in the Viewer. It directs the user to the variogram-management skill for plotly-based variogram visualisation alongside the Viewer link for the block model.",
+      "category": "mixed-object-routing"
+    }
+  ]
+}

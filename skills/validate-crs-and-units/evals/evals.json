@@ -30,6 +30,12 @@
       "prompt": "Validate the spatial compatibility between my VCU Test Point Set and VCU Test Block Model before I proceed",
       "expected_output": "A spatial compatibility check is performed comparing coordinate reference systems of both objects, returning a pass result with the shared CRS confirmed",
       "category": "workflow-gate-validation"
+    },
+    {
+      "id": 5,
+      "prompt": "Neither my VCU Unspecified CRS Samples nor my VCU Unspecified CRS Block Model have a CRS defined — can I still run estimation?",
+      "expected_output": "Both objects are flagged as missing CRS. The result indicates compatibility cannot be determined and warns that proceeding without defined coordinate systems carries risk of spatial errors",
+      "category": "both-objects-missing-crs"
     }
   ]
 }

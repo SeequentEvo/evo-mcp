@@ -1,6 +1,6 @@
 ---
 name: evo-object-visualisation
-description: Generate a combined Evo Viewer link and per-object Portal links for explicit object lists. Use this for generic object visualisation workflows, not only kriging.
+description: Generates Evo Viewer and Portal links for point sets, block models, and grids. Does not support variogram or ellipsoid visualisation.
 ---
 
 # Object Visualisation
@@ -28,7 +28,28 @@ Use this skill when the user wants to:
 - Require explicit user-supplied object IDs.
 - Do not infer or discover objects unless the user asks for that separately.
 
+## Code-Generated Visualization
+
+Some geoscience objects — particularly **variograms** and **search ellipsoids** — are not supported by the Evo Viewer. This skill does not handle visualization for those object types. When a user requests visualization for an unsupported type, explain that it cannot be shown in the Evo Viewer and that code-generated visualization (e.g., plotly) is required.
+
+### Supported Object Types
+
+| Object Type | Evo Viewer? |
+|---|---|
+| Point sets | ✅ Yes |
+| Block models | ✅ Yes |
+| Regular 3D grids | ✅ Yes |
+| Variogram ellipsoids | ❌ Not supported by this skill |
+| Variogram curves | ❌ Not supported by this skill |
+| Search ellipsoids | ❌ Not supported by this skill |
+
 ## Required Inputs
 
 - `workspace_id`
 - `object_ids`
+
+## Error Handling
+
+- Empty object ID list: fail with a message indicating at least one object ID is required.
+- Invalid object ID: fail with a resolution error identifying which ID could not be found.
+- Workspace not accessible: fail with an explicit workspace resolution message.

@@ -1,6 +1,6 @@
 ---
 name: evo-kriging-run
-description: Build and execute kriging scenarios from resolved inputs using the kriging_build_parameters and kriging_run compute tools. Use this skill whenever the user already has workspace, source, target, variogram, and neighborhood inputs ready and wants to run one or more kriging estimation scenarios, including method comparisons, attribute variations, or neighborhood sensitivity checks.
+description: Executes kriging estimation scenarios from fully resolved inputs — source, target, variogram, and search neighborhood must all be ready.
 ---
 
 # Kriging Run
@@ -18,7 +18,7 @@ Use this skill when:
 
 Do not use this skill when:
 
-- object IDs have not been resolved yet (use `evo-object-discovery` first)
+- object IDs have not been resolved yet
 - the neighborhood has not been defined yet
 - CRS has not been validated (use `validate-crs-and-units` first)
 - the user only wants to inspect or design inputs without running
@@ -31,8 +31,6 @@ This skill uses two compute tools:
 | --- | --- |
 | `kriging_build_parameters` | Build a validated `KrigingParameters` payload from primitive inputs |
 | `kriging_run` | Execute one or more scenarios in parallel |
-
-Use `viewer_generate_multi_object_links` only if the user wants a combined viewer across multiple kriging targets.
 
 ## Workflow
 
@@ -98,19 +96,21 @@ kriging_run(
 - Build one scenario per `kriging_build_parameters` call and collect them into the list before calling `kriging_run`.
 - Do not add a separate preflight step just to determine whether a target attribute will be created or updated; report the resolved operation from `kriging_run` results.
 - Use canonical field names: `search` for the search neighborhood, `method` for the kriging method.
-- The tool internally normalizes `ellipsoid_ranges` → `ranges` for round-trip compatibility. Use `ranges` in neighborhood inputs (matching the SDK constructor), e.g. `"ranges": {"major": ..., "semi_major": ..., "minor": ...}`.
+- The tool automatically normalizes search neighborhood field names (e.g., `ellipsoid_ranges` → `ranges`) for SDK compatibility. No manual field renaming is needed when passing results between skills.
 - Results from `kriging_run` are ordered to match the input `scenarios` list.
 - Do not rewrite or reshape payloads returned by `kriging_build_parameters` before passing to `kriging_run`.
 
 ## Required Inputs
 
+All object identifiers below are resolved upstream — users work with names, not UUIDs.
+
 - `workspace_id`
-- `target_object_id`: UUID of the target BlockModel or Regular3DGrid
+- `target_object_id`: resolved identifier of the target block model or regular grid
 - `target_attribute`: attribute name to create or update on the target
-- `point_set_object_id`: UUID of the source PointSet
-- `point_set_attribute`: existing source attribute name on the PointSet
-- `variogram_object_id`: UUID of the variogram object
-- `search`: a canonical search neighborhood payload that is already defined before this skill runs
+- `point_set_object_id`: resolved identifier of the source point set
+- `point_set_attribute`: existing source attribute name on the point set
+- `variogram_object_id`: resolved identifier of the variogram
+- `search`: a canonical search neighborhood payload
 
 ## Optional Inputs
 
@@ -154,10 +154,22 @@ After `kriging_run` completes, summarize each result:
 1. State the target object name and attribute operation (created or updated).
 2. Provide the portal and viewer inspection links.
 3. If multiple scenarios ran, number them in order.
-4. If the user wants a combined viewer for multiple targets, use `viewer_generate_multi_object_links`.
 
 ## Error Handling
 
 - If `kriging_build_parameters` fails because of an unresolvable UUID, missing attribute, or role mismatch, report the error and do not proceed to `kriging_run`.
 - If `kriging_run` fails for any scenario, report which scenario or scenarios failed.
 - If CRS mismatch warnings were already acknowledged during setup, surface them again in the response rather than silently ignoring them.
+
+## Performance Troubleshooting
+
+If kriging takes too long or times out:
+- **Reduce block count**: Use larger block sizes to decrease the number of blocks to estimate.
+- **Reduce `max_samples`**: Fewer samples per block means faster estimation. Try 12–16 instead of 20+.
+- **Reduce search ellipsoid ranges**: A smaller search radius means fewer candidate samples per block. Try 1.5× the variogram range instead of 3×.
+- **Reduce scenario count**: Run fewer scenarios per batch.
+
+If kriging produces many unestimated blocks:
+- **Increase search ranges**: The ellipsoid may be too small to find enough samples. Try 2–3× the variogram range.
+- **Decrease `min_samples`**: Lowering the minimum sample requirement allows estimation in sparse areas.
+- **Check data coverage**: Verify your source data covers the target block model extents.

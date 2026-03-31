@@ -9,7 +9,7 @@
   "evals":[
     {
       "id": 1,
-      "prompt": "Design a regular block model from explicit extents: x 1000–3000, y 2000–3500, z 100–500, block sizes 25/25/10, name 'Domain BM', path '/blockmodels/domain_bm.json'. Return total blocks and the resulting bounding box.",
+      "prompt": "Design a regular block model covering x 1000–3000, y 2000–3500, z 100–500 with 25m by 25m by 10m blocks. Call it 'Domain BM'. Show me total blocks and the resulting bounding box.",
       "expected_output": "Block model is created with a valid derived grid showing origin, block counts, block sizes, and total blocks.",
       "category": "local-explicit-extents"
     },
@@ -27,15 +27,21 @@
     },
     {
       "id": 4,
-      "prompt": "Test validation: try to create a block model with block_size_z=0, then try again with x_min=50 and x_max=10. Return both errors.",
-      "expected_output": "Two validation errors are surfaced: non-positive block size and invalid min/max extents.",
-      "category": "local-validation-errors"
+      "prompt": "Try to create a block model with a block height of zero — what happens?",
+      "expected_output": "A validation error is surfaced indicating that block sizes must be greater than zero.",
+      "category": "error-handling-zero-block-size"
     },
     {
       "id": 5,
       "prompt": "Use the 'BM Test Block Model' as the source object. Get its bounding box, then design a new block model from those extents with block sizes 20/20/5 and padding 10/10/2. Get the definition details of the result.",
       "expected_output": "Bounding box derived from BM Test Block Model. New block model created from padded extents. Definition details return a valid grid summary.",
       "category": "source-bounds-two-step"
+    },
+    {
+      "id": 6,
+      "prompt": "Design a block model where x_min is 50 and x_max is 10 — is that valid?",
+      "expected_output": "A validation error is surfaced indicating that the minimum extent cannot exceed the maximum extent.",
+      "category": "error-handling-inverted-extents"
     }
   ]
 }

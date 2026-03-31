@@ -1,7 +1,9 @@
 {
   "skill_name": "point-set-management",
   "setup": {
-    "steps": []
+    "steps": [
+      {"step": 0, "tool": "reset_staging", "args": {}}
+    ]
   },
   "evals": [
     {
@@ -12,7 +14,7 @@
     },
     {
       "id": 2,
-      "prompt": "Build a point set from skills/point-set-management/evals/samples_with_invalid.csv using Easting/Northing/RL for coordinates with coordinate_cleaning='drop_invalid', then summarize it and report how many rows were dropped.",
+      "prompt": "Build a point set from skills/point-set-management/evals/samples_with_invalid.csv using Easting/Northing/RL for coordinates, drop any rows with bad coordinates, then summarize it and report how many rows were dropped.",
       "expected_output": "Summary shows fewer than 7 rows due to dropped invalid coordinate rows. dropped_invalid_coordinate_rows is greater than 0.",
       "category": "coordinate-cleaning-drop-invalid"
     },
@@ -30,7 +32,7 @@
     },
     {
       "id": 5,
-      "prompt": "Build a point set from skills/point-set-management/evals/samples_with_invalid.csv using Easting/Northing/RL for coordinates with coordinate_cleaning='keep_invalid'.",
+      "prompt": "Build a point set from skills/point-set-management/evals/samples_with_invalid.csv using Easting/Northing/RL for coordinates but tell it to keep the invalid rows instead of dropping them.",
       "expected_output": "The request fails with a validation error indicating that 'keep_invalid' is not a valid coordinate cleaning mode.",
       "category": "error-handling-invalid-cleaning-mode"
     }

@@ -1,143 +1,135 @@
 ---
 name: kriging-orchestrator
-description: Orchestrate a first-pass kriging workflow using existing Evo objects and the evo-mcp compute tools. Use this whenever the user wants to run kriging from existing pointsets, variograms, block models, or regular grids using primitive IDs and attribute names.
+description: Orchestrates end-to-end kriging from discovery through reporting. Use when the full workflow is needed, not a single step.
 ---
 
 # Kriging Orchestrator
 
-Use this skill to run one or more kriging tasks through MCP while keeping `KrigingParameters` as the canonical model.
+Guide the user through a complete kriging estimation workflow using natural-language conversation. The user describes what they want to estimate, and this orchestrator coordinates the necessary steps behind the scenes.
 
-Internally, use a two-step process:
-
-1. Build a validated payload from primitive inputs plus `workspace_id`.
-2. Run kriging using a `scenarios` list and a separate `workspace_id`.
-
-`workspace_id` is required when building parameters so the tool can resolve object IDs, but it is not embedded in the returned `KrigingParameters` payload.
+Users are geologists. They work with object names, attribute names, and geoscience concepts — never with internal identifiers, tool names, or payload structures.
 
 ## Trigger Conditions
 
 Use this skill when the user wants to:
 
-- run kriging from existing Evo objects
-- build kriging inputs from object IDs and attribute names
-- execute kriging through the `kriging_build_parameters` and `kriging_run` MCP tools
-- avoid inventing a second request model
+- run kriging to estimate grades, properties, or other attributes
+- set up a kriging workflow from their existing data
+- compare different kriging configurations (method, neighborhood, attributes)
+- estimate into a block model or regular grid from sample data
 
-## Workflow
+## End-to-End Workflow
 
-1. Use the `evo-object-discovery` skill if source, variogram, or target objects are not already resolved.
-2. Confirm `workspace_id`, target object and target attribute, source pointset object and source attribute, and variogram.
-3. Confirm primitive inputs: target object UUID + target attribute name, source pointset UUID + source attribute name, and variogram UUID.
-4. Call `kriging_build_parameters` with primitive IDs and typed search/method inputs.
-5. Pass the returned payload as a single-item `scenarios` list to `kriging_run(workspace_id=..., scenarios=[...])`.
+The orchestrator manages the conversation and assembles resolved inputs across the steps below. Some steps are handled directly by the orchestrator; others are delegated to a named skill.
 
-```python
-payload = kriging_build_parameters(
-    workspace_id=workspace_id,
-    target_object_id=target_object_id,
-    target_attribute=target_attribute,
-    point_set_object_id=point_set_object_id,
-    point_set_attribute=point_set_attribute,
-    variogram_object_id=variogram_object_id,
-    search=search,
-    method={"type": "ordinary"},
-)
+**What gets assembled:** workspace → staged objects → validated CRS → neighborhood payload → confirmed attribute names → published object IDs → kriging results
 
-kriging_run(workspace_id=workspace_id, scenarios=[payload])
+---
+
+### Phase 1 — Gather Inputs
+
+#### Step 1: Confirm workspace *(orchestrator)*
+Ask the user which workspace contains their data. Capture the `workspace_id`.
+
+#### Step 2: Resolve or create objects *(orchestrator + skills)*
+Identify the source point set, variogram, and target block model. Each object may follow either path — a mixed combination is valid (e.g., variogram from Evo, block model created locally):
+
+- **Object exists in Evo:**
+  1. Find by name → *skill: `evo-object-discovery`*
+  2. Import into local session → *skill: `evo-object-management`*
+- **Object needs to be created locally:**
+  - Source point set from CSV → *skill: `point-set-management`*
+  - New variogram from parameters → *skill: `variogram-management`*
+  - New block model from extents → *skill: `block-model-management`*
+
+**Assembles:** locally staged objects (sourced from Evo, created locally, or a mix of both)
+
+#### Step 3: Validate spatial compatibility — *skill: `validate-crs-and-units`*
+Delegate to this skill once all objects are staged.
+Do not proceed until validation passes or the user explicitly accepts a mismatch.
+
+#### Step 4: Design the search neighborhood — *skill: `design-search-neighborhood`*
+Delegate to this skill once CRS validation has passed.
+**Assembles:** `search` neighborhood payload
+
+#### Step 5: Confirm attribute names *(orchestrator)*
+Ask the user which attribute to estimate from (source) and what to call the result on the target.
+**Assembles:** `point_set_attribute`, `target_attribute`
+
+#### Step 6: Publish modified or new objects — *skill: `evo-object-management`*
+Before running kriging, ensure all required objects have valid workspace object IDs. Only publish objects that need it:
+
+- **New staged objects** (created in steps 2): must be published
+- **Objects modified since import** (e.g., variogram re-fitted, block model redesigned): must be re-published
+- **Objects fetched from Evo and unchanged**: already have valid object IDs — skip
+
+**Assembles:** `point_set_object_id`, `variogram_object_id`, `target_object_id`
+
+---
+
+### Phase 2 — Execute
+
+#### Step 7: Build and run kriging — *skill: `evo-kriging-run`*
+Delegate to this skill once all inputs are assembled: `workspace_id`, `point_set_object_id`, `point_set_attribute`, `variogram_object_id`, `target_object_id`, `target_attribute`, and `search`.
+**Assembles:** structured kriging results with inspection links
+
+---
+
+### Phase 3 — Report and Visualize
+
+#### Step 8: Report results — *skill: `kriging-reporting`*
+Delegate to this skill once kriging completes.
+
+#### Step 9 (optional): Visualize — *skill: `evo-object-visualisation`*
+Delegate to this skill if the user wants to view the results in the Evo Viewer.
+
+
+## Conversation Guidelines
+
+- **Ask, don't assume**: confirm object selections, attribute names, and method choices with the user before handing off.
+- **Use names, not IDs**: always refer to objects by their name rather than internal identifiers.
+- **Speak geoscience**: use terms the user knows — "samples", "estimation target", "search range" — not tool or parameter names.
+- **One step at a time**: confirm each step is complete before moving to the next.
+
+## Skill Composition Map
+
+```text
+User: "Run kriging on my gold data"
+|
++-- 1. Confirm workspace                                        [orchestrator]
++-- 2. Resolve or create objects (per-object, mix allowed)      [orchestrator + skills]
+|     +-- evo-object-discovery   -> find in Evo by name
+|     +-- evo-object-management  -> import from Evo to session
+|     +-- point-set-management   -> build from CSV
+|     +-- variogram-management   -> create from parameters
+|     +-- block-model-management -> design from extents
++-- 3. validate-crs-and-units    -> check CRS                   [skill]
++-- 4. design-search-neighborhood -> neighborhood payload       [skill]
++-- 5. Confirm attribute names                                  [orchestrator]
++-- 6. evo-object-management     -> publish new/modified only   [skill]
++-- 7. evo-kriging-run            -> execute                    [skill]
++-- 8. kriging-reporting          -> summarize                  [skill]
++-- 9. evo-object-visualisation   -> view (optional)            [skill]
 ```
 
-If the tool returns a wrapped result (for example `{ "payload": {...} }`), pass the inner payload object:
+Each skill is self-contained. The orchestrator passes object names between steps — leaf skills resolve names to their internal representations independently.
 
-```python
-build_result = kriging_build_parameters(...)
-kriging_run(workspace_id=workspace_id, scenarios=[build_result["payload"]])
-```
+## Error Handling
 
-## Rules
+- If an object cannot be found, ask the user to try different search terms or confirm the object exists in the workspace.
+- If any step fails, explain the issue in plain geoscience language and offer to retry or take an alternative path.
+- Never surface raw error codes, stack traces, or internal identifiers to the user.
 
-- Pass `workspace_id` to `kriging_build_parameters` so the tool can resolve source, target, and variogram objects.
-- Keep `workspace_id` separate from the returned `KrigingParameters` payload and from the `scenarios` entries passed to `kriging_run`.
-- `kriging_run` accepts only `scenarios: list[KrigingParameters]`; do not pass a single payload directly.
-- Ensure `scenarios` is non-empty before calling `kriging_run`.
-- Prefer primitive UUID inputs for objects and attribute names for source/target fields.
-- Do not pass a JSON string when a structured object will do.
-- Always use `kriging_build_parameters` before `kriging_run`.
-- Let `kriging_build_parameters` return the canonical run payload shape. It performs internal search payload normalization (including `ellipsoid_ranges` to `ranges`) for MCP round-trips.
-- Use strict canonical inputs and fix invalid IDs/attributes instead of guessing alternate shapes.
-- Let the tool derive canonical references from typed objects; do not hand-build Evo reference URLs or raw JMESPath expressions.
-- Follow role constraints enforced by the tool typing:
-    - `target_object_id`: UUID referencing a `BlockModel` or `Regular3DGrid`
-    - `point_set_object_id`: UUID referencing a `PointSet`
-    - `variogram_object_id`: UUID referencing a `variogram`
+## Required Context
 
-## Required Inputs
+- A workspace to publish objects into and run kriging against
+- A source point set (existing in Evo, or built locally from CSV)
+- A variogram (existing in Evo, or created locally)
+- A target block model or regular grid (existing in Evo, or designed locally)
+- Any new or modified objects must be published before kriging runs
 
-- `workspace_id`
-- `target_object_id` and `target_attribute`
-- `point_set_object_id` and `point_set_attribute`
-- `variogram_object_id`
-- search neighborhood
+## Scope
 
-## First-Pass Scope
-
-- Single run and multi-scenario runs are both supported.
-- Existing objects only.
+- Single and multi-scenario runs are both supported.
 - Targets may be block models or regular grids.
-- No server-side visualization helpers.
-
-## Example Pattern
-
-```python
-payload = kriging_build_parameters(
-    workspace_id=workspace_id,
-    target_object_id="<block-model-or-grid-uuid>",
-    target_attribute="kriged_grade",
-    point_set_object_id="<pointset-uuid>",
-    point_set_attribute="grade",
-    variogram_object_id="<variogram-uuid>",
-    search={
-        "ellipsoid": {
-            "ranges": {"major": 200.0, "semi_major": 150.0, "minor": 100.0}
-        },
-        "max_samples": 20,
-    },
-    method={"type": "ordinary"},
-)
-
-kriging_run(workspace_id=workspace_id, scenarios=[payload])
-```
-
-## Validation Notes
-
-- If `kriging_build_parameters` fails, fix those input errors first and rebuild before running.
-- If `kriging_build_parameters` fails because `workspace_id` is missing, provide it and rebuild. The build step requires workspace context even though the returned payload does not include it.
-- If `kriging_run` fails due to missing source attribute, re-check that `point_set_attribute` exactly matches an attribute name on the source pointset.
-- If `kriging_run` fails validation on object references, re-check workspace/object role pairing and retry.
-- Do not patch malformed references or fabricate attribute expressions at run time. Fix upstream inputs, rebuild payload, and rerun.
-
-## Multi-Scenario Pattern
-
-Use this for parameter sweeps:
-
-```python
-scenarios = [
-    kriging_build_parameters(
-        workspace_id=workspace_id,
-        target_object_id=target_object_id,
-        target_attribute=f"kriged_grade_ms_{max_samples}",
-        point_set_object_id=point_set_object_id,
-        point_set_attribute=point_set_attribute,
-        variogram_object_id=variogram_object_id,
-        search={
-            "ellipsoid": {
-                "ranges": {"major": 200.0, "semi_major": 150.0, "minor": 100.0}
-            },
-            "max_samples": max_samples,
-        },
-        method={"type": "ordinary"},
-    )
-    for max_samples in [8, 12, 20]
-]
-
-kriging_run(workspace_id=workspace_id, scenarios=scenarios)
-```
+- Local object creation (point sets, variograms, block models) and Evo import are both supported paths.

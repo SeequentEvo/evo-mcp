@@ -53,8 +53,7 @@
       "id": 8,
       "prompt": "Create a spherical variogram (sill=1.0, nugget=0.1, major=300, semi-major=200, minor=100, dip_azimuth=45, dip=15, pitch=0) and generate a full visualisation — both the 3D ellipsoid and 2D variogram curves.",
       "expected_output": "Ellipsoid geometry and curve details are returned. Plotly visualisation code is generated using those outputs and renders a 3D surface and 2D curve chart.",
-      "category": "visualization-3d-and-2d-end-to-end",
-      "local_only": true
+      "category": "visualization-3d-and-2d-end-to-end"
     }
   ]
 }

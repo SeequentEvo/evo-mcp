@@ -9,56 +9,56 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Import EOM Import Variogram from the workspace. Verify the summary reports sill=1.2, nugget=0.05, and structure_count=1.",
-      "expected_output": "Import succeeds and summary confirms sill=1.2, nugget=0.05, structure_count=1.",
+      "prompt": "Bring my EOM Import Variogram from the workspace into the session so I can use it locally.",
+      "expected_output": "Import succeeds and summary confirms the variogram properties including sill, nugget, and structure count.",
       "category": "import-variogram"
     },
     {
       "id": 2,
-      "prompt": "Import EOM Import Point Set from the workspace. Verify the summary reports point_count=6, attribute_names includes GRADE and DOMAIN, and coordinate_reference_system=EPSG:32650.",
-      "expected_output": "Import succeeds and summary confirms point_count=6, attributes include GRADE and DOMAIN, CRS is EPSG:32650.",
+      "prompt": "Import the EOM Import Point Set from my workspace. I want to check it has the GRADE and DOMAIN attributes.",
+      "expected_output": "Import succeeds and summary confirms the point set with its attributes (GRADE, DOMAIN), point count, and coordinate reference system.",
       "category": "import-point-set"
     },
     {
       "id": 3,
-      "prompt": "Import EOM Import Block Model from the workspace. Verify the summary reports nx=4, ny=3, nz=2, total_blocks=24, and block_size_dx=12.5.",
-      "expected_output": "Import succeeds and summary confirms nx=4, ny=3, nz=2, total_blocks=24, block_size_dx=12.5.",
+      "prompt": "Import the EOM Import Block Model from my workspace so I can inspect its grid dimensions.",
+      "expected_output": "Import succeeds and summary confirms the block model grid dimensions and block size.",
       "category": "import-block-model"
     },
     {
       "id": 4,
-      "prompt": "Publish the staged-only local object EOM Stage Variogram New as a new object to the workspace. Confirm a new object_id and version_id are returned.",
-      "expected_output": "Publish succeeds for a staged-only variogram. Result includes non-empty object_id and version_id for a newly created workspace object.",
+      "prompt": "Publish my local variogram EOM Stage Variogram New to the workspace as a brand new object.",
+      "expected_output": "Publish succeeds for the staged-only variogram. A new workspace object is created with a valid object ID and version ID.",
       "category": "publish-new-variogram"
     },
     {
       "id": 5,
-      "prompt": "Publish the staged-only local object EOM Stage Point Set New as a new object to the workspace. Confirm a new object_id and version_id are returned.",
-      "expected_output": "Publish succeeds for a staged-only point set. Result includes non-empty object_id and version_id for a newly created workspace object.",
+      "prompt": "Save my local point set EOM Stage Point Set New to the workspace as a new object.",
+      "expected_output": "Publish succeeds for the staged-only point set. A new workspace object is created with a valid object ID and version ID.",
       "category": "publish-new-point-set"
     },
     {
       "id": 6,
-      "prompt": "Publish the staged-only local object EOM Stage Block Model New as a new object to the workspace. Confirm a new object_id and version_id are returned.",
-      "expected_output": "Publish succeeds for a staged-only regular block model. Result includes non-empty object_id and version_id for a newly created workspace object.",
+      "prompt": "Upload my local block model EOM Stage Block Model New to the workspace as a new object.",
+      "expected_output": "Publish succeeds for the staged-only regular block model. A new workspace object is created with a valid object ID and version ID.",
       "category": "publish-new-block-model"
     },
     {
       "id": 7,
-      "prompt": "Import EOM Both Variogram from the workspace and note object_id and version_id. Then publish it as a new version of the same object. Confirm object_id stays the same and version_id changes.",
-      "expected_output": "Import succeeds for EOM Both Variogram, then publish-new-version succeeds with identical object_id and different version_id.",
+      "prompt": "Import EOM Both Variogram from the workspace, then publish it back as an updated version of the same object.",
+      "expected_output": "Import succeeds for EOM Both Variogram, then publish as new version succeeds — the object ID stays the same but the version ID changes.",
       "category": "publish-new-version-variogram"
     },
     {
       "id": 8,
-      "prompt": "Import EOM Both Point Set from the workspace and note object_id and version_id. Then publish it as a new version of the same object. Confirm object_id stays the same and version_id changes.",
-      "expected_output": "Import succeeds for EOM Both Point Set, then publish-new-version succeeds with identical object_id and different version_id.",
+      "prompt": "Import EOM Both Point Set from the workspace, then publish it back as an updated version.",
+      "expected_output": "Import succeeds for EOM Both Point Set, then publish as new version succeeds — the object ID stays the same but the version ID changes.",
       "category": "publish-new-version-point-set"
     },
     {
       "id": 9,
-      "prompt": "Import EOM Both Block Model from the workspace and note object_id and version_id. Then attempt to publish it as a new version of the same object. Confirm that the publish fails with an appropriate error explaining that block models cannot be published as new versions directly.",
-      "expected_output": "Import succeeds for EOM Both Block Model. Publish-new-version fails with an error (e.g. 403 or explicit message) indicating that block models cannot be updated directly via the API and must use the Block Model Service.",
+      "prompt": "Import EOM Both Block Model from the workspace, then try to publish it back as a new version.",
+      "expected_output": "Import succeeds for EOM Both Block Model. Publishing as a new version fails with an error explaining that block models cannot be updated directly via this workflow.",
       "category": "publish-new-version-block-model"
     }
   ]

@@ -1,6 +1,6 @@
 ---
 name: design-search-neighborhood
-description: Design a canonical search neighborhood ellipsoid for spatial estimation tasks. Use this skill whenever the user needs to configure a neighborhood from explicit ellipsoid values or from a variogram. Derives ranges locally from a named variogram — no Evo service interaction required.
+description: Designs search neighborhood ellipsoids for spatial estimation — configures ranges and sample limits, or derives them from variogram parameters.
 ---
 
 # Design Search Neighborhood
@@ -68,7 +68,7 @@ design_search_neighborhood(
 
 ## Rules
 
-- The tool output uses `ellipsoid_ranges` in its serialized shape. When passing the neighborhood to `kriging_build_parameters` or other tools that accept a `SearchNeighborhood`, rename `ellipsoid_ranges` to `ranges` to match the SDK constructor. The kriging tools normalize this internally, but callers should use `ranges` for consistency.
+- The downstream kriging tools automatically normalize the neighborhood output for execution. No manual field renaming is needed when passing results between skills.
 - All three explicit ranges (`major`, `semi_major`, `minor`) must be provided together — partial ranges are rejected.
 - Prefer `variogram_name` when a variogram is available in the session.
 - Do not pass `variogram_object_id` and `variogram_name` together — they are mutually exclusive.
@@ -76,6 +76,39 @@ design_search_neighborhood(
 - Do not perform publish/import in this skill; handle those workflows separately.
 - Surface derivation metadata (`mode`, `scale_factor`, `variogram_name`) so the user can review how the neighborhood was configured.
 - Do not guess sample limits. Ask the user or use reasonable defaults (e.g., `max_samples=20`).
+
+## Parameter Guidance for Geologists
+
+### Choosing Search Ranges
+- **Rule of thumb**: Set search ranges to 1.5–3× the variogram ranges.
+- Use `scale_factor=2.0` (the moderate preset) as a reliable starting point.
+- If your data is dense and well-distributed, a tighter search (1.5×) may capture local trends better.
+- If data is sparse or clustered, a broader search (3×) avoids gaps in estimation.
+
+### Choosing Max Samples
+- **5–10**: Fast, emphasizes local variation, higher variance in estimates.
+- **15–25**: Balanced — start with 20 for most workflows.
+- **30+**: Smoother estimates, diminishing returns, slower computation.
+
+### When Search Is Too Small
+If kriging estimates show many unestimated blocks or high variance:
+- Increase search ranges (try 3× the variogram range).
+- Increase `max_samples` to ensure enough samples fall within the ellipsoid.
+
+### When Search Is Too Large
+If estimates are overly smooth or computation is slow:
+- Reduce search ranges closer to 1.5× the variogram range.
+- Reduce `max_samples` to limit the influence radius.
+
+## Error Handling
+
+- Incomplete explicit ranges (only 1 or 2 of major/semi_major/minor provided): reject and list the missing ranges.
+- Non-positive explicit range values: reject and identify the invalid range.
+- `max_samples < 1`: reject with guidance that at least 1 sample is required.
+- `min_samples > max_samples`: reject and suggest correcting the sample limits.
+- Both `variogram_name` and `variogram_object_id` provided: reject — these are mutually exclusive sources.
+- Variogram name not found in session: report that the named variogram could not be resolved.
+- No range source provided (no explicit ranges, no variogram name, no variogram object ID): reject and explain the available input modes.
 
 ## Required Inputs
 
@@ -115,4 +148,4 @@ design_search_neighborhood(
 }
 ```
 
-**Important:** The `neighborhood` output uses `ellipsoid_ranges` as the serialized key. When passing to `kriging_build_parameters` (which expects a `SearchNeighborhood`), rename `ellipsoid_ranges` to `ranges` in the `ellipsoid` dict. The `_normalize_kriging_payload` helper in the kriging tools handles this automatically, but callers constructing payloads manually should use `ranges`.
+**Note:** The neighborhood output is passed directly to downstream kriging tools, which handle any field normalization automatically.

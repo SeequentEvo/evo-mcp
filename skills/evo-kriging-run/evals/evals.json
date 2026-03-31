@@ -27,12 +27,18 @@
     },
     {
       "id": 4,
-      "prompt": "Test error handling: try running kriging with an empty scenario list, then try building kriging parameters with a point set object ID that does not exist in the workspace.",
-      "expected_output": "Two distinct errors are returned: empty scenarios rejected, and a non-existent object ID causes a resolution failure.",
-      "category": "error-handling"
+      "prompt": "Run kriging without providing any scenarios — just submit an empty run.",
+      "expected_output": "The run is rejected with an error indicating that at least one scenario must be provided.",
+      "category": "error-handling-empty-scenarios"
     },
     {
       "id": 5,
+      "prompt": "Try to set up a kriging run using a point set called 'Nonexistent Samples' that doesn't exist in the workspace.",
+      "expected_output": "Parameter building fails with an error indicating the source point set could not be resolved.",
+      "category": "error-handling-missing-object"
+    },
+    {
+      "id": 6,
       "prompt": "Build three kriging scenarios all using EKR WP Assay Samples (CU_pct), EKR CU Kriging Estimate, and EKR CU_pct Variogram. Use a default neighborhood (major=500, semi_major=360, minor=200, max_samples=16) for the first two and a broader neighborhood (major=750, semi_major=540, minor=300, max_samples=24) for the third. Target attributes 'Au_OK', 'Au_SK', and 'Au_broad'. Run all three in one batch.",
       "expected_output": "Three scenarios are built and executed in a single batch call. Results contain three entries in input order matching Au_OK, Au_SK, and Au_broad.",
       "category": "multi-attribute-batch"

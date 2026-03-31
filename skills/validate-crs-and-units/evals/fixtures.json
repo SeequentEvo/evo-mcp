@@ -69,5 +69,15 @@
         "GRADE": [0.45, 0.52, 0.38, 0.61, 0.47]
       }
     }
+  },
+  "no_crs_block_model": {
+    "seed_mode": "staged",
+    "object_type": "regular_block_model",
+    "name": "VCU Unspecified CRS Block Model",
+    "description": "Block model with no coordinate reference system defined",
+    "coordinate_reference_system": "unspecified",
+    "origin": {"x": 1000.0, "y": 2000.0, "z": 300.0},
+    "n_blocks": {"nx": 5, "ny": 4, "nz": 3},
+    "block_size": {"dx": 10.0, "dy": 10.0, "dz": 10.0}
   }
 }

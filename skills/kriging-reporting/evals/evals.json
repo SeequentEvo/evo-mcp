@@ -4,7 +4,7 @@
     "steps": [
       {"step": 0, "tool": "reset_staging", "args": {}},
       {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills/kriging-reporting/evals/fixtures.json"]}},
-      {"step": 2, "action": "Run a kriging scenario using the published objects to produce estimated attributes on the block model"}
+      {"step": 2, "tool": "kriging_run", "args": {}, "note": "Run a kriging scenario using the published objects to produce estimated attributes on the block model"}
     ]
   },
   "evals": [
@@ -25,6 +25,12 @@
       "prompt": "What should I do after kriging completes?",
       "expected_output": "Guidance on recommended next steps after kriging, such as validating estimation results, reviewing block model statistics, or visualising the estimated block model alongside the source data",
       "category": "post-kriging-next-steps"
+    },
+    {
+      "id": 4,
+      "prompt": "I ran ordinary and simple kriging side by side — can you show me a comparison chart of the two sets of estimates?",
+      "expected_output": "A plotly box plot or equivalent comparison visualisation is generated showing the distribution of estimated values from each scenario side by side, allowing the user to visually compare ordinary vs simple kriging results.",
+      "category": "scenario-comparison-visualization"
     }
   ]
 }

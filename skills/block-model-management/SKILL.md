@@ -1,6 +1,6 @@
 ---
 name: block-model-management
-description: Design and inspect block models locally. Supports both regular (created from extents) and standard (import-only) block models. Use this for local block model work — import/publish is in evo-object-management.
+description: Designs regular block models from extents and block sizes. Inspects block model definitions and validates grid parameters locally.
 ---
 
 # Block Model Management
@@ -15,8 +15,6 @@ Use this skill when the user needs to:
 - inspect and validate any block model definition (regular or standard)
 - keep local design and inspection separate from Evo persistence
 
-For import/publish operations, use `evo-object-management`.
-
 ## Block Model Types
 
 - **Regular**: uniform grid, can be designed locally from extents. Has origin, n_blocks, block_size.
@@ -25,6 +23,8 @@ For import/publish operations, use `evo-object-management`.
 Both types can be staged and inspected locally.
 
 ## When to Use Each Tool
+
+### Quick Selection Guide
 
 - `regular_block_model_design_from_extents`: Design a new regular block model from explicit min/max extents and block sizes.
 - `block_model_get_definition_details`: Inspect and summarize any staged block model (regular or standard).
@@ -39,7 +39,7 @@ User needs block model help
 |
 +-- Needs to verify any block model payload? --> block_model_get_definition_details
 |
-+-- Needs to import or publish? --> Use evo-object-management skill
++-- Needs to import or publish? --> outside this skill's scope
 ```
 
 ## Workflow
@@ -74,6 +74,14 @@ Canonical regular block model payload:
 }
 ```
 
+## Error Handling
+
+- Non-positive block size (`dx`, `dy`, or `dz` ≤ 0): reject with clear message identifying which dimension is invalid.
+- Invalid extents (`min >= max` on any axis): reject and identify the offending axis.
+- Zero-volume grid (extents collapse on any axis): reject before computing block counts.
+- Block model name not found in session: report that the name could not be resolved and suggest checking staged objects.
+- Standard block model used with design tool: explain that standard block models are import-only and cannot be redesigned locally.
+
 ## Required Inputs
 
 - Local design from extents:
@@ -100,4 +108,4 @@ Canonical regular block model payload:
 
 1. Design the block model using `regular_block_model_design_from_extents(...)` with the desired extents.
 2. Review the block model payload locally.
-3. Use `evo-object-management` skill to publish with `regular_block_model_publish`.
+3. Publish to Evo using `regular_block_model_publish`.

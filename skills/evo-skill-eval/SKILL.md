@@ -1,6 +1,6 @@
 ---
 name: evo-skill-eval
-description: Run evaluations for one or more evo-mcp skills against a shared workspace. Use this skill whenever someone wants to test, evaluate, benchmark, or grade skill behaviour — especially when running multiple skills simultaneously. Triggers on phrases like "run the evals", "evaluate the skills", "test skill X", "run all skill evals", "check the evals for", or "benchmark skill performance".
+description: Runs and evaluates evo-mcp skill evals against a workspace — tests, benchmarks, and assesses skill behaviour.
 ---
 
 # Evo Skill Eval
@@ -122,6 +122,24 @@ Keep prior iterations (`iteration-1`, `iteration-2`, ...). Do not delete old run
 - Re-run after skill edits: use a new `iteration-N` directory.
 - Reuse seeded workspace only if fixture inputs did not change.
 - If fixtures changed, repeat Shared setup.
+
+## Required Inputs
+
+- One or more skill names (or "all" to select every skill with evals)
+- Each target skill must have `evals/evals.json`
+
+## Optional Inputs
+
+- Additional fixture files beyond skill-bundled fixtures
+- Iteration number override (defaults to next sequential)
+- Serial execution flag (default is parallel)
+
+## Error Handling
+
+- **Missing evals.json for a selected skill**: Skip that skill with a warning rather than aborting the entire run.
+- **Seed failure**: Report the seed error and do not proceed to execution. Common causes: malformed fixture JSON, unsupported object types, or connectivity issues.
+- **Executor subagent failure**: Capture partial output and continue with remaining skills. Report which skill failed and at which eval.
+- **Grading mismatch**: If grading.json cannot be written (e.g., missing outputs), mark the eval as "ungraded" with an explanation.
 
 ## Reference files
 

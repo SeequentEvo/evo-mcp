@@ -1,6 +1,6 @@
 ---
 name: point-set-management
-description: Build and inspect PointSet payloads locally from CSV data. For import/publish use evo-object-management.
+description: Builds and inspects point sets locally from CSV data — loads coordinates, validates quality, and summarizes geometry and attributes.
 ---
 
 # Point Set Management
@@ -14,8 +14,6 @@ Use this skill when the user needs to:
 - build a point-set payload from CSV coordinates and attributes
 - inspect a point-set payload
 - inspect point-set attribute columns and null patterns
-
-For import/publish, use `evo-object-management`.
 
 ## Sample Data
 
@@ -40,7 +38,7 @@ User needs point-set help
 |
 +-- Needs attribute diagnostics? --> point_set_attribute_details (by point_set_name)
 |
-+-- Needs to import or publish? --> Use evo-object-management skill
++-- Needs to import or publish? --> outside this skill's scope
 ```
 
 ## Workflow
@@ -68,10 +66,28 @@ User needs point-set help
 ### Example 2: Build local payload then persist
 
 1. Call `point_set_build_local(...)`.
-2. Call `point_set_publish(workspace_id="...", point_set_name="Assays", mode="create", object_path="/pointsets/assays.json")`.
+2. Publish to Evo using `point_set_publish`.
 
 ## Error Handling
 
 - Missing coordinate columns: fail fast and list missing columns.
 - Non-numeric coordinates: fail or drop rows depending on `coordinate_cleaning`.
 - Empty payload after cleaning: fail with explicit guidance.
+
+## Required Inputs
+
+- For `point_set_build_local`:
+  - `object_name`
+  - `csv_file`
+  - `x_column`, `y_column`, `z_column`
+- For `point_set_summarize`:
+  - `point_set_name`
+- For `point_set_attribute_details`:
+  - `point_set_name`
+
+## Optional Inputs
+
+- `coordinate_cleaning` (`drop_invalid` or `strict`)
+- `description`
+- `coordinate_reference_system`
+- `size_unit_id`
