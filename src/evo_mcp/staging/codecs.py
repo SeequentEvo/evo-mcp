@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import math
 import uuid as _uuid
-from typing import Any, Protocol, Union, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import pandas as pd
 from evo.blockmodels.typed import RegularBlockModelData
@@ -54,6 +54,7 @@ __all__ = [
     "PointSetCodec",
     "VariogramCodec",
     "BlockModelCodec",
+    "RegularBlockModelCodec",
     "get_codec",
     "variogram_structure_from_dict",
 ]
@@ -77,14 +78,18 @@ def _coerce_float(value: Any, field_name: str) -> float:
     try:
         return float(value)
     except (TypeError, ValueError) as exc:
-        raise StageValidationError(f"{field_name} must be numeric; got {value!r}.") from exc
+        raise StageValidationError(
+            f"{field_name} must be numeric; got {value!r}."
+        ) from exc
 
 
 def _coerce_int(value: Any, field_name: str) -> int:
     try:
         return int(value)
     except (TypeError, ValueError) as exc:
-        raise StageValidationError(f"{field_name} must be an integer; got {value!r}.") from exc
+        raise StageValidationError(
+            f"{field_name} must be an integer; got {value!r}."
+        ) from exc
 
 
 def _ellipsoid_from_dict(data: dict[str, Any]) -> Ellipsoid:
@@ -94,11 +99,15 @@ def _ellipsoid_from_dict(data: dict[str, Any]) -> Ellipsoid:
     return Ellipsoid(
         ranges=EllipsoidRanges(
             major=_coerce_float(ranges_d.get("major"), "ellipsoid_ranges.major"),
-            semi_major=_coerce_float(ranges_d.get("semi_major"), "ellipsoid_ranges.semi_major"),
+            semi_major=_coerce_float(
+                ranges_d.get("semi_major"), "ellipsoid_ranges.semi_major"
+            ),
             minor=_coerce_float(ranges_d.get("minor"), "ellipsoid_ranges.minor"),
         ),
         rotation=Rotation(
-            dip_azimuth=_coerce_float(rotation_d.get("dip_azimuth", 0.0), "rotation.dip_azimuth"),
+            dip_azimuth=_coerce_float(
+                rotation_d.get("dip_azimuth", 0.0), "rotation.dip_azimuth"
+            ),
             dip=_coerce_float(rotation_d.get("dip", 0.0), "rotation.dip"),
             pitch=_coerce_float(rotation_d.get("pitch", 0.0), "rotation.pitch"),
         ),
@@ -122,9 +131,13 @@ def variogram_structure_from_dict(structure: dict[str, Any]) -> Any:
         )
     variogram_type = structure.get("variogram_type")
     if not variogram_type:
-        raise StageValidationError("Variogram structure dict is missing 'variogram_type'.")
+        raise StageValidationError(
+            "Variogram structure dict is missing 'variogram_type'."
+        )
 
-    contribution = _coerce_float(structure.get("contribution"), "structure.contribution")
+    contribution = _coerce_float(
+        structure.get("contribution"), "structure.contribution"
+    )
     anisotropy_payload = structure.get("anisotropy")
     if not isinstance(anisotropy_payload, dict):
         raise StageValidationError("Variogram structure dict is missing 'anisotropy'.")
@@ -157,9 +170,13 @@ def variogram_structure_from_dict(structure: dict[str, Any]) -> Any:
     if vtype == "linear":
         return LinearStructure(contribution=contribution, anisotropy=anisotropy)
     if vtype == "spheroidal":
-        return SpheroidalStructure(contribution=contribution, anisotropy=anisotropy, alpha=alpha)
+        return SpheroidalStructure(
+            contribution=contribution, anisotropy=anisotropy, alpha=alpha
+        )
     if vtype == "generalisedcauchy":
-        return GeneralisedCauchyStructure(contribution=contribution, anisotropy=anisotropy, alpha=alpha)
+        return GeneralisedCauchyStructure(
+            contribution=contribution, anisotropy=anisotropy, alpha=alpha
+        )
     raise StageValidationError(f"Unsupported variogram_type: {variogram_type!r}.")
 
 
@@ -191,7 +208,10 @@ class PointSetCodec:
                 continue
             values = df[column]
             if pd.api.types.is_numeric_dtype(values):
-                attributes[column] = [None if (isinstance(v, float) and math.isnan(v)) else v for v in values.tolist()]
+                attributes[column] = [
+                    None if (isinstance(v, float) and math.isnan(v)) else v
+                    for v in values.tolist()
+                ]
             else:
                 attributes[column] = values.fillna("").astype(str).tolist()
         return {
@@ -201,9 +221,18 @@ class PointSetCodec:
             "coordinate_reference_system": payload.coordinate_reference_system,
             "data": {
                 "coordinates": {
-                    "x": [None if (isinstance(v, float) and math.isnan(v)) else v for v in df["x"].astype(float).tolist()],
-                    "y": [None if (isinstance(v, float) and math.isnan(v)) else v for v in df["y"].astype(float).tolist()],
-                    "z": [None if (isinstance(v, float) and math.isnan(v)) else v for v in df["z"].astype(float).tolist()],
+                    "x": [
+                        None if (isinstance(v, float) and math.isnan(v)) else v
+                        for v in df["x"].astype(float).tolist()
+                    ],
+                    "y": [
+                        None if (isinstance(v, float) and math.isnan(v)) else v
+                        for v in df["y"].astype(float).tolist()
+                    ],
+                    "z": [
+                        None if (isinstance(v, float) and math.isnan(v)) else v
+                        for v in df["z"].astype(float).tolist()
+                    ],
                 },
                 "attributes": attributes,
             },
@@ -216,9 +245,15 @@ class PointSetCodec:
         try:
             df = pd.DataFrame(
                 {
-                    "x": pd.to_numeric(pd.Series(coords["x"]), errors="raise").astype("float64"),
-                    "y": pd.to_numeric(pd.Series(coords["y"]), errors="raise").astype("float64"),
-                    "z": pd.to_numeric(pd.Series(coords["z"]), errors="raise").astype("float64"),
+                    "x": pd.to_numeric(pd.Series(coords["x"]), errors="raise").astype(
+                        "float64"
+                    ),
+                    "y": pd.to_numeric(pd.Series(coords["y"]), errors="raise").astype(
+                        "float64"
+                    ),
+                    "z": pd.to_numeric(pd.Series(coords["z"]), errors="raise").astype(
+                        "float64"
+                    ),
                 }
             )
         except KeyError as exc:
@@ -296,7 +331,9 @@ class VariogramCodec:
             "nugget": float(payload.nugget),
             "is_rotation_fixed": payload.is_rotation_fixed,
             "structures": payload.get_structures_as_dicts(),
-            "data_variance": float(payload.data_variance) if payload.data_variance is not None else None,
+            "data_variance": float(payload.data_variance)
+            if payload.data_variance is not None
+            else None,
             "modelling_space": payload.modelling_space,
             "domain": payload.domain,
             "attribute": payload.attribute,
@@ -362,9 +399,6 @@ class VariogramCodec:
             raise StageValidationError("VariogramData sill must be greater than zero.")
 
 
-AnyBlockModelData = Union[RegularBlockModelData, BlockModelData]
-
-
 def _rotation_to_dict(rotation: Rotation | None) -> dict[str, float] | None:
     if rotation is None:
         return None
@@ -386,83 +420,78 @@ def _rotation_from_dict(data: dict[str, Any] | None) -> Rotation | None:
 
 
 class BlockModelCodec:
-    """Codec for RegularBlockModelData and BlockModelData staged payloads."""
+    """Codec for BlockModelData staged payloads (standard/reference block models only).
+
+    Standard block models are imported from the Block Model Service as references
+    and are read-only — they cannot be published back.
+    """
 
     object_type: str = "block_model"
 
-    def to_stage_payload(
-        self, typed_object: AnyBlockModelData
-    ) -> AnyBlockModelData:
-        if not isinstance(typed_object, (RegularBlockModelData, BlockModelData)):
+    def to_stage_payload(self, typed_object: BlockModelData) -> BlockModelData:
+        if not isinstance(typed_object, BlockModelData):
             raise StageValidationError(
-                f"Expected RegularBlockModelData or BlockModelData, got {type(typed_object).__name__}."
+                f"Expected BlockModelData, got {type(typed_object).__name__}."
             )
         return typed_object
 
-    def from_stage_payload(
-        self, payload: AnyBlockModelData
-    ) -> AnyBlockModelData:
-        if not isinstance(payload, (RegularBlockModelData, BlockModelData)):
+    def from_stage_payload(self, payload: BlockModelData) -> BlockModelData:
+        if not isinstance(payload, BlockModelData):
             raise StageValidationError(
-                f"Expected RegularBlockModelData or BlockModelData in store, got {type(payload).__name__}."
+                f"Expected BlockModelData in store, got {type(payload).__name__}."
             )
         return payload
 
-    def to_dict(self, payload: AnyBlockModelData) -> dict[str, Any]:
-        """Serialize RegularBlockModelData or BlockModelData to a JSON-compatible dict."""
-        if isinstance(payload, BlockModelData):
-            g = payload.geometry
-            return {
-                "block_model_kind": "standard",
-                "name": payload.name,
-                "description": payload.description,
-                "tags": payload.tags,
-                "extensions": payload.extensions,
-                "coordinate_reference_system": payload.coordinate_reference_system,
-                "block_model_uuid": str(payload.block_model_uuid),
-                "block_model_version_uuid": (
-                    str(payload.block_model_version_uuid)
-                    if payload.block_model_version_uuid is not None
-                    else None
-                ),
-                "model_type": g.model_type,
-                "origin": {"x": float(g.origin.x), "y": float(g.origin.y), "z": float(g.origin.z)},
-                "n_blocks": {"nx": int(g.n_blocks.nx), "ny": int(g.n_blocks.ny), "nz": int(g.n_blocks.nz)},
-                "block_size": {"dx": float(g.block_size.dx), "dy": float(g.block_size.dy), "dz": float(g.block_size.dz)},
-                "rotation": _rotation_to_dict(g.rotation),
-                "attributes": [
-                    {
-                        "name": attr.name,
-                        "attribute_type": attr.attribute_type,
-                        "block_model_column_uuid": (
-                            str(attr.block_model_column_uuid)
-                            if attr.block_model_column_uuid is not None
-                            else None
-                        ),
-                        "unit": attr.unit,
-                    }
-                    for attr in payload.attributes
-                ],
-            }
-        # Regular block model
-        o = payload.origin
-        n = payload.n_blocks
-        b = payload.block_size
+    def to_dict(self, payload: BlockModelData) -> dict[str, Any]:
+        """Serialize BlockModelData to a JSON-compatible dict."""
+        g = payload.geometry
         return {
-            "block_model_kind": "regular",
+            "block_model_kind": "standard",
             "name": payload.name,
             "description": payload.description,
+            "tags": payload.tags,
+            "extensions": payload.extensions,
             "coordinate_reference_system": payload.coordinate_reference_system,
-            "size_unit_id": getattr(payload, "size_unit_id", None),
-            "origin": {"x": float(o.x), "y": float(o.y), "z": float(o.z)},
-            "n_blocks": {"nx": int(n.nx), "ny": int(n.ny), "nz": int(n.nz)},
-            "block_size": {"dx": float(b.dx), "dy": float(b.dy), "dz": float(b.dz)},
+            "block_model_uuid": str(payload.block_model_uuid),
+            "block_model_version_uuid": (
+                str(payload.block_model_version_uuid)
+                if payload.block_model_version_uuid is not None
+                else None
+            ),
+            "model_type": g.model_type,
+            "origin": {
+                "x": float(g.origin.x),
+                "y": float(g.origin.y),
+                "z": float(g.origin.z),
+            },
+            "n_blocks": {
+                "nx": int(g.n_blocks.nx),
+                "ny": int(g.n_blocks.ny),
+                "nz": int(g.n_blocks.nz),
+            },
+            "block_size": {
+                "dx": float(g.block_size.dx),
+                "dy": float(g.block_size.dy),
+                "dz": float(g.block_size.dz),
+            },
+            "rotation": _rotation_to_dict(g.rotation),
+            "attributes": [
+                {
+                    "name": attr.name,
+                    "attribute_type": attr.attribute_type,
+                    "block_model_column_uuid": (
+                        str(attr.block_model_column_uuid)
+                        if attr.block_model_column_uuid is not None
+                        else None
+                    ),
+                    "unit": attr.unit,
+                }
+                for attr in payload.attributes
+            ],
         }
 
-    def from_dict(self, data: dict[str, Any]) -> AnyBlockModelData:
-        """Reconstruct RegularBlockModelData or BlockModelData from a dict produced by to_dict()."""
-        kind = data.get("block_model_kind", "regular")
-
+    def from_dict(self, data: dict[str, Any]) -> BlockModelData:
+        """Reconstruct BlockModelData from a dict produced by to_dict()."""
         try:
             name = data["name"]
         except KeyError as exc:
@@ -490,48 +519,153 @@ class BlockModelCodec:
             dz=_coerce_float(b_d.get("dz"), "block_size.dz"),
         )
 
-        if kind == "standard":
-            bm_uuid_raw = data.get("block_model_uuid")
-            if not bm_uuid_raw:
-                raise StageValidationError(
-                    "Standard BlockModelData dict is missing 'block_model_uuid'."
-                )
-            bm_version_raw = data.get("block_model_version_uuid")
-            attrs_raw = data.get("attributes", [])
-            attributes = [
-                BlockModelAttribute(
-                    name=a["name"],
-                    attribute_type=a.get("attribute_type", "unknown"),
-                    block_model_column_uuid=(
-                        _uuid.UUID(a["block_model_column_uuid"])
-                        if a.get("block_model_column_uuid")
-                        else None
-                    ),
-                    unit=a.get("unit"),
-                )
-                for a in attrs_raw
-            ]
-            return BlockModelData(
-                name=name,
-                description=data.get("description"),
-                tags=data.get("tags") or {},
-                extensions=data.get("extensions"),
-                coordinate_reference_system=data.get("coordinate_reference_system"),
-                block_model_uuid=_uuid.UUID(str(bm_uuid_raw)),
-                block_model_version_uuid=(
-                    _uuid.UUID(str(bm_version_raw)) if bm_version_raw is not None else None
-                ),
-                geometry=BlockModelGeometry(
-                    model_type=data.get("model_type", "unknown"),
-                    origin=origin,
-                    n_blocks=n_blocks,
-                    block_size=block_size,
-                    rotation=_rotation_from_dict(data.get("rotation")),
-                ),
-                attributes=attributes,
+        bm_uuid_raw = data.get("block_model_uuid")
+        if not bm_uuid_raw:
+            raise StageValidationError(
+                "Standard BlockModelData dict is missing 'block_model_uuid'."
             )
+        bm_version_raw = data.get("block_model_version_uuid")
+        attrs_raw = data.get("attributes", [])
+        attributes = [
+            BlockModelAttribute(
+                name=a["name"],
+                attribute_type=a.get("attribute_type", "unknown"),
+                block_model_column_uuid=(
+                    _uuid.UUID(a["block_model_column_uuid"])
+                    if a.get("block_model_column_uuid")
+                    else None
+                ),
+                unit=a.get("unit"),
+            )
+            for a in attrs_raw
+        ]
+        return BlockModelData(
+            name=name,
+            description=data.get("description"),
+            tags=data.get("tags") or {},
+            extensions=data.get("extensions"),
+            coordinate_reference_system=data.get("coordinate_reference_system"),
+            block_model_uuid=_uuid.UUID(str(bm_uuid_raw)),
+            block_model_version_uuid=(
+                _uuid.UUID(str(bm_version_raw)) if bm_version_raw is not None else None
+            ),
+            geometry=BlockModelGeometry(
+                model_type=data.get("model_type", "unknown"),
+                origin=origin,
+                n_blocks=n_blocks,
+                block_size=block_size,
+                rotation=_rotation_from_dict(data.get("rotation")),
+            ),
+            attributes=attributes,
+        )
 
-        # Default: regular
+    def summarize(self, payload: BlockModelData) -> dict[str, Any]:
+        g = payload.geometry
+        n = g.n_blocks
+        b = g.block_size
+        total = n.nx * n.ny * n.nz
+        return {
+            "block_model_kind": "standard",
+            "model_type": g.model_type,
+            "total_blocks": total,
+            "nx": n.nx,
+            "ny": n.ny,
+            "nz": n.nz,
+            "block_size_dx": b.dx,
+            "block_size_dy": b.dy,
+            "block_size_dz": b.dz,
+            "attribute_count": len(payload.attributes),
+            "attribute_names": [attr.name for attr in payload.attributes],
+            "coordinate_reference_system": payload.coordinate_reference_system,
+        }
+
+    def validate(self, payload: BlockModelData) -> None:
+        if not isinstance(payload, BlockModelData):
+            raise StageValidationError(
+                f"Expected BlockModelData, got {type(payload).__name__}."
+            )
+        g = payload.geometry
+        b = g.block_size
+        if b.dx <= 0 or b.dy <= 0 or b.dz <= 0:
+            raise StageValidationError(
+                "BlockModelData block sizes must all be greater than zero."
+            )
+        n = g.n_blocks
+        if n.nx < 1 or n.ny < 1 or n.nz < 1:
+            raise StageValidationError("BlockModelData n_blocks must all be >= 1.")
+
+
+class RegularBlockModelCodec:
+    """Codec for RegularBlockModelData staged payloads (regular block models only).
+
+    Regular block models can be locally designed, imported from the workspace,
+    and published back to the workspace.
+    """
+
+    object_type: str = "regular_block_model"
+
+    def to_stage_payload(
+        self, typed_object: RegularBlockModelData
+    ) -> RegularBlockModelData:
+        if not isinstance(typed_object, RegularBlockModelData):
+            raise StageValidationError(
+                f"Expected RegularBlockModelData, got {type(typed_object).__name__}."
+            )
+        return typed_object
+
+    def from_stage_payload(
+        self, payload: RegularBlockModelData
+    ) -> RegularBlockModelData:
+        if not isinstance(payload, RegularBlockModelData):
+            raise StageValidationError(
+                f"Expected RegularBlockModelData in store, got {type(payload).__name__}."
+            )
+        return payload
+
+    def to_dict(self, payload: RegularBlockModelData) -> dict[str, Any]:
+        """Serialize RegularBlockModelData to a JSON-compatible dict."""
+        o = payload.origin
+        n = payload.n_blocks
+        b = payload.block_size
+        return {
+            "name": payload.name,
+            "description": payload.description,
+            "coordinate_reference_system": payload.coordinate_reference_system,
+            "size_unit_id": getattr(payload, "size_unit_id", None),
+            "origin": {"x": float(o.x), "y": float(o.y), "z": float(o.z)},
+            "n_blocks": {"nx": int(n.nx), "ny": int(n.ny), "nz": int(n.nz)},
+            "block_size": {"dx": float(b.dx), "dy": float(b.dy), "dz": float(b.dz)},
+        }
+
+    def from_dict(self, data: dict[str, Any]) -> RegularBlockModelData:
+        """Reconstruct RegularBlockModelData from a dict produced by to_dict()."""
+        try:
+            name = data["name"]
+        except KeyError as exc:
+            raise StageValidationError(
+                "RegularBlockModelData dict is missing required key 'name'."
+            ) from exc
+
+        origin_d = data.get("origin", {})
+        n_d = data.get("n_blocks", {})
+        b_d = data.get("block_size", {})
+
+        origin = Point3(
+            x=_coerce_float(origin_d.get("x"), "origin.x"),
+            y=_coerce_float(origin_d.get("y"), "origin.y"),
+            z=_coerce_float(origin_d.get("z"), "origin.z"),
+        )
+        n_blocks = Size3i(
+            nx=_coerce_int(n_d.get("nx"), "n_blocks.nx"),
+            ny=_coerce_int(n_d.get("ny"), "n_blocks.ny"),
+            nz=_coerce_int(n_d.get("nz"), "n_blocks.nz"),
+        )
+        block_size = Size3d(
+            dx=_coerce_float(b_d.get("dx"), "block_size.dx"),
+            dy=_coerce_float(b_d.get("dy"), "block_size.dy"),
+            dz=_coerce_float(b_d.get("dz"), "block_size.dz"),
+        )
+
         return RegularBlockModelData(
             name=name,
             description=data.get("description"),
@@ -542,27 +676,7 @@ class BlockModelCodec:
             block_size=block_size,
         )
 
-    def summarize(self, payload: AnyBlockModelData) -> dict[str, Any]:
-        if isinstance(payload, BlockModelData):
-            g = payload.geometry
-            n = g.n_blocks
-            b = g.block_size
-            total = n.nx * n.ny * n.nz
-            return {
-                "block_model_kind": "standard",
-                "model_type": g.model_type,
-                "total_blocks": total,
-                "nx": n.nx,
-                "ny": n.ny,
-                "nz": n.nz,
-                "block_size_dx": b.dx,
-                "block_size_dy": b.dy,
-                "block_size_dz": b.dz,
-                "attribute_count": len(payload.attributes),
-                "attribute_names": [attr.name for attr in payload.attributes],
-                "coordinate_reference_system": payload.coordinate_reference_system,
-            }
-        # Regular
+    def summarize(self, payload: RegularBlockModelData) -> dict[str, Any]:
         n = payload.n_blocks
         b = payload.block_size
         total = n.nx * n.ny * n.nz
@@ -582,24 +696,10 @@ class BlockModelCodec:
             "coordinate_reference_system": payload.coordinate_reference_system,
         }
 
-    def validate(self, payload: AnyBlockModelData) -> None:
-        if isinstance(payload, BlockModelData):
-            g = payload.geometry
-            b = g.block_size
-            if b.dx <= 0 or b.dy <= 0 or b.dz <= 0:
-                raise StageValidationError(
-                    "BlockModelData block sizes must all be greater than zero."
-                )
-            n = g.n_blocks
-            if n.nx < 1 or n.ny < 1 or n.nz < 1:
-                raise StageValidationError(
-                    "BlockModelData n_blocks must all be >= 1."
-                )
-            return
-
+    def validate(self, payload: RegularBlockModelData) -> None:
         if not isinstance(payload, RegularBlockModelData):
             raise StageValidationError(
-                f"Expected RegularBlockModelData or BlockModelData, got {type(payload).__name__}."
+                f"Expected RegularBlockModelData, got {type(payload).__name__}."
             )
         b = payload.block_size
         if b.dx <= 0 or b.dy <= 0 or b.dz <= 0:
@@ -616,6 +716,7 @@ class BlockModelCodec:
 _POINT_SET_CODEC = PointSetCodec()
 _VARIOGRAM_CODEC = VariogramCodec()
 _BLOCK_MODEL_CODEC = BlockModelCodec()
+_REGULAR_BLOCK_MODEL_CODEC = RegularBlockModelCodec()
 
 
 def get_codec(object_type: str) -> Codec:
@@ -626,4 +727,6 @@ def get_codec(object_type: str) -> Codec:
         return _VARIOGRAM_CODEC
     if object_type == "block_model":
         return _BLOCK_MODEL_CODEC
+    if object_type == "regular_block_model":
+        return _REGULAR_BLOCK_MODEL_CODEC
     raise StageValidationError(f"Unknown object_type: {object_type!r}")

@@ -211,13 +211,13 @@ def register_block_model_tools(mcp) -> None:
             extent_source="explicit_extents",
         )
         envelope = staging_service.stage_local_build(
-            object_type="block_model",
+            object_type="regular_block_model",
             typed_payload=typed_data,
         )
         n_blocks = typed_data.n_blocks
         object_registry.register(
             name=object_name,
-            object_type="block_model",
+            object_type="regular_block_model",
             stage_id=envelope.stage_id,
             summary={"total_blocks": n_blocks.nx * n_blocks.ny * n_blocks.nz},
         )
@@ -230,10 +230,15 @@ def register_block_model_tools(mcp) -> None:
         """Inspect and summarize a block model definition by name."""
         try:
             entry, parsed = object_registry.get_payload(
-                name=block_model_name, object_type="block_model"
+                name=block_model_name, object_type="regular_block_model"
             )
-        except (StageError, ResolutionError) as exc:
-            raise ValueError(str(exc)) from exc
+        except (StageError, ResolutionError):
+            try:
+                entry, parsed = object_registry.get_payload(
+                    name=block_model_name, object_type="block_model"
+                )
+            except (StageError, ResolutionError) as exc:
+                raise ValueError(str(exc)) from exc
 
         if isinstance(parsed, BlockModelData):
             g = parsed.geometry

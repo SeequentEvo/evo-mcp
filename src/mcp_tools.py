@@ -7,6 +7,12 @@ A FastMCP server that provides tools for interacting with the Evo platform,
 including workspace management, object ops, and data transfer.
 
 Configuration:
+    Set MCP_DEV_MODE=true to enable dev mode:
+    - Enables dev tools for staging inspection and fixture management
+    - Use seed_fixtures(fixture_file, fixture_names) to load skill-specific fixtures
+    - Use reset_staging() to clear state between eval runs
+    - Fixtures are available for the full session (24-hour TTL)
+
     Set MCP_TOOL_FILTER environment variable to filter tools and prompts:
     - "admin" : Workspace management tools
     - "data"    : Object query and management tools
@@ -38,7 +44,15 @@ from evo_mcp.tools import (
     register_general_tools,
     register_filesystem_tools,
     register_object_builder_tools,
+    register_object_management_tools,
     register_instance_users_admin_tools,
+    register_point_set_tools,
+    register_block_model_tools,
+    register_variogram_tools,
+    register_search_neighborhood_tools,
+    register_spatial_tools,
+    register_dev_tools,
+    register_visualisation_tools,
 )
 
 
@@ -75,6 +89,8 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
     TOOL_FILTER = "all"
 
+DEV_MODE = os.getenv("MCP_DEV_MODE", "").lower() in ("1", "true", "yes")
+
 # Initialize FastMCP server with agent type in name for clarity
 server_name = (
     "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
@@ -105,6 +121,11 @@ def _get_objects_reference_content() -> str:
 # Always register general tools (workspace discovery, object queries, etc.)
 register_general_tools(mcp)
 
+# Dev tools — only register in dev mode (staging is internal infrastructure)
+if DEV_MODE:
+    register_dev_tools(mcp)
+    print("DEV MODE: Dev tools registered (use seed_fixtures to load skill fixtures)")
+
 if TOOL_FILTER in ["all", "admin"]:
     # Admin Agent: Workspace and instance management tools
     # Includes: workspace creation, snapshots, duplication, permissions management
@@ -114,6 +135,11 @@ if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
+    # Import/publish tools in object_management_tools
+    register_object_management_tools(mcp)
+    register_point_set_tools(mcp)
+    register_block_model_tools(mcp)
+    register_variogram_tools(mcp)
     if TOOL_FILTER == "data":
         print("Evo MCP Server configured for Data Agent")
     else:
@@ -121,6 +147,9 @@ if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
 
 if TOOL_FILTER in ["all", "compute"]:
     register_compute_tools(mcp)
+    register_search_neighborhood_tools(mcp)
+    register_spatial_tools(mcp)
+    register_visualisation_tools(mcp)
     if TOOL_FILTER == "compute":
         print("Evo MCP Server configured for Compute Agent")
     else:

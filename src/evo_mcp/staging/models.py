@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
-ObjectType = Literal["point_set", "block_model", "variogram"]
+ObjectType = Literal["point_set", "block_model", "regular_block_model", "variogram"]
 SourceType = Literal["imported", "built_local", "cloned", "mutated"]
 StageStatus = Literal["active", "published", "expired", "discarded"]
 

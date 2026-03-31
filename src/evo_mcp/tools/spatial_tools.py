@@ -49,12 +49,17 @@ def register_spatial_tools(mcp) -> None:
 
         try:
             target_entry, target_payload = object_registry.get_payload(
-                name=target_name, object_type="block_model"
+                name=target_name, object_type="regular_block_model"
             )
-        except (ResolutionError, Exception) as exc:
-            raise ValueError(
-                f"Could not resolve target '{target_name}' as a block model."
-            ) from exc
+        except (ResolutionError, Exception):
+            try:
+                target_entry, target_payload = object_registry.get_payload(
+                    name=target_name, object_type="block_model"
+                )
+            except (ResolutionError, Exception) as exc:
+                raise ValueError(
+                    f"Could not resolve target '{target_name}' as a block model."
+                ) from exc
 
         source_crs = extract_crs(source_payload)
         target_crs = extract_crs(target_payload)
