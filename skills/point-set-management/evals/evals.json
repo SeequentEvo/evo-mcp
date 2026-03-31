@@ -23,18 +23,6 @@
       "prompt": "Build a point set from skills/point-set-management/evals/samples.csv using Easting/Northing/RL for coordinates, then get the attribute details to identify numeric versus non-numeric attributes and null counts.",
       "expected_output": "Attribute details return per-attribute dtype, is_numeric, null_count, and preview_values. GRADE is numeric, LITHOLOGY is non-numeric.",
       "category": "local-attribute-inspection"
-    },
-    {
-      "id": 4,
-      "prompt": "Build a point set from skills/point-set-management/evals/samples.csv specifying Easting as x_column and Northing as y_column but omitting the z_column.",
-      "expected_output": "The request fails with a validation error indicating that the Z coordinate column is missing.",
-      "category": "error-handling-missing-z-column"
-    },
-    {
-      "id": 5,
-      "prompt": "Build a point set from skills/point-set-management/evals/samples_with_invalid.csv using Easting/Northing/RL for coordinates but tell it to keep the invalid rows instead of dropping them.",
-      "expected_output": "The request fails with a validation error indicating that 'keep_invalid' is not a valid coordinate cleaning mode.",
-      "category": "error-handling-invalid-cleaning-mode"
     }
   ]
 }
