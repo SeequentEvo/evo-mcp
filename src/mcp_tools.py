@@ -24,14 +24,17 @@ The environment variables can be set in a .env file or
 passed directly to the MCP server as input parameters.
 """
 
-import os
+import json as _json
 import logging
+import os
 from pathlib import Path
+
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import configure_logging
+from starlette.middleware import Middleware
+from starlette.types import ASGIApp, Receive, Scope, Send
+
 from evo_mcp.client_auth import create_auth_provider
-
-
 from evo_mcp.tools import (
     register_admin_tools,
     # register_data_tools,
@@ -354,9 +357,6 @@ if __name__ == "__main__":
 
     # Run the server with selected transport mode
     if TRANSPORT == "http":
-        import json as _json
-        from starlette.middleware import Middleware
-        from starlette.types import ASGIApp, Receive, Scope, Send
 
         class AuthMetadataPatchMiddleware:
             """Patches the OAuth metadata to advertise 'none' as a supported

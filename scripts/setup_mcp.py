@@ -145,7 +145,31 @@ def prompt_auth_method(current_value: str | None) -> str:
     return AUTH_METHOD_CHOICES[choice]
 
 
-def prompt_tool_filter(current_value: str | None) -> str:
+def prompt_delegated_auth(current_value: str | None) -> str:
+    """Prompt for client-delegated authentication mode."""
+    print()
+    print("Enable client-delegated authentication?")
+    print("When enabled, each MCP client authenticates independently via")
+    print("browser-based OAuth — no shared credentials on the server.")
+    print()
+    print("1. Yes — each client signs in with their own Bentley account (recommended)")
+    print("2. No  — the server authenticates once and shares the session")
+    print()
+
+    if current_value:
+        print(f"Current value: {current_value}")
+        if is_confirmed():
+            return current_value
+
+    choice = prompt_choice(
+        "Enter your choice [1-2] (default: 1): ",
+        {"1", "2"},
+        "1",
+        "Invalid choice. Please enter 1 or 2.",
+    )
+    return "true" if choice == "1" else "false"
+
+
     """Prompt for MCP tool filter selection."""
     print()
     print("Select which tools to enable:")
@@ -730,6 +754,12 @@ def main():
 
         print()
         protocol, env_values = get_protocol_choice(env_values)
+
+        if protocol == "http" and env_values.get("AUTH_METHOD") == "native_app":
+            current_delegated = load_env_file(project_dir).get("CLIENT_DELEGATED_AUTH")
+            env_values["CLIENT_DELEGATED_AUTH"] = prompt_delegated_auth(current_delegated)
+        else:
+            env_values["CLIENT_DELEGATED_AUTH"] = "false"
 
         write_env_file(project_dir, env_values)
         print()

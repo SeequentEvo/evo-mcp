@@ -9,9 +9,10 @@ This package provides tools for interacting with the Evo platform,
 including workspace management, object operations, and data transfer capabilities.
 """
 
-from .context import get_evo_context
 import importlib.metadata
 from pathlib import Path
+
+from .context import get_evo_context
 
 try:
     import tomllib
