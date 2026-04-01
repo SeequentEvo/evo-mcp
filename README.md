@@ -236,7 +236,7 @@ Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app
 
 ##### Evo app credentials
 
-You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
+You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account to access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
 
 Fill in your app credentials in the `.env` file:
 ```bash
@@ -373,7 +373,7 @@ python scripts/setup_mcp.py
   - For HTTP mode, use `templates/cursor-http-config.json` instead.
   - Update the template URL host and port to match `MCP_HTTP_HOST` and `MCP_HTTP_PORT` in your `.env`, and ensure the HTTP server is running.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
-3. Search for "mcp". Select either **View: Open MCP Settings** to update the user settings.
+3. Search for "mcp". Select **View: Open MCP Settings** to update the user settings.
   ![Cursor Command Palette](images/cursor-command-palette.png)
 
 4. Click the **Add Custom MCP** button.

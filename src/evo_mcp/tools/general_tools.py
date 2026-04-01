@@ -167,8 +167,11 @@ def register_general_tools(mcp):
                     "path": obj.path,
                     "schema_id": obj.schema_id.sub_classification,
                     "version_id": obj.version_id,
-                    "created_at": obj.created_at.isoformat() if obj.created_at else None,
-                    # "updated_at": obj.updated_at.isoformat() if obj.updated_at else None,
+                    "created_at": obj.created_at,
+                    "created_by": obj.created_by,
+                    "modified_at": obj.modified_at,
+                    "modified_by": obj.modified_by,
+                    "stage": obj.stage
                 }
                 for obj in objects.items()
             ]
@@ -210,8 +213,11 @@ def register_general_tools(mcp):
             "path": obj.metadata.path,
             "schema_id": obj.metadata.schema_id.sub_classification,
             "version_id": obj.metadata.version_id,
-            "created_at": obj.metadata.created_at.isoformat() if obj.metadata.created_at else None,
-            #"updated_at": obj.metadata.updated_at.isoformat() if obj.metadata.updated_at else None,
+            "created_at": obj.metadata.created_at,
+            "created_by": obj.metadata.created_by,
+            "modified_at": obj.metadata.modified_at,
+            "modified_by": obj.metadata.modified_by,
+            "stage": obj.metadata.stage,
         }
 
 
