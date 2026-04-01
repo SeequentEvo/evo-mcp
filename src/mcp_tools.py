@@ -37,7 +37,9 @@ from evo_mcp.tools import (
     register_filesystem_tools,
     register_object_builder_tools,
     register_file_tools,
-    register_instance_users_admin_tools
+    register_instance_users_admin_tools,
+    register_duplicate_tools,
+    register_object_compare_tools,
 )
 
 # Get transport mode from environment variable
@@ -97,6 +99,8 @@ if TOOL_FILTER in ["all", "admin"]:
     # Includes: workspace creation, snapshots, duplication, permissions management
     register_admin_tools(mcp)
     register_instance_users_admin_tools(mcp)
+    register_duplicate_tools(mcp)
+    register_object_compare_tools(mcp)
 if TOOL_FILTER in ["all", "data"]: #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
@@ -154,6 +158,8 @@ if TOOL_FILTER == "all":
         - Listing users in the instance and their roles
         - Adding or removing users from the instance
         - Updating user roles in the instance
+        - Comparing two objects across workspaces or instances in detail
+        - Inspecting linked Parquet blob schemas and metadata for two objects
 
         When a user asks about workspaces, use the available MCP tools to provide accurate information.
         Always be clear about what workspace you're working with.
@@ -190,6 +196,7 @@ if TOOL_FILTER in ["all", "admin"]:
         - Managing user permissions and access control
         - Health checks and status monitoring
         - Selecting instances (organizations) to work with
+        - Comparing two objects across workspaces or instances in detail
 
         When a user asks about workspaces, use the available MCP tools to provide accurate information.
         Always be clear about what workspace you're working with.
