@@ -30,18 +30,18 @@ Use this skill when the user wants to:
 
 ## Code-Generated Visualization
 
-Some geoscience objects — particularly **variograms** and **search ellipsoids** — are not supported by the Evo Viewer. This skill does not handle visualization for those object types. When a user requests visualization for an unsupported type, explain that it cannot be shown in the Evo Viewer and that code-generated visualization (e.g., plotly) is required.
+Some geoscience objects -- particularly **variograms** and **search ellipsoids** -- are not supported by the Evo Viewer. This skill does not handle visualization for those object types. When a user requests visualization for an unsupported type, explain that it cannot be shown in the Evo Viewer and that code-generated visualization (e.g., plotly) is required.
 
 ### Supported Object Types
 
 | Object Type | Evo Viewer? |
 |---|---|
-| Point sets | ✅ Yes |
-| Block models | ✅ Yes |
-| Regular 3D grids | ✅ Yes |
-| Variogram ellipsoids | ❌ Not supported by this skill |
-| Variogram curves | ❌ Not supported by this skill |
-| Search ellipsoids | ❌ Not supported by this skill |
+| Point sets | [Y] Yes |
+| Block models | [Y] Yes |
+| Regular 3D grids | [Y] Yes |
+| Variogram ellipsoids | [N] Not supported by this skill |
+| Variogram curves | [N] Not supported by this skill |
+| Search ellipsoids | [N] Not supported by this skill |
 
 ## Required Inputs
 
