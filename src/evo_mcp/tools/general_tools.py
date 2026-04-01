@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastmcp import Context
 
-from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.context import get_evo_context
 
 # Set up logging to file for debugging
 logging.basicConfig(
@@ -34,6 +34,7 @@ def register_general_tools(mcp):
         """
         results = {}
         
+        evo_context = await get_evo_context()
         if evo_context.workspace_client:
             workspace_health = await evo_context.workspace_client.get_service_health()
             results["workspace_service"] = {
@@ -42,7 +43,6 @@ def register_general_tools(mcp):
             }
         
         if workspace_id:
-            await ensure_initialized()
             object_client = await evo_context.get_object_client(UUID(workspace_id))
             object_health = await object_client.get_service_health()
             results["object_service"] = {
@@ -65,7 +65,7 @@ def register_general_tools(mcp):
             deleted: Include deleted workspaces
             limit: Maximum number of results
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         
         workspaces = await evo_context.workspace_client.list_workspaces(
             name=name if name else None,
@@ -96,7 +96,7 @@ def register_general_tools(mcp):
             workspace_id: Workspace UUID (provide either this or workspace_name)
             workspace_name: Workspace name (provide either this or workspace_id)
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         
         if workspace_id:
             workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
@@ -139,9 +139,7 @@ def register_general_tools(mcp):
         logger.info(f"evo_list_objects called with workspace_id={workspace_id}, schema_id={schema_id}")
         
         try:
-            logger.debug("Calling ensure_initialized()")
-            await ensure_initialized()
-            logger.debug("ensure_initialized() completed successfully")
+            evo_context = await get_evo_context()
             
             logger.debug(f"Getting object client for workspace {workspace_id}")
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -197,7 +195,7 @@ def register_general_tools(mcp):
             object_path: Object path (provide either this or object_id)
             version: Specific version ID (optional)
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         
         if object_id:
@@ -226,7 +224,7 @@ def register_general_tools(mcp):
         ctx: Context,
     ) -> list[dict]:
         """List instances the user has access to."""
-        await ensure_initialized()
+        evo_context = await get_evo_context()
 
         if evo_context.org_id:
             await ctx.info(f"Selected instance ID {evo_context.org_id}")
@@ -249,7 +247,7 @@ def register_general_tools(mcp):
             instance_id: Instance UUID (provide either this or instance_name)
             instance_name: Instance name (provide either this or instance_id)
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
 
         instances = await evo_context.discovery_client.list_organizations()
         for instance in instances:

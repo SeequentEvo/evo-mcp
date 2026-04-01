@@ -5,18 +5,18 @@ from typing import Callable
 from evo.workspaces.endpoints import InstanceUsersApi
 from evo.workspaces.endpoints.models import AddInstanceUsersRequest, UserRoleMapping
 
-from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.context import get_evo_context
 
+async def get_workspace_client():
+    evo_context = await get_evo_context()
+    if workspace_client := evo_context.workspace_client:
+        return workspace_client
+    else:
+        raise ValueError("Please ensure you are connected to an instance.")
 
 def register_instance_users_admin_tools(mcp):
     """Register tools for managing instance users with the FastMCP server."""
 
-    async def get_workspace_client():
-        await ensure_initialized()
-        if workspace_client := evo_context.workspace_client:
-            return workspace_client
-        else:
-            raise ValueError("Please ensure you are connected to an instance.")
   
     @mcp.tool()
     async def get_users_in_instance(

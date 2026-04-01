@@ -25,7 +25,7 @@ from uuid import UUID
 import pandas as pd
 
 from evo.common.utils import Cache
-from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.context import get_evo_context
 from evo_mcp.utils.object_builders import (
     PointsetBuilder,
     LineSegmentsBuilder,
@@ -153,7 +153,7 @@ def register_object_builder_tools(mcp):
             }
         
         # Create the object
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -342,7 +342,7 @@ def register_object_builder_tools(mcp):
             }
         
         # Create the object
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -595,7 +595,7 @@ def register_object_builder_tools(mcp):
             }
         
         # Create the object
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -800,7 +800,7 @@ def register_object_builder_tools(mcp):
             }
         
         # Create the object
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))

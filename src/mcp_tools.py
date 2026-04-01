@@ -24,12 +24,17 @@ The environment variables can be set in a .env file or
 passed directly to the MCP server as input parameters.
 """
 
-import os
+import json as _json
 import logging
+import os
 from pathlib import Path
+
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import configure_logging
+from starlette.middleware import Middleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
+from evo_mcp.client_auth import create_auth_provider
 from evo_mcp.tools import (
     register_admin_tools,
     # register_data_tools,
@@ -49,9 +54,36 @@ if TRANSPORT not in VALID_TRANSPORTS:
     TRANSPORT = "stdio"
 
 # Get HTTP configuration if using HTTP transport
-if TRANSPORT == "http":
-    HTTP_HOST = os.getenv("MCP_HTTP_HOST", "localhost")
-    HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
+HTTP_HOST = os.getenv("MCP_HTTP_HOST", "localhost")
+HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
+
+# Whether to enable OAuth authentication for HTTP transport.
+# When enabled, the server acts as an OIDC proxy: MCP clients authenticate
+# via an OAuth browser flow (Dynamic Client Registration + PKCE), and the
+# server validates each request's token before forwarding it to Evo APIs.
+# This enables client-delegated auth — each connected client authenticates
+# independently and sees only the instances/workspaces their account has access to.
+#
+# Disable if:
+#   - The server is behind a reverse proxy that already enforces auth
+#   - You are doing local development and don't want to deal with OAuth
+#   - You want server-managed auth (set AUTH_METHOD=client_credentials or
+#     native_app and let the server handle authentication)
+#
+# Defaults to False. Set to true only when MCP_TRANSPORT=http.
+
+if os.getenv("CLIENT_DELEGATED_AUTH", "").lower()in ("1", "true", "yes"):
+    CLIENT_DELEGATED_AUTH = True
+else:
+    CLIENT_DELEGATED_AUTH = False  # default: off unless explicitly enabled
+
+if CLIENT_DELEGATED_AUTH and TRANSPORT != "http":
+    logging.warning(
+        "CLIENT_DELEGATED_AUTH=true has no effect with MCP_TRANSPORT='%s' — "
+        "OAuth authentication is only supported with HTTP transport. Ignoring.",
+        TRANSPORT,
+    )
+    CLIENT_DELEGATED_AUTH = False
 
 # Get agent type from environment variable
 # This can either be set via MCP inputs, or the .env file used by the agent example
@@ -66,9 +98,14 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
     TOOL_FILTER = "all"
 
+
+
+
+
 # Initialize FastMCP server with agent type in name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
-mcp = FastMCP(server_name)
+auth_provider = create_auth_provider(f"http://{HTTP_HOST}:{HTTP_PORT}") if CLIENT_DELEGATED_AUTH else None
+mcp = FastMCP(server_name, auth=auth_provider)
 
 # Show more traceback frame for now, we may want to disabled the rich
 # traceback formatting entirely too.
@@ -308,7 +345,7 @@ if TOOL_FILTER in ["all", "data"]:
     
 
 # Note: Evo context initialization happens lazily on first tool call
-# via ensure_initialized() because OAuth requires browser interaction
+# via get_evo_context() because OAuth requires browser interaction
 # =============================================================================
 # Main Entry Point
 # =============================================================================
@@ -320,11 +357,95 @@ if __name__ == "__main__":
 
     # Run the server with selected transport mode
     if TRANSPORT == "http":
+
+        class AuthMetadataPatchMiddleware:
+            """Patches the OAuth metadata to advertise 'none' as a supported
+            token endpoint auth method, which is required for public MCP
+            clients (like VS Code) that don't have a client secret.
+
+            The MCP SDK hardcodes only ["client_secret_post", "client_secret_basic"],
+            but the OIDCProxy's DCR endpoint actually accepts "none".
+            """
+
+            def __init__(self, app: ASGIApp) -> None:
+                self.app = app
+
+            async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+                if scope["type"] != "http":
+                    await self.app(scope, receive, send)
+                    return
+
+                path = scope.get("path", "")
+                method = scope.get("method", "?")
+                print(f"[req] {method} {path}", flush=True)
+
+                if not path.startswith("/.well-known/oauth-authorization-server"):
+                    await self.app(scope, receive, send)
+                    return
+
+                # Capture response body, patch token_endpoint_auth_methods_supported
+                response_body = bytearray()
+                response_started = False
+                original_headers = []
+                original_status = 200
+
+                async def capture_send(message):
+                    nonlocal response_started, original_headers, original_status
+                    if message["type"] == "http.response.start":
+                        response_started = True
+                        original_status = message.get("status", 200)
+                        original_headers = list(message.get("headers", []))
+                    elif message["type"] == "http.response.body":
+                        response_body.extend(message.get("body", b""))
+
+                await self.app(scope, receive, capture_send)
+
+                try:
+                    data = _json.loads(bytes(response_body))
+                    methods = data.get("token_endpoint_auth_methods_supported", [])
+                    if "none" not in methods:
+                        methods.append("none")
+                        data["token_endpoint_auth_methods_supported"] = methods
+                    patched = _json.dumps(data).encode()
+
+                    # Update content-length header
+                    new_headers = [
+                        (k, v) for k, v in original_headers
+                        if k != b"content-length"
+                    ]
+                    new_headers.append(
+                        (b"content-length", str(len(patched)).encode())
+                    )
+
+                    await send({
+                        "type": "http.response.start",
+                        "status": original_status,
+                        "headers": new_headers,
+                    })
+                    await send({
+                        "type": "http.response.body",
+                        "body": patched,
+                    })
+                    print(f"[req] Patched auth metadata: added 'none' to token_endpoint_auth_methods_supported", flush=True)
+                except Exception:
+                    # If parsing fails, send original response unchanged
+                    await send({
+                        "type": "http.response.start",
+                        "status": original_status,
+                        "headers": original_headers,
+                    })
+                    await send({
+                        "type": "http.response.body",
+                        "body": bytes(response_body),
+                    })
+
         logger.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
         mcp.run(
             transport="http",
             host=HTTP_HOST,
             port=HTTP_PORT,
+            log_level="debug",
+            middleware=[Middleware(AuthMetadataPatchMiddleware)],
         )
     else:
         # Default STDIO mode
