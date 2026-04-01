@@ -14,16 +14,17 @@ See ``evo_mcp/contexts/`` for the class implementations:
   - delegated.py  — DelegatedAuthContext (CLIENT_DELEGATED_AUTH=true)
 """
 
-import hashlib
+import asyncio
 import logging
 import os
+import shutil
 from pathlib import Path
 
 from cachetools import TTLCache
 from dotenv import load_dotenv
-from fastmcp.server.dependencies import get_access_token, get_http_request
 
 from evo_mcp.contexts import EvoContextBase, ManagedAuthContext, DelegatedAuthContext
+from evo_mcp.contexts.helpers import get_client_session_info
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -35,9 +36,6 @@ log_handler = logging.FileHandler("mcp_tools_debug.log")
 log_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
 logger.addHandler(log_handler)
 
-# ---------------------------------------------------------------------------
-# Module-level registry
-# ---------------------------------------------------------------------------
 
 delegated_mode: bool = False
 managed_context: ManagedAuthContext = ManagedAuthContext()
@@ -46,6 +44,7 @@ SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "3600"))
 delegated_contexts: TTLCache[str, DelegatedAuthContext] = TTLCache(
     maxsize=float("inf"), ttl=SESSION_TTL_SECONDS
 )
+session_locks: dict[str, asyncio.Lock] = {}
 
 CLIENT_DELEGATED_AUTH_ENV = os.getenv("CLIENT_DELEGATED_AUTH", "false").lower()
 if CLIENT_DELEGATED_AUTH_ENV in ("true", "1", "yes"):
@@ -55,63 +54,32 @@ else:
     delegated_mode = False
     logger.info("Using managed authentication mode")
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def get_client_session_id() -> str:
-    """Return a stable identifier for the current MCP client session.
-
-    Prefers the ``mcp-session-id`` HTTP header (set by Streamable HTTP
-    transport).  Falls back to a hash of the access token if no session header is available.
-    """
-    try:
-        request = get_http_request()
-        session_id = request.headers.get("mcp-session-id")
-        if session_id:
-            return session_id
-    except RuntimeError:
-        pass  # no HTTP request available
-    token_obj = get_access_token()
-    if not token_obj:
-        raise RuntimeError("No FastMCP access token available in delegated auth mode")
-    return hashlib.sha256(token_obj.token.encode()).hexdigest()[:16]
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
 
 async def get_evo_context() -> EvoContextBase:
     """Return an initialized context for the current request.
 
     In managed mode, returns the single shared ManagedAuthContext.
     In delegated mode, looks up (or creates) a DelegatedAuthContext
-    keyed by the MCP session ID.  If the context already exists (i.e.
-    the session is known), the access token is hot-swapped so that
-    instance and workspace selection survive token refreshes.
+    keyed by the MCP session ID.  On every request the context is
+    re-initialized with the current access token, rebuilding API clients
+    cleanly while preserving instance selection via seeds.
     """
     if not delegated_mode:
         await managed_context.initialize()
         return managed_context
 
-    token_obj = get_access_token()
-    if not token_obj:
-        raise RuntimeError("No FastMCP access token available in delegated auth mode")
-    upstream_access_token = token_obj.token
-    session_id = get_client_session_id()
 
-    context = delegated_contexts.get(session_id)
-    if context is not None:
-        context.update_access_token(upstream_access_token)
-        # Re-insert to reset TTL timer
+    session_id, upstream_access_token = get_client_session_info()
+
+    # Per-session lock prevents duplicate context creation when
+    # concurrent requests arrive for the same new session.
+    lock = session_locks.setdefault(session_id, asyncio.Lock())
+    async with lock:
+        context = delegated_contexts.get(session_id)
+        if context is None:
+            context = DelegatedAuthContext(client_session_id=session_id)
+        await context.initialize(upstream_access_token)
+        # Re-insert resets TTL timer
         delegated_contexts[session_id] = context
         return context
 
-    # New session
-    context = DelegatedAuthContext(client_session_id=session_id, access_token=upstream_access_token)
-    await context.initialize()
-    delegated_contexts[session_id] = context
-    logger.debug("Created new delegated context for session %s", session_id[:8])
-    return context

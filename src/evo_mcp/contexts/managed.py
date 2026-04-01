@@ -7,6 +7,7 @@
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
@@ -25,6 +26,10 @@ from .base import EvoContextBase
 
 logger = logging.getLogger(__name__)
 
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent
+_CACHE_PATH = _REPO_ROOT / ".cache"
+_CACHE_PATH.mkdir(parents=True, exist_ok=True)
+
 
 class ManagedAuthContext(EvoContextBase):
     """Single-user context with server-managed OAuth.
@@ -35,8 +40,10 @@ class ManagedAuthContext(EvoContextBase):
     """
 
     def __init__(self):
-        super()._init__()
+        super().__init__()
         self.initialized: bool = False
+        self.cache_path = _CACHE_PATH
+        self.cache_path.mkdir(parents=True, exist_ok=True)
 
     # -- Token cache --------------------------------------------------------
 
@@ -56,7 +63,7 @@ class ManagedAuthContext(EvoContextBase):
             logger.debug("Cached token appears to be valid and not expired.")
             return access_token
         except Exception as e:
-            logger.info("Cached token invalid or expired: %s - %s", type(e)._name__, e)
+            logger.info("Cached token invalid or expired: %s - %s", type(e).__name__, e)
             return None
 
     def save_access_token_to_cache(self, access_token: str) -> None:
@@ -65,7 +72,8 @@ class ManagedAuthContext(EvoContextBase):
             json.dump({"access_token": access_token}, f)
         logger.info("Access token saved to cache at %s", token_cache_path)
 
-    # -- Variable cache (org_id, hub_url) -----------------------------------
+
+    # -- Auth ---------------------------------------------------------------
 
     def load_variables_from_cache(self) -> None:
         try:
@@ -87,7 +95,7 @@ class ManagedAuthContext(EvoContextBase):
         with open(self.cache_path / "variables.json", "w", encoding="utf-8") as f:
             json.dump(variables, f)
 
-    # -- Auth ---------------------------------------------------------------
+    # -- OAuth flows --------------------------------------------------------
 
     async def get_access_token_via_client_credentials(self) -> str:
         logger.debug("Obtaining a new service token")

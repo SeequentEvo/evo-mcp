@@ -21,11 +21,6 @@ from evo.workspaces import WorkspaceAPIClient
 
 logger = logging.getLogger(__name__)
 
-_REPO_ROOT = Path(__file__).parent.parent.parent.parent
-_CACHE_PATH = _REPO_ROOT / ".cache"
-if not _CACHE_PATH.exists():
-    _CACHE_PATH.mkdir()
-
 
 class EvoContextBase(ABC):
     """Shared interface for Evo context objects.
@@ -37,7 +32,7 @@ class EvoContextBase(ABC):
 
     def __init__(self):
         self.transport: Optional[AioTransport] = None
-        self.cache_path: Path = _CACHE_PATH
+        self.cache_path: Optional[Path] = None
         self.connector: Optional[APIConnector] = None
         self.workspace_client: Optional[WorkspaceAPIClient] = None
         self.discovery_client: Optional[DiscoveryAPIClient] = None

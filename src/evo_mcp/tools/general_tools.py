@@ -224,7 +224,7 @@ def register_general_tools(mcp):
         ctx: Context,
     ) -> list[dict]:
         """List instances the user has access to."""
-        evo_context = await get_evo_context(ctx)
+        evo_context = await get_evo_context()
 
         if evo_context.org_id:
             await ctx.info(f"Selected instance ID {evo_context.org_id}")
