@@ -2,10 +2,12 @@
 name = "evo-mcp"
 version = "0.1.0"
 description = "An MCP server implementation using Evo SDK"
+license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
-    "fastmcp>=2.12.5",
+    "fastmcp>=3.0.2",
     "google-adk==1.22.1",
+    "evo-files>=0.2.4",
     "evo-objects>=0.3.3",
     "evo-sdk-common>=0.5.13",
     "evo-schemas>=2025.9.2",
@@ -21,4 +23,5 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "reuse",
 ]
