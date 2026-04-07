@@ -15,7 +15,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from itertools import combinations
-from typing import Any
+from typing import Any, Awaitable, Callable
 from uuid import UUID
 
 from evo.common.data import Environment
@@ -24,6 +24,63 @@ from evo.objects import ObjectAPIClient
 from evo_mcp.context import evo_context, ensure_initialized
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_WORKSPACE_PAGE_SIZE = 100
+DEFAULT_OBJECT_PAGE_SIZE = 100
+MIN_PAGE_SIZE = 1
+LIST_REQUEST_TIMEOUT_SECONDS = 60
+OBJECT_FETCH_TIMEOUT_SECONDS = 60
+
+
+def _is_pagination_limit_error(exc: Exception) -> bool:
+    return "pagination limit exceeded" in str(exc).lower()
+
+
+async def _list_all_pages(
+    fetch_page: Callable[..., Awaitable[Any]],
+    *,
+    page_size: int,
+    resource_name: str,
+) -> list[Any]:
+    current_page_size = max(MIN_PAGE_SIZE, page_size)
+
+    while True:
+        items: list[Any] = []
+        offset = 0
+
+        try:
+            while True:
+                page = await fetch_page(
+                    offset=offset,
+                    limit=current_page_size,
+                    request_timeout=LIST_REQUEST_TIMEOUT_SECONDS,
+                )
+                page_items = page.items()
+                if not page_items and not page.is_last:
+                    raise RuntimeError(
+                        f"No pagination progress while listing {resource_name}: "
+                        f"offset={offset}, limit={current_page_size}, total={page.total}"
+                    )
+
+                items.extend(page_items)
+                if page.is_last:
+                    return items
+                offset = page.next_offset
+        except Exception as exc:
+            if not _is_pagination_limit_error(exc) or current_page_size <= MIN_PAGE_SIZE:
+                raise
+
+            next_page_size = max(MIN_PAGE_SIZE, current_page_size // 2)
+            if next_page_size == current_page_size:
+                raise
+
+            logger.warning(
+                "List pagination limit exceeded while listing %s with limit=%s; retrying with limit=%s",
+                resource_name,
+                current_page_size,
+                next_page_size,
+            )
+            current_page_size = next_page_size
 
 
 def _fmt_user(user: Any) -> str:
@@ -125,6 +182,7 @@ async def _scan_object(
                 workspace_id=str(workspace_id),
                 version=object_metadata.version_id,
                 additional_headers={"Accept-Encoding": "gzip"},
+                request_timeout=OBJECT_FETCH_TIMEOUT_SECONDS,
             )
 
             record["schema"] = response.object.model_dump(mode="python", by_alias=True).get("schema")
@@ -150,8 +208,11 @@ async def _run_duplicate_analysis(
     await ensure_initialized()
 
     # Resolve which workspaces to scan
-    all_workspaces = await evo_context.workspace_client.list_workspaces(limit=500)
-    ws_list = list(all_workspaces.items())
+    ws_list = await _list_all_pages(
+        evo_context.workspace_client.list_workspaces,
+        page_size=DEFAULT_WORKSPACE_PAGE_SIZE,
+        resource_name="workspaces",
+    )
 
     if workspace_ids:
         requested = {wid.lower() for wid in workspace_ids}
@@ -184,7 +245,11 @@ async def _run_duplicate_analysis(
         object_client = ObjectAPIClient(ws_env, evo_context.connector)
 
         try:
-            objects = await object_client.list_all_objects(limit_per_request=5000)
+            objects = await _list_all_pages(
+                object_client.list_objects,
+                page_size=DEFAULT_OBJECT_PAGE_SIZE,
+                resource_name=f"objects in workspace {ws_name}",
+            )
         except Exception as exc:
             logger.warning("Failed to list objects in workspace %s: %s", ws_name, exc)
             workspace_stats.append({"name": ws_name, "id": str(workspace.id), "objects": 0, "error": str(exc)})
