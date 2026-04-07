@@ -73,7 +73,7 @@ class ManagedAuthContext(EvoContextBase):
         logger.info("Access token saved to cache at %s", token_cache_path)
 
 
-    # -- Auth ---------------------------------------------------------------
+    # -- Variables cache -----------------------------------------------------
 
     def load_variables_from_cache(self) -> None:
         try:
@@ -155,15 +155,17 @@ class ManagedAuthContext(EvoContextBase):
     # -- Lifecycle ----------------------------------------------------------
 
     async def initialize(self) -> None:
-        """Initialize or reuse the single shared context."""
+        """Initialize or reuse the single shared context.
+
+        ``access_token`` is accepted for interface compatibility but
+        ignored — managed mode obtains its own tokens.
+        """
         if self.initialized and self.get_access_token_from_cache() is not None:
             return
 
         self.load_variables_from_cache()
-        authorizer = await self.get_authorizer()
 
         await self.discover_and_build(
-            authorizer,
             seed_org_id=self.org_id,
             seed_hub_url=self.hub_url,
         )
@@ -171,10 +173,5 @@ class ManagedAuthContext(EvoContextBase):
         self.save_variables_to_cache()
 
     async def switch_instance(self, org_id: UUID, hub_url: str) -> None:
-        self.org_id = org_id
-        self.hub_url = hub_url
-        self.connector = APIConnector(
-            hub_url, self.connector.transport, self.connector.authorizer
-        )
-        self.workspace_client = WorkspaceAPIClient(self.connector, org_id)
+        await super().switch_instance(org_id, hub_url)
         self.save_variables_to_cache()

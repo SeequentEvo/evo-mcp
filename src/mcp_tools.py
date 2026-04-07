@@ -72,11 +72,8 @@ HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
 #
 # Defaults to False. Set to true only when MCP_TRANSPORT=http.
 
-if os.getenv("CLIENT_DELEGATED_AUTH", "").lower()in ("1", "true", "yes"):
-    CLIENT_DELEGATED_AUTH = True
-else:
-    CLIENT_DELEGATED_AUTH = False  # default: off unless explicitly enabled
-
+CLIENT_DELEGATED_AUTH = os.getenv("CLIENT_DELEGATED_AUTH", "").lower() in ("1", "true")
+     
 if CLIENT_DELEGATED_AUTH and TRANSPORT != "http":
     logging.warning(
         "CLIENT_DELEGATED_AUTH=true has no effect with MCP_TRANSPORT='%s' — "
@@ -377,7 +374,7 @@ if __name__ == "__main__":
 
                 path = scope.get("path", "")
                 method = scope.get("method", "?")
-                print(f"[req] {method} {path}", flush=True)
+                logger.debug("[req] %s %s", method, path)
 
                 if not path.startswith("/.well-known/oauth-authorization-server"):
                     await self.app(scope, receive, send)
@@ -426,7 +423,7 @@ if __name__ == "__main__":
                         "type": "http.response.body",
                         "body": patched,
                     })
-                    print(f"[req] Patched auth metadata: added 'none' to token_endpoint_auth_methods_supported", flush=True)
+                    logger.debug("Patched auth metadata: added 'none' to token_endpoint_auth_methods_supported")
                 except Exception:
                     # If parsing fails, send original response unchanged
                     await send({
@@ -444,7 +441,6 @@ if __name__ == "__main__":
             transport="http",
             host=HTTP_HOST,
             port=HTTP_PORT,
-            log_level="debug",
             middleware=[Middleware(AuthMetadataPatchMiddleware)],
         )
     else:

@@ -170,6 +170,7 @@ def prompt_delegated_auth(current_value: str | None) -> str:
     return "true" if choice == "1" else "false"
 
 
+def prompt_tool_filter(current_value: str | None) -> str:
     """Prompt for MCP tool filter selection."""
     print()
     print("Select which tools to enable:")

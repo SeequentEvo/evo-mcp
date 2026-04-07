@@ -13,6 +13,8 @@ from evo.common import APIConnector
 from evo.oauth import AccessTokenAuthorizer
 from evo.workspaces import WorkspaceAPIClient
 
+from evo_mcp.contexts.helpers import get_client_session_upstream_access_token
+
 from .base import EvoContextBase
 
 logger = logging.getLogger(__name__)
@@ -36,26 +38,21 @@ class DelegatedAuthContext(EvoContextBase):
         self.cache_path = Path(tempfile.mkdtemp(prefix=f"evo-mcp-{client_session_id[:8]}-"))
         #TODO: Consider using redis-based cache backend to share session data across multiple MCP server instances or to deploy in ephemeral environments (e.g. Kubernetes)
 
-    async def initialize(self, access_token: str) -> None:
+    async def get_authorizer(self) -> AccessTokenAuthorizer:
+        return AccessTokenAuthorizer(access_token=self._access_token)
+
+    async def initialize(self) -> None:
         """Build (or rebuild) API clients from the given access token.
 
         The current ``org_id`` and ``hub_url`` are passed as seeds so the
         Discovery HTTP call is skipped on rebuilds.
         """
-        if access_token == self._access_token and self.connector is not None:
+        upstream_access_token = get_client_session_upstream_access_token()
+        if upstream_access_token == self._access_token and self.connector is not None:
             return  # Same token and already initialized — skip rebuild
-        self._access_token = access_token
+        self._access_token = upstream_access_token
 
-        authorizer = AccessTokenAuthorizer(access_token=self._access_token)
         await self.discover_and_build(
-            authorizer,
             seed_org_id=self.org_id,
             seed_hub_url=self.hub_url,
         )
-
-    async def switch_instance(self, org_id: UUID, hub_url: str) -> None:
-        self.org_id = org_id
-        self.hub_url = hub_url
-        authorizer = AccessTokenAuthorizer(access_token=self._access_token)
-        self.connector = APIConnector(hub_url, self.get_transport(), authorizer)
-        self.workspace_client = WorkspaceAPIClient(self.connector, org_id)

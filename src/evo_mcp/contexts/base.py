@@ -43,11 +43,13 @@ class EvoContextBase(ABC):
 
     @abstractmethod
     async def initialize(self) -> None:
-        """Ensure the context is ready for API calls."""
+        """Ensure the context is ready for API calls.
+        """
 
     @abstractmethod
-    async def switch_instance(self, org_id: UUID, hub_url: str) -> None:
-        """Switch to a different Evo instance."""
+    async def get_authorizer(self) -> AccessTokenAuthorizer:
+        """Get the access token authorizer to be used for API calls."""
+
 
     # -- Shared helpers -----------------------------------------------------
 
@@ -60,7 +62,6 @@ class EvoContextBase(ABC):
 
     async def discover_and_build(
         self,
-        authorizer: AccessTokenAuthorizer,
         *,
         seed_org_id: Optional[UUID] = None,
         seed_hub_url: Optional[str] = None,
@@ -72,7 +73,7 @@ class EvoContextBase(ABC):
         """
         discovery_url = os.getenv("EVO_DISCOVERY_URL")
         transport = self.get_transport()
-
+        authorizer = await self.get_authorizer()
         discovery_connector = APIConnector(discovery_url, transport, authorizer)
         self.discovery_client = DiscoveryAPIClient(discovery_connector)
 
@@ -98,6 +99,14 @@ class EvoContextBase(ABC):
 
         self.connector = APIConnector(self.hub_url, transport, authorizer)
         self.workspace_client = WorkspaceAPIClient(self.connector, self.org_id)
+
+    async def switch_instance(self, org_id: UUID, hub_url: str) -> None:
+        self.org_id = org_id
+        self.hub_url = hub_url
+        self.connector = APIConnector(
+            hub_url, self.get_transport(), await self.get_authorizer()
+        )
+        self.workspace_client = WorkspaceAPIClient(self.connector, org_id)
 
     async def get_object_client(self, workspace_id: UUID) -> ObjectAPIClient:
         """Get or create an object client for a workspace."""

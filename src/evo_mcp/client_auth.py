@@ -20,6 +20,11 @@ def create_auth_provider(base_url: str):
     """
 
     client_id = os.getenv("EVO_CLIENT_ID")
+    if not client_id:
+        raise ValueError(
+            "EVO_CLIENT_ID environment variable is required for authentication. "
+            "Register an application at the iTwin Developer Portal and set EVO_CLIENT_ID."
+        )
     issuer_url = os.getenv("ISSUER_URL", "https://ims.bentley.com")
     config_url = f"{issuer_url}/.well-known/openid-configuration"
 
@@ -37,6 +42,8 @@ def create_auth_provider(base_url: str):
     # Bentley IMS native/SPA apps are public clients (no client secret).
     # The proxy authenticates upstream using PKCE only.
     evo_scopes = f"openid {EvoScopes.all_evo}"
+
+    _apply_loopback_redirect_patch()
 
     return OIDCProxy(
         config_url=config_url,
@@ -66,10 +73,19 @@ def create_auth_provider(base_url: str):
 # This patch can be removed once FastMCP ships a fix upstream.
 # ---------------------------------------------------------------------------
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+_loopback_patch_applied = False
 
 
 def _apply_loopback_redirect_patch() -> None:
-    """Patch fastmcp redirect-URI matching for RFC 8252 loopback compliance."""
+    """Patch fastmcp redirect-URI matching for RFC 8252 loopback compliance.
+
+    Safe to call multiple times — the patch is only applied once.
+    """
+    global _loopback_patch_applied
+    if _loopback_patch_applied:
+        return
+    _loopback_patch_applied = True
+
     from fastmcp.server.auth import redirect_validation as _rv
     from fastmcp.server.auth.oauth_proxy import models as _models
 
@@ -125,6 +141,3 @@ def _apply_loopback_redirect_patch() -> None:
     # Patch both the module-level function and the reference inside models.py
     _rv.matches_allowed_pattern = _patched_matches_allowed_pattern
     _models.matches_allowed_pattern = _patched_matches_allowed_pattern
-
-
-_apply_loopback_redirect_patch()
