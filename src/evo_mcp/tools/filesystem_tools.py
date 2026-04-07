@@ -21,7 +21,7 @@ import pandas as pd
 from fastmcp import Context
 from fastmcp.utilities.logging import get_logger
 
-from evo_mcp.logging_utils import log_handled_failure, log_operation_event
+from evo_mcp.logging_utils import log_handled_failure, log_operation_event, result_with_operation_id
 
 
 logger = get_logger(__name__)
@@ -103,7 +103,7 @@ def register_filesystem_tools(mcp):
                     status=result["status"],
                     configured_directory=result["configured_directory"],
                 )
-                return result
+                return result_with_operation_id(operation_id, result)
 
             result = {
                 "current_directory": str(current_dir),
@@ -121,7 +121,7 @@ def register_filesystem_tools(mcp):
                 current_directory=result["current_directory"],
                 exists=result["exists"],
             )
-            return result
+            return result_with_operation_id(operation_id, result)
         except Exception as e:
             await log_handled_failure(
                 ctx,
@@ -171,6 +171,7 @@ def register_filesystem_tools(mcp):
                     data_directory=str(data_dir),
                 )
                 return {
+                    "operation_id": operation_id,
                     "error": f"Data directory does not exist: {data_dir}",
                     "status": "directory_missing",
                 }
@@ -211,7 +212,7 @@ def register_filesystem_tools(mcp):
                 data_directory=result["data_directory"],
                 file_count=result["file_count"],
             )
-            return result
+            return result_with_operation_id(operation_id, result)
         except Exception as e:
             await log_handled_failure(
                 ctx,
@@ -265,6 +266,7 @@ def register_filesystem_tools(mcp):
                 file_path=str(file_path_obj),
             )
             return {
+                "operation_id": operation_id,
                 "error": f"File not found: {file_path_obj}",
                 "status": "file_missing",
             }
@@ -314,18 +316,18 @@ def register_filesystem_tools(mcp):
                 total_rows=result["total_rows"],
                 total_columns=result["total_columns"],
             )
-            return result
+            return result_with_operation_id(operation_id, result)
         except Exception as e:
-            await log_operation_event(
+            await log_handled_failure(
                 ctx,
                 logger,
                 "Failed to preview CSV file",
                 operation_id,
-                ctx_level="error",
+                e,
                 file_path=str(file_path_obj),
-                error=str(e),
+                max_rows=max_rows,
             )
-            return {
+            return result_with_operation_id(operation_id, {
                 "error": str(e),
                 "status": "parse_error",
-            }
+            })

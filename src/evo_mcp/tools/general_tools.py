@@ -12,7 +12,7 @@ from fastmcp import Context
 from fastmcp.utilities.logging import get_logger
 
 from evo_mcp.context import evo_context, ensure_initialized
-from evo_mcp.logging_utils import log_handled_failure, log_operation_event, operation_extra
+from evo_mcp.logging_utils import log_handled_failure, log_operation_event, operation_extra, result_with_operation_id
 
 logger = get_logger(__name__)
 
@@ -64,7 +64,7 @@ def register_general_tools(mcp):
                 operation_id,
                 services=list(results.keys()),
             )
-            return results
+            return result_with_operation_id(operation_id, results)
         except Exception as e:
             await log_handled_failure(
                 ctx,
@@ -146,6 +146,7 @@ def register_general_tools(mcp):
 
             result = [
                 {
+                    "operation_id": operation_id,
                     "id": str(ws.id),
                     "name": ws.display_name,
                     "description": ws.description,
@@ -234,7 +235,7 @@ def register_general_tools(mcp):
                 workspace_id=result["id"],
             )
 
-            return result
+            return result_with_operation_id(operation_id, result)
         except Exception as e:
             await log_handled_failure(
                 ctx,
@@ -309,6 +310,7 @@ def register_general_tools(mcp):
             
             result = [
                 {
+                    "operation_id": operation_id,
                     "id": str(obj.id),
                     "name": obj.name,
                     "path": obj.path,
@@ -403,7 +405,7 @@ def register_general_tools(mcp):
                 workspace_id=workspace_id,
             )
 
-            return result
+            return result_with_operation_id(operation_id, result)
         except Exception as e:
             await log_handled_failure(
                 ctx,
@@ -435,14 +437,23 @@ def register_general_tools(mcp):
                     extra=operation_extra(operation_id, instance_id=str(evo_context.org_id)),
                 )
             instances = await evo_context.discovery_client.list_organizations()
+            result = [
+                {
+                    "operation_id": operation_id,
+                    "id": str(instance.id),
+                    "name": instance.display_name,
+                    "hub_urls": [hub.url for hub in instance.hubs],
+                }
+                for instance in instances
+            ]
             await log_operation_event(
                 ctx,
                 logger,
                 "Available Evo instances listed",
                 operation_id,
-                returned_count=len(instances),
+                returned_count=len(result),
             )
-            return instances
+            return result
         except Exception as e:
             await log_handled_failure(
                 ctx,
@@ -494,7 +505,11 @@ def register_general_tools(mcp):
                         instance_id=str(instance.id),
                         instance_name=instance.display_name,
                     )
-                    return instance
+                    return result_with_operation_id(operation_id, {
+                        "id": str(instance.id),
+                        "name": instance.display_name,
+                        "hub_urls": [hub.url for hub in instance.hubs],
+                    })
 
             raise ValueError(
                 f"No instance found for parameters {instance_id=} {instance_name=}. "

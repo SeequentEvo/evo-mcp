@@ -7,11 +7,12 @@ MCP tools for object management operations.
 """
 
 import json
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastmcp import Context
 from fastmcp.utilities.logging import get_logger
 
 from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.logging_utils import log_handled_failure, log_operation_event, result_with_operation_id
 from evo_mcp.utils.evo_data_utils import extract_data_references
 
 logger = get_logger(__name__)
@@ -34,30 +35,55 @@ def register_data_tools(mcp):
             path: Object path
             object_dict: Object definition as JSON/dict
         """
-        if ctx:
-            await ctx.info("Creating object", extra={"workspace_id": workspace_id, "path": path})
-        await ensure_initialized()
-        object_client = await evo_context.get_object_client(UUID(workspace_id))
-        
-        # Ensure no UUID is set for new objects
-        if isinstance(object_dict, str):
-            object_dict = json.loads(object_dict)
-        object_dict["uuid"] = None
-        
-        metadata = await object_client.create_geoscience_object(path, object_dict)
-        
-        result = {
-            "id": str(metadata.id),
-            "name": metadata.name,
-            "path": metadata.path,
-            "version_id": metadata.version_id,
-            "created_at": metadata.created_at.isoformat() if metadata.created_at else None,
-        }
+        operation_id = str(uuid4())
+        await log_operation_event(
+            ctx,
+            logger,
+            "Creating object",
+            operation_id,
+            workspace_id=workspace_id,
+            path=path,
+        )
+        try:
+            await ensure_initialized()
+            object_client = await evo_context.get_object_client(UUID(workspace_id))
 
-        if ctx:
-            await ctx.info("Object created", extra={"object_id": result["id"], "path": result["path"]})
+            # Ensure no UUID is set for new objects
+            if isinstance(object_dict, str):
+                object_dict = json.loads(object_dict)
+            object_dict["uuid"] = None
 
-        return result
+            metadata = await object_client.create_geoscience_object(path, object_dict)
+
+            result = {
+                "id": str(metadata.id),
+                "name": metadata.name,
+                "path": metadata.path,
+                "version_id": metadata.version_id,
+                "created_at": metadata.created_at.isoformat() if metadata.created_at else None,
+            }
+
+            await log_operation_event(
+                ctx,
+                logger,
+                "Object created",
+                operation_id,
+                object_id=result["id"],
+                path=result["path"],
+            )
+
+            return result_with_operation_id(operation_id, result)
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to create object",
+                operation_id,
+                e,
+                workspace_id=workspace_id,
+                path=path,
+            )
+            raise
     
     @mcp.tool()
     async def get_object_content(
@@ -75,41 +101,61 @@ def register_data_tools(mcp):
             object_path: Object path
             version: Specific version ID
         """
-        if ctx:
-            await ctx.info(
-                "Getting object content",
-                extra={
-                    "workspace_id": workspace_id,
-                    "object_id": object_id or None,
-                    "object_path": object_path or None,
-                    "version": version or None,
+        operation_id = str(uuid4())
+        await log_operation_event(
+            ctx,
+            logger,
+            "Getting object content",
+            operation_id,
+            workspace_id=workspace_id,
+            object_id=object_id or None,
+            object_path=object_path or None,
+            version=version or None,
+        )
+        try:
+            await ensure_initialized()
+            object_client = await evo_context.get_object_client(UUID(workspace_id))
+
+            if object_id:
+                obj = await object_client.download_object_by_id(UUID(object_id), version=version if version else None)
+            elif object_path:
+                obj = await object_client.download_object_by_path(object_path, version=version if version else None)
+            else:
+                raise ValueError("Either object_id or object_path must be provided")
+
+            result = {
+                "metadata": {
+                    "id": str(obj.metadata.id),
+                    "name": obj.metadata.name,
+                    "path": obj.metadata.path,
+                    "schema_id": obj.metadata.schema_id.sub_classification,
+                    "version_id": obj.metadata.version_id,
                 },
+                "content": obj.as_dict()
+            }
+
+            await log_operation_event(
+                ctx,
+                logger,
+                "Object content fetched",
+                operation_id,
+                object_id=result["metadata"]["id"],
             )
-        await ensure_initialized()
-        object_client = await evo_context.get_object_client(UUID(workspace_id))
-        
-        if object_id:
-            obj = await object_client.download_object_by_id(UUID(object_id), version=version if version else None)
-        elif object_path:
-            obj = await object_client.download_object_by_path(object_path, version=version if version else None)
-        else:
-            raise ValueError("Either object_id or object_path must be provided")
-        
-        result = {
-            "metadata": {
-                "id": str(obj.metadata.id),
-                "name": obj.metadata.name,
-                "path": obj.metadata.path,
-                "schema_id": obj.metadata.schema_id.sub_classification,
-                "version_id": obj.metadata.version_id,
-            },
-            "content": obj.as_dict()
-        }
 
-        if ctx:
-            await ctx.info("Object content fetched", extra={"object_id": result["metadata"]["id"]})
-
-        return result
+            return result_with_operation_id(operation_id, result)
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to get object content",
+                operation_id,
+                e,
+                workspace_id=workspace_id,
+                object_id=object_id or None,
+                object_path=object_path or None,
+                version=version or None,
+            )
+            raise
 
 
     @mcp.tool()
@@ -126,34 +172,58 @@ def register_data_tools(mcp):
             object_id: Object UUID (provide either this or object_path)
             object_path: Object path (provide either this or object_id)
         """
-        if ctx:
-            await ctx.info(
-                "Listing object versions",
-                extra={"workspace_id": workspace_id, "object_id": object_id or None, "object_path": object_path or None},
+        operation_id = str(uuid4())
+        await log_operation_event(
+            ctx,
+            logger,
+            "Listing object versions",
+            operation_id,
+            workspace_id=workspace_id,
+            object_id=object_id or None,
+            object_path=object_path or None,
+        )
+        try:
+            await ensure_initialized()
+            object_client = await evo_context.get_object_client(UUID(workspace_id))
+
+            if object_id:
+                versions = await object_client.list_versions_by_id(UUID(object_id))
+            elif object_path:
+                versions = await object_client.list_versions_by_path(object_path)
+            else:
+                raise ValueError("Either object_id or object_path must be provided")
+
+            result = [
+                {
+                    "operation_id": operation_id,
+                    "version_id": v.version_id,
+                    "created_at": v.created_at.isoformat() if v.created_at else None,
+                    "created_by": str(v.created_by.id) if v.created_by else None,
+                }
+                for v in versions
+            ]
+
+            await log_operation_event(
+                ctx,
+                logger,
+                "Object versions listed",
+                operation_id,
+                returned_count=len(result),
             )
-        await ensure_initialized()
-        object_client = await evo_context.get_object_client(UUID(workspace_id))
-        
-        if object_id:
-            versions = await object_client.list_versions_by_id(UUID(object_id))
-        elif object_path:
-            versions = await object_client.list_versions_by_path(object_path)
-        else:
-            raise ValueError("Either object_id or object_path must be provided")
-        
-        result = [
-            {
-                "version_id": v.version_id,
-                "created_at": v.created_at.isoformat() if v.created_at else None,
-                "created_by": str(v.created_by.id) if v.created_by else None,
-            }
-            for v in versions
-        ]
 
-        if ctx:
-            await ctx.info("Object versions listed", extra={"returned_count": len(result)})
-
-        return result
+            return result
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to list object versions",
+                operation_id,
+                e,
+                workspace_id=workspace_id,
+                object_id=object_id or None,
+                object_path=object_path or None,
+            )
+            raise
 
     @mcp.tool()
     async def extract_data_references(
@@ -169,18 +239,41 @@ def register_data_tools(mcp):
             object_id: Object UUID
             version: Specific version ID (optional)
         """
-        if ctx:
-            await ctx.info(
-                "Extracting data references",
-                extra={"workspace_id": workspace_id, "object_id": object_id, "version": version or None},
-            )
-        await ensure_initialized()
-        object_client = await evo_context.get_object_client(UUID(workspace_id))
-        
-        obj = await object_client.download_object_by_id(UUID(object_id), version=version if version else None)
-        data_refs = extract_data_references(obj.as_dict())
+        operation_id = str(uuid4())
+        await log_operation_event(
+            ctx,
+            logger,
+            "Extracting data references",
+            operation_id,
+            workspace_id=workspace_id,
+            object_id=object_id,
+            version=version or None,
+        )
+        try:
+            await ensure_initialized()
+            object_client = await evo_context.get_object_client(UUID(workspace_id))
 
-        if ctx:
-            await ctx.info("Data references extracted", extra={"reference_count": len(data_refs)})
-        
-        return data_refs
+            obj = await object_client.download_object_by_id(UUID(object_id), version=version if version else None)
+            data_refs = extract_data_references(obj.as_dict())
+
+            await log_operation_event(
+                ctx,
+                logger,
+                "Data references extracted",
+                operation_id,
+                reference_count=len(data_refs),
+            )
+
+            return data_refs
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to extract data references",
+                operation_id,
+                e,
+                workspace_id=workspace_id,
+                object_id=object_id,
+                version=version or None,
+            )
+            raise

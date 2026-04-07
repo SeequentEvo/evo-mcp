@@ -13,7 +13,7 @@ from fastmcp.utilities.logging import get_logger
 
 
 from evo_mcp.context import evo_context, ensure_initialized
-from evo_mcp.logging_utils import log_handled_failure, log_operation_event, operation_extra
+from evo_mcp.logging_utils import log_handled_failure, log_operation_event, operation_extra, result_with_operation_id
 from evo_mcp.utils.evo_data_utils import extract_data_references, copy_object_data
 
 logger = get_logger(__name__)
@@ -219,7 +219,7 @@ def register_admin_tools(mcp):
                 total_objects=len(objects_snapshot),
             )
 
-            return {
+            return result_with_operation_id(operation_id, {
                 "snapshot": snapshot,
                 "summary": {
                     "snapshot_name": snapshot_name,
@@ -229,7 +229,7 @@ def register_admin_tools(mcp):
                     "note_to_user": "Store this snapshot data to restore later using evo_restore_workspace_snapshot",
                     "note_to_agent": "Display the full snapshot in your response.",
                 },
-            }
+            })
         except Exception as e:
             await log_handled_failure(
                 ctx,
@@ -328,7 +328,7 @@ def register_admin_tools(mcp):
                 data_blobs_copied=result["data_blobs_copied"],
             )
 
-            return result
+            return result_with_operation_id(operation_id, result)
         except Exception as e:
             await log_handled_failure(
                 ctx,
