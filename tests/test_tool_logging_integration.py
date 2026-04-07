@@ -108,6 +108,37 @@ class ToolLoggingIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(["https://hub.example.invalid"], result[0]["hub_urls"])
         self.assertIn("operation_id", result[0])
 
+    async def test_list_my_instances_allows_missing_context(self) -> None:
+        fake_mcp = _FakeMCP()
+        register_general_tools(fake_mcp)
+        list_instances_tool = fake_mcp.tools["list_my_instances"]
+
+        fake_context = SimpleNamespace(
+            org_id="instance-1",
+            discovery_client=SimpleNamespace(
+                list_organizations=AsyncMock(
+                    return_value=[
+                        SimpleNamespace(
+                            id="instance-1",
+                            display_name="Instance One",
+                            hubs=[SimpleNamespace(url="https://hub.example.invalid")],
+                        )
+                    ]
+                )
+            ),
+        )
+
+        with (
+            patch("evo_mcp.tools.general_tools.ensure_initialized", AsyncMock()),
+            patch("evo_mcp.tools.general_tools.evo_context", fake_context),
+        ):
+            result = await list_instances_tool(ctx=None)
+
+        self.assertEqual(1, len(result))
+        self.assertEqual("instance-1", result[0]["id"])
+        self.assertEqual("Instance One", result[0]["name"])
+        self.assertIn("operation_id", result[0])
+
     async def test_workspace_copy_object_returns_operation_id(self) -> None:
         fake_mcp = _FakeMCP()
         register_admin_tools(fake_mcp)

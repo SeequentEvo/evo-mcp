@@ -297,7 +297,7 @@ def register_general_tools(mcp):
             if ctx:
                 await ctx.debug("Fetching objects from service")
             objects = await object_client.list_objects(
-                schema_id=None, # [schema_id] if schema_id else None,
+                schema_id=None,
                 deleted=deleted,
                 limit=limit
             )
@@ -423,7 +423,7 @@ def register_general_tools(mcp):
 
     @mcp.tool()
     async def list_my_instances(
-        ctx: Context,
+        ctx: Context | None = None,
     ) -> list[dict]:
         """List instances the user has access to."""
         operation_id = str(uuid4())
@@ -431,7 +431,7 @@ def register_general_tools(mcp):
         try:
             await ensure_initialized()
 
-            if evo_context.org_id:
+            if ctx and evo_context.org_id:
                 await ctx.info(
                     "Current Evo instance selected",
                     extra=operation_extra(operation_id, instance_id=str(evo_context.org_id)),
