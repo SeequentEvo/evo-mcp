@@ -409,8 +409,6 @@ def register_admin_tools(mcp):
                     source_total_objects=len(all_objects),
                 ),
             )
-            if total_objects == 0:
-                await ctx.report_progress(progress=100, total=100)
         
         # Track progress
         copied_count = 0

@@ -154,6 +154,41 @@ class ToolLoggingIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(1, result["data_blobs_copied"])
         self.assertIn("operation_id", result)
 
+    async def test_workspace_duplicate_workspace_reports_completion_once_for_empty_selection(self) -> None:
+        fake_mcp = _FakeMCP()
+        register_admin_tools(fake_mcp)
+        duplicate_tool = fake_mcp.tools["workspace_duplicate_workspace"]
+
+        fake_ctx = SimpleNamespace(info=AsyncMock(), report_progress=AsyncMock())
+        source_client = SimpleNamespace(list_all_objects=AsyncMock(return_value=[]))
+        target_workspace = SimpleNamespace(id="workspace-2", display_name="Target Workspace")
+        fake_context = SimpleNamespace(
+            workspace_client=SimpleNamespace(create_workspace=AsyncMock(return_value=target_workspace)),
+            get_object_client=AsyncMock(side_effect=[source_client, SimpleNamespace()]),
+            connector=object(),
+        )
+
+        with (
+            patch("evo_mcp.tools.admin_tools.ensure_initialized", AsyncMock()),
+            patch("evo_mcp.tools.admin_tools.evo_context", fake_context),
+        ):
+            result = await duplicate_tool(
+                source_workspace_id="00000000-0000-0000-0000-000000000001",
+                target_name="Target Workspace",
+                ctx=fake_ctx,
+            )
+
+        completion_calls = [
+            awaited_call
+            for awaited_call in fake_ctx.report_progress.await_args_list
+            if awaited_call.kwargs.get("progress") == 100 and awaited_call.kwargs.get("total") == 100
+        ]
+
+        self.assertEqual(1, len(completion_calls))
+        self.assertEqual("workspace-2", result["target_workspace_id"])
+        self.assertEqual(0, result["objects_copied"])
+        self.assertEqual(0, result["objects_failed"])
+
 
 if __name__ == "__main__":
     unittest.main()
