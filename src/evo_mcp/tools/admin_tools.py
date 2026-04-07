@@ -13,7 +13,7 @@ from fastmcp.utilities.logging import get_logger
 
 
 from evo_mcp.context import evo_context, ensure_initialized
-from evo_mcp.logging_utils import log_handled_failure, operation_extra
+from evo_mcp.logging_utils import log_handled_failure, log_operation_event, operation_extra
 from evo_mcp.utils.evo_data_utils import extract_data_references, copy_object_data
 
 logger = get_logger(__name__)
@@ -66,7 +66,7 @@ def register_admin_tools(mcp):
         workspace_id: str,
         ctx: Context | None = None,
     ) -> dict:
-        """Get summary statistics for a workspace (object counts by type).
+        """Get summary statistics for a workspace (object counts by type and file counts by extension).
         
         Args:
             workspace_id: Workspace UUID
@@ -75,6 +75,7 @@ def register_admin_tools(mcp):
             await ctx.info("Getting workspace summary", extra={"workspace_id": workspace_id})
         await ensure_initialized()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
+        file_client = await evo_context.get_file_client(UUID(workspace_id))
         
         # Get all objects
         all_objects = await object_client.list_all_objects()
@@ -85,14 +86,30 @@ def register_admin_tools(mcp):
             schema = obj.schema_id.sub_classification
             schema_counts[schema] = schema_counts.get(schema, 0) + 1
         
+        # Get all files
+        all_files = await file_client.list_all_files()
+        
+        # Count files by extension
+        extension_counts = {}
+        for file in all_files:
+            # Extract extension from filename
+            name = file.name
+            if '.' in name:
+                ext = name.rsplit('.', 1)[-1].lower()
+            else:
+                ext = "(no extension)"
+            extension_counts[ext] = extension_counts.get(ext, 0) + 1
+        
         result = {
             "workspace_id": str(workspace_id),
             "total_objects": len(all_objects),
             "objects_by_schema": schema_counts,
+            "total_files": len(all_files),
+            "files_by_extension": extension_counts
         }
 
         if ctx:
-            await ctx.info("Workspace summary complete", extra={"total_objects": result["total_objects"]})
+            await ctx.info("Workspace summary complete", extra={"total_objects": result["total_objects"], "total_files": result["total_files"]})
 
         return result
 
@@ -113,81 +130,118 @@ def register_admin_tools(mcp):
         Returns:
             Snapshot metadata and object version information
         """
-        if ctx:
-            await ctx.info(
-                "Creating workspace snapshot",
-                extra={
-                    "workspace_id": workspace_id,
-                    "snapshot_name": snapshot_name or None,
-                    "include_data_blobs": include_data_blobs,
-                },
-            )
-            await ctx.report_progress(progress=5, total=100)
+        operation_id = str(uuid4())
 
-        await ensure_initialized()
-        object_client = await evo_context.get_object_client(UUID(workspace_id))
-        workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
-        
-        # Get all objects
-        all_objects = await object_client.list_all_objects()
-        if ctx:
-            await ctx.report_progress(progress=20, total=100)
-        
-        # Create snapshot
-        timestamp = datetime.utcnow().isoformat()
-        snapshot_name = snapshot_name or f"snapshot_{timestamp}"
-        
-        objects_snapshot = []
-        
-        total_objects = len(all_objects)
-        for i, obj in enumerate(all_objects):
-            obj_info = {
-                "id": str(obj.id),
-                "name": obj.name,
-                "path": obj.path,
-                "schema_id": obj.schema_id.sub_classification,
-                "version_id": obj.version_id,
-                "created_at": obj.created_at.isoformat() if obj.created_at else None,
-                # "updated_at": obj.updated_at.isoformat() if obj.updated_at else None
-            }
-            
-            if include_data_blobs:
-                try:
-                    downloaded_obj = await object_client.download_object_by_id(obj.id, version=obj.version_id)
-                    data_refs = extract_data_references(downloaded_obj.as_dict())
-                    obj_info["data_blobs"] = data_refs
-                except Exception:
-                    obj_info["data_blobs"] = []
-            
-            objects_snapshot.append(obj_info)
-            if ctx and total_objects > 0:
-                progress = 20 + int(((i + 1) / total_objects) * 75)
-                await ctx.report_progress(progress=progress, total=100)
+        await log_operation_event(
+            ctx,
+            logger,
+            "Creating workspace snapshot",
+            operation_id,
+            workspace_id=workspace_id,
+            snapshot_name=snapshot_name or None,
+            include_data_blobs=include_data_blobs,
+        )
 
-        if ctx:
-            await ctx.report_progress(progress=100, total=100)
-        
-        snapshot = {
-            "snapshot_name": snapshot_name,
-            "snapshot_timestamp": timestamp,
-            "workspace_id": workspace_id,
-            "workspace_name": workspace.display_name,
-            "workspace_description": workspace.description,
-            "object_count": len(objects_snapshot),
-            "objects": objects_snapshot
-        }
-        
-        return {
-            "snapshot": snapshot,
-            "summary": {
+        try:
+            if ctx:
+                await ctx.report_progress(progress=5, total=100)
+
+            await ensure_initialized()
+            object_client = await evo_context.get_object_client(UUID(workspace_id))
+            workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
+
+            # Get all objects
+            all_objects = await object_client.list_all_objects()
+            if ctx:
+                await ctx.report_progress(progress=20, total=100)
+
+            # Create snapshot
+            timestamp = datetime.utcnow().isoformat()
+            snapshot_name = snapshot_name or f"snapshot_{timestamp}"
+
+            objects_snapshot = []
+            total_objects = len(all_objects)
+            for i, obj in enumerate(all_objects):
+                obj_info = {
+                    "id": str(obj.id),
+                    "name": obj.name,
+                    "path": obj.path,
+                    "schema_id": obj.schema_id.sub_classification,
+                    "version_id": obj.version_id,
+                    "created_at": obj.created_at.isoformat() if obj.created_at else None,
+                    # "updated_at": obj.updated_at.isoformat() if obj.updated_at else None
+                }
+
+                if include_data_blobs:
+                    try:
+                        downloaded_obj = await object_client.download_object_by_id(obj.id, version=obj.version_id)
+                        data_refs = extract_data_references(downloaded_obj.as_dict())
+                        obj_info["data_blobs"] = data_refs
+                    except Exception as e:
+                        obj_info["data_blobs"] = []
+                        await log_handled_failure(
+                            ctx,
+                            logger,
+                            "Failed to extract data blobs for snapshot object",
+                            operation_id,
+                            e,
+                            ctx_level="warning",
+                            workspace_id=workspace_id,
+                            object_id=str(obj.id),
+                            object_path=obj.path,
+                        )
+
+                objects_snapshot.append(obj_info)
+                if ctx and total_objects > 0:
+                    progress = 20 + int(((i + 1) / total_objects) * 75)
+                    await ctx.report_progress(progress=progress, total=100)
+
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
+
+            snapshot = {
                 "snapshot_name": snapshot_name,
-                "timestamp": timestamp,
+                "snapshot_timestamp": timestamp,
                 "workspace_id": workspace_id,
-                "total_objects": len(objects_snapshot),
-                "note_to_user": "Store this snapshot data to restore later using evo_restore_workspace_snapshot",
-                "note_to_agent": "Display the full snapshot in your response."
+                "workspace_name": workspace.display_name,
+                "workspace_description": workspace.description,
+                "object_count": len(objects_snapshot),
+                "objects": objects_snapshot,
             }
-        }
+
+            await log_operation_event(
+                ctx,
+                logger,
+                "Workspace snapshot created",
+                operation_id,
+                workspace_id=workspace_id,
+                snapshot_name=snapshot_name,
+                total_objects=len(objects_snapshot),
+            )
+
+            return {
+                "snapshot": snapshot,
+                "summary": {
+                    "snapshot_name": snapshot_name,
+                    "timestamp": timestamp,
+                    "workspace_id": workspace_id,
+                    "total_objects": len(objects_snapshot),
+                    "note_to_user": "Store this snapshot data to restore later using evo_restore_workspace_snapshot",
+                    "note_to_agent": "Display the full snapshot in your response.",
+                },
+            }
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to create workspace snapshot",
+                operation_id,
+                e,
+                workspace_id=workspace_id,
+                snapshot_name=snapshot_name or None,
+                include_data_blobs=include_data_blobs,
+            )
+            raise
 
     @mcp.tool()
     async def workspace_copy_object(
@@ -205,58 +259,89 @@ def register_admin_tools(mcp):
             object_id: Object UUID to copy
             version: Specific version ID (optional)
         """
-        if ctx:
-            await ctx.info(
-                "Copying object between workspaces",
-                extra={
-                    "source_workspace_id": source_workspace_id,
-                    "target_workspace_id": target_workspace_id,
-                    "object_id": object_id,
-                    "version": version or None,
-                },
-            )
-            await ctx.report_progress(progress=5, total=100)
+        operation_id = str(uuid4())
 
-        await ensure_initialized()
-        source_client = await evo_context.get_object_client(UUID(source_workspace_id))
-        target_client = await evo_context.get_object_client(UUID(target_workspace_id))
-        
-        # Download source object
-        source_object = await source_client.download_object_by_id(UUID(object_id), version=version if version else None)
-        if ctx:
-            await ctx.report_progress(progress=30, total=100)
-        
-        # Extract and copy data blobs
-        data_identifiers = extract_data_references(source_object.as_dict())
-        if data_identifiers:
-            await copy_object_data(
-                source_client,
-                target_client,
-                source_object,
-                data_identifiers,
-                evo_context.connector
-            )
-        if ctx:
-            await ctx.report_progress(progress=75, total=100)
-        
-        # Create object in target workspace
-        object_dict = source_object.as_dict()
-        object_dict["uuid"] = None
-        
-        new_metadata = await target_client.create_geoscience_object(
-            source_object.metadata.path,
-            object_dict
+        await log_operation_event(
+            ctx,
+            logger,
+            "Copying object between workspaces",
+            operation_id,
+            source_workspace_id=source_workspace_id,
+            target_workspace_id=target_workspace_id,
+            object_id=object_id,
+            version=version or None,
         )
-        if ctx:
-            await ctx.report_progress(progress=100, total=100)
-        
-        return {
-            "id": str(new_metadata.id),
-            "name": new_metadata.name,
-            "path": new_metadata.path,
-            "version_id": new_metadata.version_id,
-            "data_blobs_copied": len(data_identifiers),
-        }
+
+        try:
+            if ctx:
+                await ctx.report_progress(progress=5, total=100)
+
+            await ensure_initialized()
+            source_client = await evo_context.get_object_client(UUID(source_workspace_id))
+            target_client = await evo_context.get_object_client(UUID(target_workspace_id))
+
+            # Download source object
+            source_object = await source_client.download_object_by_id(UUID(object_id), version=version if version else None)
+            if ctx:
+                await ctx.report_progress(progress=30, total=100)
+
+            # Extract and copy data blobs
+            data_identifiers = extract_data_references(source_object.as_dict())
+            if data_identifiers:
+                await copy_object_data(
+                    source_client,
+                    target_client,
+                    source_object,
+                    data_identifiers,
+                    evo_context.connector,
+                )
+            if ctx:
+                await ctx.report_progress(progress=75, total=100)
+
+            # Create object in target workspace
+            object_dict = source_object.as_dict()
+            object_dict["uuid"] = None
+
+            new_metadata = await target_client.create_geoscience_object(
+                source_object.metadata.path,
+                object_dict,
+            )
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
+
+            result = {
+                "id": str(new_metadata.id),
+                "name": new_metadata.name,
+                "path": new_metadata.path,
+                "version_id": new_metadata.version_id,
+                "data_blobs_copied": len(data_identifiers),
+            }
+
+            await log_operation_event(
+                ctx,
+                logger,
+                "Workspace object copy completed",
+                operation_id,
+                source_workspace_id=source_workspace_id,
+                target_workspace_id=target_workspace_id,
+                object_id=result["id"],
+                data_blobs_copied=result["data_blobs_copied"],
+            )
+
+            return result
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to copy object between workspaces",
+                operation_id,
+                e,
+                source_workspace_id=source_workspace_id,
+                target_workspace_id=target_workspace_id,
+                object_id=object_id,
+                version=version or None,
+            )
+            raise
 
     @mcp.tool()
     async def workspace_duplicate_workspace(

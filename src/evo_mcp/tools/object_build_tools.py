@@ -27,7 +27,7 @@ from fastmcp.utilities.logging import get_logger
 
 from evo.common.utils import Cache
 from evo_mcp.context import evo_context, ensure_initialized
-from evo_mcp.logging_utils import log_handled_failure, operation_extra, result_with_operation_id
+from evo_mcp.logging_utils import log_handled_failure, log_operation_event, operation_extra, result_with_operation_id
 from evo_mcp.utils.object_builders import (
     PointsetBuilder,
     LineSegmentsBuilder,
@@ -40,6 +40,24 @@ from evo_schemas.objects.downhole_collection import DownholeCollection_V1_3_0
 from evo_schemas.objects.downhole_intervals import DownholeIntervals_V1_3_0
 
 logger = get_logger(__name__)
+
+
+async def _log_builder_result(
+    ctx: Context | None,
+    operation_id: str,
+    message: str,
+    *,
+    ctx_level: str,
+    **extra,
+) -> None:
+    await log_operation_event(
+        ctx,
+        logger,
+        message,
+        operation_id,
+        ctx_level=ctx_level,
+        **extra,
+    )
 
 
 def register_object_builder_tools(mcp):
@@ -103,6 +121,7 @@ def register_object_builder_tools(mcp):
         try:
             csv_path = Path(csv_file)
             if not csv_path.exists():
+                await _log_builder_result(ctx, operation_id, "Pointset CSV file not found", ctx_level="error", csv_file=csv_file)
                 return result_with_operation_id(operation_id, {"status": "error", "error": f"CSV file not found: {csv_file}"})
             df = pd.read_csv(csv_path)
             result["data_summary"]["rows"] = len(df)
@@ -110,6 +129,7 @@ def register_object_builder_tools(mcp):
             if ctx:
                 await ctx.report_progress(progress=15, total=100)
         except Exception as e:
+            await _log_builder_result(ctx, operation_id, "Failed to read pointset CSV file", ctx_level="error", csv_file=csv_file, error=str(e))
             return result_with_operation_id(operation_id, {"status": "error", "error": f"Failed to read CSV file: {e}"})
         
         # Validate required columns
@@ -117,6 +137,7 @@ def register_object_builder_tools(mcp):
         missing = [c for c in required if c not in df.columns]
         if missing:
             result["errors"].append(f"Missing required columns: {missing}")
+            await _log_builder_result(ctx, operation_id, "Pointset validation failed", ctx_level="warning", errors=result["errors"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Clean string columns
@@ -131,6 +152,7 @@ def register_object_builder_tools(mcp):
             result["warnings"].append(f"{nan_count} rows have NaN coordinates")
         if nan_count == len(df):
             result["errors"].append("All rows have NaN coordinates")
+            await _log_builder_result(ctx, operation_id, "Pointset validation failed", ctx_level="warning", errors=result["errors"], warnings=result["warnings"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Calculate bounding box for preview
@@ -148,6 +170,7 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["valid_points"] = len(valid_df)
         except Exception as e:
             result["errors"].append(f"Failed to calculate bounding box: {e}")
+            await _log_builder_result(ctx, operation_id, "Pointset validation failed", ctx_level="warning", errors=result["errors"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Determine attribute columns
@@ -214,6 +237,7 @@ def register_object_builder_tools(mcp):
             try:
                 Pointset_V1_3_0.from_dict(obj_dict)
             except Exception as e:
+                await _log_builder_result(ctx, operation_id, "Pointset schema validation failed", ctx_level="error", error=str(e))
                 return result_with_operation_id(operation_id, {
                     "status": "schema_validation_failed",
                     "error": str(e),
@@ -329,6 +353,7 @@ def register_object_builder_tools(mcp):
         try:
             vertices_path = Path(vertices_file)
             if not vertices_path.exists():
+                await _log_builder_result(ctx, operation_id, "Line segments vertices file not found", ctx_level="error", vertices_file=vertices_file)
                 return result_with_operation_id(operation_id, {"status": "error", "error": f"Vertices file not found: {vertices_file}"})
             vertices_df = pd.read_csv(vertices_path)
             result["data_summary"]["vertices"] = len(vertices_df)
@@ -336,12 +361,14 @@ def register_object_builder_tools(mcp):
             if ctx:
                 await ctx.report_progress(progress=10, total=100)
         except Exception as e:
+            await _log_builder_result(ctx, operation_id, "Failed to read line segments vertices file", ctx_level="error", vertices_file=vertices_file, error=str(e))
             return result_with_operation_id(operation_id, {"status": "error", "error": f"Failed to read vertices file: {e}"})
         
         # Load segments
         try:
             segments_path = Path(segments_file)
             if not segments_path.exists():
+                await _log_builder_result(ctx, operation_id, "Line segments segments file not found", ctx_level="error", segments_file=segments_file)
                 return result_with_operation_id(operation_id, {"status": "error", "error": f"Segments file not found: {segments_file}"})
             segments_df = pd.read_csv(segments_path)
             result["data_summary"]["segments"] = len(segments_df)
@@ -349,6 +376,7 @@ def register_object_builder_tools(mcp):
             if ctx:
                 await ctx.report_progress(progress=20, total=100)
         except Exception as e:
+            await _log_builder_result(ctx, operation_id, "Failed to read line segments segments file", ctx_level="error", segments_file=segments_file, error=str(e))
             return result_with_operation_id(operation_id, {"status": "error", "error": f"Failed to read segments file: {e}"})
         
         # Validate required columns
@@ -363,6 +391,7 @@ def register_object_builder_tools(mcp):
             result["errors"].append(f"Missing segment columns: {missing}")
         
         if result["errors"]:
+            await _log_builder_result(ctx, operation_id, "Line segments validation failed", ctx_level="warning", errors=result["errors"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Clean string columns
@@ -380,6 +409,7 @@ def register_object_builder_tools(mcp):
                 f"Segment indices exceed vertex count. Max valid index: {max_vertex_idx}, "
                 f"found start max: {start_max}, end max: {end_max}"
             )
+            await _log_builder_result(ctx, operation_id, "Line segments validation failed", ctx_level="warning", errors=result["errors"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Calculate bounding box
@@ -389,6 +419,7 @@ def register_object_builder_tools(mcp):
             valid_df = vertices_df[valid_mask]
             if len(valid_df) == 0:
                 result["errors"].append("No valid vertex coordinates found")
+                await _log_builder_result(ctx, operation_id, "Line segments validation failed", ctx_level="warning", errors=result["errors"])
                 return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
             
             result["data_summary"]["bounding_box"] = {
@@ -401,6 +432,7 @@ def register_object_builder_tools(mcp):
             }
         except Exception as e:
             result["errors"].append(f"Failed to calculate bounding box: {e}")
+            await _log_builder_result(ctx, operation_id, "Line segments validation failed", ctx_level="warning", errors=result["errors"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         if dry_run:
@@ -463,6 +495,7 @@ def register_object_builder_tools(mcp):
             try:
                 LineSegments_V2_2_0.from_dict(obj_dict)
             except Exception as e:
+                await _log_builder_result(ctx, operation_id, "Line segments schema validation failed", ctx_level="error", error=str(e))
                 return result_with_operation_id(operation_id, {
                     "status": "schema_validation_failed",
                     "error": str(e),
@@ -594,24 +627,28 @@ def register_object_builder_tools(mcp):
         try:
             collar_path = Path(collar_file)
             if not collar_path.exists():
+                await _log_builder_result(ctx, operation_id, "Downhole collar file not found", ctx_level="error", collar_file=collar_file)
                 return result_with_operation_id(operation_id, {"status": "error", "error": f"Collar file not found: {collar_file}"})
             collar_df = pd.read_csv(collar_path)
             result["data_summary"]["collar_rows"] = len(collar_df)
             if ctx:
                 await ctx.report_progress(progress=8, total=100)
         except Exception as e:
+            await _log_builder_result(ctx, operation_id, "Failed to read downhole collar file", ctx_level="error", collar_file=collar_file, error=str(e))
             return result_with_operation_id(operation_id, {"status": "error", "error": f"Failed to read collar file: {e}"})
         
         # Load survey file
         try:
             survey_path = Path(survey_file)
             if not survey_path.exists():
+                await _log_builder_result(ctx, operation_id, "Downhole survey file not found", ctx_level="error", survey_file=survey_file)
                 return result_with_operation_id(operation_id, {"status": "error", "error": f"Survey file not found: {survey_file}"})
             survey_df = pd.read_csv(survey_path)
             result["data_summary"]["survey_rows"] = len(survey_df)
             if ctx:
                 await ctx.report_progress(progress=15, total=100)
         except Exception as e:
+            await _log_builder_result(ctx, operation_id, "Failed to read downhole survey file", ctx_level="error", survey_file=survey_file, error=str(e))
             return result_with_operation_id(operation_id, {"status": "error", "error": f"Failed to read survey file: {e}"})
         
         # Validate required columns
@@ -630,6 +667,7 @@ def register_object_builder_tools(mcp):
             result["errors"].append(f"Missing survey columns: {missing}")
         
         if result["errors"]:
+            await _log_builder_result(ctx, operation_id, "Downhole collection validation failed", ctx_level="warning", errors=result["errors"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Clean string columns
@@ -647,6 +685,7 @@ def register_object_builder_tools(mcp):
             )
         if nan_count == len(collar_df):
             result["errors"].append("All collar rows have NaN coordinates")
+            await _log_builder_result(ctx, operation_id, "Downhole collection validation failed", ctx_level="warning", errors=result["errors"], warnings=result["warnings"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Count unique holes
@@ -671,6 +710,7 @@ def register_object_builder_tools(mcp):
             }
         except Exception as e:
             result["errors"].append(f"Failed to calculate bounding box: {e}")
+            await _log_builder_result(ctx, operation_id, "Downhole collection validation failed", ctx_level="warning", errors=result["errors"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Load interval files
@@ -713,6 +753,7 @@ def register_object_builder_tools(mcp):
                 result["errors"].append(f"Failed to load interval file {i}: {e}")
         
         if result["errors"]:
+            await _log_builder_result(ctx, operation_id, "Downhole collection validation failed", ctx_level="warning", errors=result["errors"], warnings=result["warnings"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Dry run - just return validation results
@@ -780,6 +821,7 @@ def register_object_builder_tools(mcp):
             try:
                 DownholeCollection_V1_3_0.from_dict(obj_dict)
             except Exception as e:
+                await _log_builder_result(ctx, operation_id, "Downhole collection schema validation failed", ctx_level="error", error=str(e))
                 return result_with_operation_id(operation_id, {
                     "status": "schema_validation_failed",
                     "error": str(e),
@@ -906,6 +948,7 @@ def register_object_builder_tools(mcp):
         try:
             csv_path = Path(csv_file)
             if not csv_path.exists():
+                await _log_builder_result(ctx, operation_id, "Downhole intervals CSV file not found", ctx_level="error", csv_file=csv_file)
                 return result_with_operation_id(operation_id, {"status": "error", "error": f"CSV file not found: {csv_file}"})
             df = pd.read_csv(csv_path)
             result["data_summary"]["rows"] = len(df)
@@ -913,6 +956,7 @@ def register_object_builder_tools(mcp):
             if ctx:
                 await ctx.report_progress(progress=15, total=100)
         except Exception as e:
+            await _log_builder_result(ctx, operation_id, "Failed to read downhole intervals CSV file", ctx_level="error", csv_file=csv_file, error=str(e))
             return result_with_operation_id(operation_id, {"status": "error", "error": f"Failed to read CSV file: {e}"})
         
         # Validate required columns
@@ -925,6 +969,7 @@ def register_object_builder_tools(mcp):
         missing = [c for c in required if c not in df.columns]
         if missing:
             result["errors"].append(f"Missing required columns: {missing}")
+            await _log_builder_result(ctx, operation_id, "Downhole intervals validation failed", ctx_level="warning", errors=result["errors"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Clean string columns
@@ -939,6 +984,7 @@ def register_object_builder_tools(mcp):
             result["warnings"].append(f"{nan_count} rows have NaN midpoint coordinates")
         if nan_count == len(df):
             result["errors"].append("All rows have NaN midpoint coordinates")
+            await _log_builder_result(ctx, operation_id, "Downhole intervals validation failed", ctx_level="warning", errors=result["errors"], warnings=result["warnings"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Calculate bounding box for preview
@@ -956,6 +1002,7 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["valid_intervals"] = len(valid_df)
         except Exception as e:
             result["errors"].append(f"Failed to calculate bounding box: {e}")
+            await _log_builder_result(ctx, operation_id, "Downhole intervals validation failed", ctx_level="warning", errors=result["errors"])
             return result_with_operation_id(operation_id, {"status": "validation_failed", "validation": result})
         
         # Count unique holes
@@ -1040,6 +1087,7 @@ def register_object_builder_tools(mcp):
             try:
                 DownholeIntervals_V1_3_0.from_dict(obj_dict)
             except Exception as e:
+                await _log_builder_result(ctx, operation_id, "Downhole intervals schema validation failed", ctx_level="error", error=str(e))
                 return result_with_operation_id(operation_id, {
                     "status": "schema_validation_failed",
                     "error": str(e),

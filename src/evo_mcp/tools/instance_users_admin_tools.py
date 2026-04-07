@@ -1,10 +1,12 @@
 import functools
 from uuid import UUID
 from typing import Callable
+from uuid import uuid4
 from fastmcp import Context
 from fastmcp.utilities.logging import get_logger
 
 from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.logging_utils import log_handled_failure, log_operation_event, operation_extra
 
 logger = get_logger(__name__)
 
@@ -39,11 +41,14 @@ def register_instance_users_admin_tools(mcp):
         Returns:
             A list of users in the instance, their names, email addresses and roles.
         """
-        if ctx:
-            await ctx.info("Listing users in instance", extra={"count": count})
-            await ctx.report_progress(progress=10, total=100)
-
-        workspace_client = await get_workspace_client()
+        operation_id = str(uuid4())
+        await log_operation_event(
+            ctx,
+            logger,
+            "Listing users in instance",
+            operation_id,
+            count=count,
+        )
 
         async def read_pages_from_api(func: Callable, up_to: int | None = None, limit: int = 100):
             """Page through the API client method `func` until we get up_to results or run out of pages.
@@ -69,40 +74,75 @@ def register_instance_users_admin_tools(mcp):
 
             return ret
 
-        instance_users = await read_pages_from_api(
-            functools.partial(
-                workspace_client.list_instance_users
-            ),
-            up_to=count,
-        )
+        try:
+            if ctx:
+                await ctx.report_progress(progress=10, total=100)
 
-        if ctx:
-            await ctx.report_progress(progress=100, total=100)
-            await ctx.info("Listed users in instance", extra={"returned_count": len(instance_users)})
-        
-        return [
-            {
-                "user_id": user.user_id,
-                "email": user.email,
-                "name": user.full_name,
-                "roles": [role.name for role in user.roles]
-            }
-            for user in instance_users
-        ]
+            workspace_client = await get_workspace_client()
+            instance_users = await read_pages_from_api(
+                functools.partial(
+                    workspace_client.list_instance_users
+                ),
+                up_to=count,
+            )
+
+            result = [
+                {
+                    "user_id": user.user_id,
+                    "email": user.email,
+                    "name": user.full_name,
+                    "roles": [role.name for role in user.roles]
+                }
+                for user in instance_users
+            ]
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
+            await log_operation_event(
+                ctx,
+                logger,
+                "Listed users in instance",
+                operation_id,
+                returned_count=len(result),
+            )
+            return result
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to list users in instance",
+                operation_id,
+                e,
+                count=count,
+            )
+            raise
     
     @mcp.tool()
     async def list_roles_in_instance(
         ctx: Context | None = None,
     ) -> list[dict]:
         """List the roles available in the instance."""
-        if ctx:
-            await ctx.info("Listing roles in instance")
-        workspace_client = await get_workspace_client()
-
-        instance_roles_response = await workspace_client.list_instance_roles()
-        if ctx:
-            await ctx.info("Listed roles in instance", extra={"role_count": len(instance_roles_response)})
-        return instance_roles_response
+        operation_id = str(uuid4())
+        await log_operation_event(ctx, logger, "Listing roles in instance", operation_id)
+        try:
+            workspace_client = await get_workspace_client()
+            instance_roles_response = await workspace_client.list_instance_roles()
+            await log_operation_event(
+                ctx,
+                logger,
+                "Listed roles in instance",
+                operation_id,
+                role_count=len(instance_roles_response),
+            )
+            return instance_roles_response
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to list roles in instance",
+                operation_id,
+                e,
+            )
+            raise
 
     @mcp.tool()
     async def add_users_to_instance(
@@ -133,32 +173,52 @@ def register_instance_users_admin_tools(mcp):
             Invitations are for external users who would need to accept the invitation to join the instance.
             Members are for users who are already part of the organization.
         """
-        if ctx:
-            await ctx.info(
-                "Adding users to instance",
-                extra={"user_count": len(user_emails), "role_count": len(role_ids)},
-            )
-            await ctx.report_progress(progress=20, total=100)
+        operation_id = str(uuid4())
+        await log_operation_event(
+            ctx,
+            logger,
+            "Adding users to instance",
+            operation_id,
+            user_count=len(user_emails),
+            role_count=len(role_ids),
+        )
 
-        workspace_client = await get_workspace_client()
-        
-        users = {email : role_ids for email in user_emails}
+        try:
+            if ctx:
+                await ctx.report_progress(progress=20, total=100)
 
-        response = await workspace_client.add_users_to_instance(users=users)
-        if ctx:
-            await ctx.report_progress(progress=100, total=100)
+            workspace_client = await get_workspace_client()
+            users = {email: role_ids for email in user_emails}
 
-        invitations = response.invitations or []
-        members = response.members or []
-        if ctx:
-            await ctx.info(
+            response = await workspace_client.add_users_to_instance(users=users)
+            if ctx:
+                await ctx.report_progress(progress=100, total=100)
+
+            invitations = response.invitations or []
+            members = response.members or []
+            await log_operation_event(
+                ctx,
+                logger,
                 "Users added to instance",
-                extra={"invitations_sent": len(invitations), "members_added": len(members)},
+                operation_id,
+                invitations_sent=len(invitations),
+                members_added=len(members),
             )
-        return {
-            "invitations_sent": [invitation.email for invitation in invitations],
-            "members_added": [member.email for member in members],
-        }
+            return {
+                "invitations_sent": [invitation.email for invitation in invitations],
+                "members_added": [member.email for member in members],
+            }
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to add users to instance",
+                operation_id,
+                e,
+                user_count=len(user_emails),
+                role_count=len(role_ids),
+            )
+            raise
 
     @mcp.tool()
     async def remove_user_from_instance(
@@ -177,22 +237,41 @@ def register_instance_users_admin_tools(mcp):
             user_id: The user ID of the user to remove from the instance. Must
                 match an entry returned from the `get_users_in_instance` tool.
         """
-        if ctx:
-            await ctx.info(
-                "Removing user from instance",
-                extra={"user_email": user_email, "user_id": str(user_id)},
+        operation_id = str(uuid4())
+        await log_operation_event(
+            ctx,
+            logger,
+            "Removing user from instance",
+            operation_id,
+            user_email=user_email,
+            user_id=str(user_id),
+        )
+
+        try:
+            workspace_client = await get_workspace_client()
+            await workspace_client.remove_instance_user(user_id=user_id)
+            await log_operation_event(
+                ctx,
+                logger,
+                "Removed user from instance",
+                operation_id,
+                user_email=user_email,
+                user_id=str(user_id),
             )
-
-        workspace_client = await get_workspace_client()
-
-        await workspace_client.remove_instance_user(user_id=user_id)
-
-        if ctx:
-            await ctx.info("Removed user from instance", extra={"user_email": user_email})
-
-        return {
-            "user_removed": user_email,
-        }
+            return {
+                "user_removed": user_email,
+            }
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to remove user from instance",
+                operation_id,
+                e,
+                user_email=user_email,
+                user_id=str(user_id),
+            )
+            raise
 
     @mcp.tool()
     async def update_user_role_in_instance(
@@ -218,22 +297,44 @@ def register_instance_users_admin_tools(mcp):
                 The default role is the "Evo user" role for the selected
                 instance.
         """
-        if ctx:
-            await ctx.info(
-                "Updating user role in instance",
-                extra={"user_email": user_email, "user_id": str(user_id), "role_count": len(role_ids)},
+        operation_id = str(uuid4())
+        await log_operation_event(
+            ctx,
+            logger,
+            "Updating user role in instance",
+            operation_id,
+            user_email=user_email,
+            user_id=str(user_id),
+            role_count=len(role_ids),
+        )
+
+        try:
+            workspace_client = await get_workspace_client()
+            await workspace_client.update_instance_user_roles(user_id=user_id, roles=role_ids)
+            await log_operation_event(
+                ctx,
+                logger,
+                "Updated user role in instance",
+                operation_id,
+                user_email=user_email,
+                user_id=str(user_id),
+                role_count=len(role_ids),
             )
-
-        workspace_client = await get_workspace_client()
-
-        await workspace_client.update_instance_user_roles(user_id=user_id, roles=role_ids)
-
-        if ctx:
-            await ctx.info("Updated user role in instance", extra={"user_email": user_email})
-
-        return {
-            "user_role_updated": user_email,
-            "new_roles": role_ids,
-        }
+            return {
+                "user_role_updated": user_email,
+                "new_roles": role_ids,
+            }
+        except Exception as e:
+            await log_handled_failure(
+                ctx,
+                logger,
+                "Failed to update user role in instance",
+                operation_id,
+                e,
+                user_email=user_email,
+                user_id=str(user_id),
+                role_count=len(role_ids),
+            )
+            raise
 
   
