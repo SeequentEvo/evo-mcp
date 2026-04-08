@@ -34,9 +34,14 @@ class DelegatedAuthContext(EvoContextBase):
         super().__init__()
         self.client_session_id = client_session_id
         self._access_token = None
-        # Temp dir for SDK Cache used by object_build_tools — cleaned up by OS
-        self.cache_path = Path(tempfile.mkdtemp(prefix=f"evo-mcp-{client_session_id[:8]}-"))
+        # Temp dir for SDK Cache used by object_build_tools — cleaned up on GC
+        self._temp_dir = tempfile.TemporaryDirectory(prefix=f"evo-mcp-{client_session_id[:8]}-")
+        self.cache_path = Path(self._temp_dir.name)
         #TODO: Consider using redis-based cache backend to share session data across multiple MCP server instances or to deploy in ephemeral environments (e.g. Kubernetes)
+
+    def cleanup(self) -> None:
+        """Remove the temporary cache directory."""
+        self._temp_dir.cleanup()
 
     async def get_authorizer(self) -> AccessTokenAuthorizer:
         return AccessTokenAuthorizer(access_token=self._access_token)

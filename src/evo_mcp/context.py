@@ -34,16 +34,14 @@ logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") == "1" else logging.INF
 
 
 delegated_mode: bool = False
-managed_context: ManagedAuthContext = ManagedAuthContext()
+managed_context: ManagedAuthContext | None = None
 
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "3600"))
 MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "1000"))
 delegated_contexts: TTLCache[str, DelegatedAuthContext] = TTLCache(
     maxsize=MAX_SESSIONS, ttl=SESSION_TTL_SECONDS
 )
-session_locks: TTLCache[str, asyncio.Lock] = TTLCache(
-    maxsize=MAX_SESSIONS, ttl=SESSION_TTL_SECONDS
-)
+session_locks: dict[str, asyncio.Lock] = {}
 
 #TODO: Move this to an environment manager module
 MCP_TRANSPORT= os.getenv("MCP_TRANSPORT", "stdio").lower()
@@ -67,6 +65,9 @@ async def get_evo_context() -> EvoContextBase:
     cleanly while preserving instance selection via seeds.
     """
     if not delegated_mode:
+        global managed_context
+        if managed_context is None:
+            managed_context = ManagedAuthContext()
         await managed_context.initialize()
         return managed_context
 

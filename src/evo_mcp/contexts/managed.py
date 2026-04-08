@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent
 _CACHE_PATH = _REPO_ROOT / ".cache"
-_CACHE_PATH.mkdir(parents=True, exist_ok=True)
 
 
 class ManagedAuthContext(EvoContextBase):

@@ -1,8 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Bentley Systems, Incorporated
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import os
-import logging
-from urllib.parse import urlparse 
-from fastmcp.server.auth.oidc_proxy import OIDCProxy
+from urllib.parse import urlparse
+
 from evo.oauth import EvoScopes
+from fastmcp.server.auth.oidc_proxy import OIDCProxy
 
 def create_auth_provider(base_url: str):
     """Create an OIDCProxy auth provider for HTTP transport.
