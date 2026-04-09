@@ -19,7 +19,7 @@ All tools follow a similar pattern:
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID
 
 import pandas as pd
@@ -55,7 +55,7 @@ def register_object_builder_tools(mcp):
         z_column: str,
         attribute_columns: list[str] = [],
         tags: dict = {},
-        coordinate_reference_system: str = "unspecified",
+        coordinate_reference_system: Union[str, int] = "unspecified",
         dry_run: bool = True,
     ) -> dict:
         """Build and create a Pointset object from a CSV file.
@@ -74,7 +74,7 @@ def register_object_builder_tools(mcp):
             z_column: Z coordinate column name
             attribute_columns: Columns to include as attributes (empty = auto-detect all)
             tags: Optional tags dictionary
-            coordinate_reference_system: CRS string (default: "unspecified")
+            coordinate_reference_system: CRS - either "unspecified" or an EPSG code (int)
             dry_run: If True, validate only without creating (default: True)
         
         Returns:
@@ -219,7 +219,7 @@ def register_object_builder_tools(mcp):
         vertex_attribute_columns: list[str] = [],
         segment_attribute_columns: list[str] = [],
         tags: dict = {},
-        coordinate_reference_system: str = "unspecified",
+        coordinate_reference_system: Union[str, int] = "unspecified",
         dry_run: bool = True,
     ) -> dict:
         """Build and create a LineSegments object from CSV files.
@@ -246,7 +246,7 @@ def register_object_builder_tools(mcp):
             vertex_attribute_columns: Vertex attributes (empty = auto-detect)
             segment_attribute_columns: Segment attributes (empty = auto-detect)
             tags: Optional tags dictionary
-            coordinate_reference_system: CRS string (default: "unspecified")
+            coordinate_reference_system: CRS - either "unspecified" or an EPSG code (int)
             dry_run: If True, validate only without creating (default: True)
         
         Returns:
@@ -415,7 +415,7 @@ def register_object_builder_tools(mcp):
         max_depth_column: Optional[str] = None,
         interval_files: list[dict] = [],
         tags: dict = {},
-        coordinate_reference_system: str = "unspecified",
+        coordinate_reference_system: Union[str, int] = "unspecified",
         invert_z: bool = False,
         dry_run: bool = True,
     ) -> dict:
@@ -453,7 +453,7 @@ def register_object_builder_tools(mcp):
                 - to_column: To depth column name
                 - attribute_columns: (optional) List of columns to include as attributes
             tags: Optional tags dictionary
-            coordinate_reference_system: CRS string (default: "unspecified")
+            coordinate_reference_system: CRS - either "unspecified" or an EPSG code (int)
             invert_z: If True, negate dip values in survey data. Set depending on the convention followed. Default: False.
             dry_run: If True, validate only without creating (default: True)
         
@@ -675,7 +675,7 @@ def register_object_builder_tools(mcp):
         attribute_columns: list[str] = [],
         is_composited: bool = False,
         tags: dict = {},
-        coordinate_reference_system: str = "unspecified",
+        coordinate_reference_system: Union[str, int] = "unspecified",
         dry_run: bool = True,
     ) -> dict:
         """Build and create a DownholeIntervals object from a CSV file.
@@ -708,7 +708,7 @@ def register_object_builder_tools(mcp):
             attribute_columns: Columns to include as attributes (empty = auto-detect)
             is_composited: Whether the intervals are composited (default: False)
             tags: Optional tags dictionary
-            coordinate_reference_system: CRS string (default: "unspecified")
+            coordinate_reference_system: CRS - either "unspecified" or an EPSG code (int)
             dry_run: If True, validate only without creating (default: True)
         
         Returns:
