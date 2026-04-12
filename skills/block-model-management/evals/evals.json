@@ -3,7 +3,7 @@
   "setup": {
     "steps": [
       {"step": 0, "tool": "reset_staging", "args": {}},
-      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills/block-model-management/evals/fixtures.json"], "fixture_names": ["bm_standard_block_model"]}}
+      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills/block-model-management/evals/fixtures.json"], "fixture_names": ["bm_regular_block_model"]}}
     ]
   },
   "evals":[

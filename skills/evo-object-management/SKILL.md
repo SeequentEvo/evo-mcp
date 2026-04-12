@@ -28,7 +28,7 @@ Use this skill when the user needs to:
 
 ## Notes
 
-- Standard (non-regular) block models can be imported but not published.
+- Subblocked block models can be imported but not published.
 - Only regular block models can be published to Evo.
 
 ## Error Handling

@@ -16,7 +16,7 @@
       }
     }
   },
-  "vcu_standard_block_model": {
+  "vcu_regular_block_model": {
     "seed_mode": "staged",
     "object_type": "regular_block_model",
     "name": "VCU Test Block Model",

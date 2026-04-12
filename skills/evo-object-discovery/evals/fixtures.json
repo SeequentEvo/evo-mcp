@@ -43,7 +43,7 @@
       }
     }
   },
-  "eod_standard_block_model": {
+  "eod_regular_block_model": {
     "seed_mode": "workspace",
     "object_type": "regular_block_model",
     "name": "EOD Test Block Model",

@@ -11,8 +11,7 @@ Each codec handles one typed SDK data class:
 
 BlockModelCodec supports two block-model variants:
   - *regular* (``RegularBlockModelData``): locally-creatable regular grids.
-  - *standard* (``BlockModelData``): non-regular models (sub-blocked, octree, …)
-    imported from the Block Model Service.  Standard models are import-only.
+  - *subblocked* (``BlockModelData``): Imported from the Block Model Service.
 
 Typed *data* classes are used, not service-backed wrapper classes.
 
@@ -420,9 +419,9 @@ def _rotation_from_dict(data: dict[str, Any] | None) -> Rotation | None:
 
 
 class BlockModelCodec:
-    """Codec for BlockModelData staged payloads (standard/reference block models only).
+    """Codec for BlockModelData staged payloads (subblocked/reference block models only).
 
-    Standard block models are imported from the Block Model Service as references
+    Subblocked block models are imported from the Block Model Service as references
     and are read-only — they cannot be published back.
     """
 
@@ -446,7 +445,7 @@ class BlockModelCodec:
         """Serialize BlockModelData to a JSON-compatible dict."""
         g = payload.geometry
         return {
-            "block_model_kind": "standard",
+            "block_model_kind": "subblocked",
             "name": payload.name,
             "description": payload.description,
             "tags": payload.tags,
@@ -522,7 +521,7 @@ class BlockModelCodec:
         bm_uuid_raw = data.get("block_model_uuid")
         if not bm_uuid_raw:
             raise StageValidationError(
-                "Standard BlockModelData dict is missing 'block_model_uuid'."
+                "Subblocked BlockModelData dict is missing 'block_model_uuid'."
             )
         bm_version_raw = data.get("block_model_version_uuid")
         attrs_raw = data.get("attributes", [])
@@ -565,7 +564,7 @@ class BlockModelCodec:
         b = g.block_size
         total = n.nx * n.ny * n.nz
         return {
-            "block_model_kind": "standard",
+            "block_model_kind": "subblocked",
             "model_type": g.model_type,
             "total_blocks": total,
             "nx": n.nx,

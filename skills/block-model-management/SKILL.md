@@ -12,13 +12,13 @@ Use this skill for local block model handling: design regular block model defini
 Use this skill when the user needs to:
 
 - design a regular block model definition from explicit extents
-- inspect and validate any block model definition (regular or standard)
+- inspect and validate any block model definition (regular or subblocked)
 - keep local design and inspection separate from Evo persistence
 
 ## Block Model Types
 
 - **Regular**: uniform grid, can be designed locally from extents. Has origin, n_blocks, block_size.
-- **Standard** (non-regular): imported from Evo only. Types include fully-sub-blocked, flexible, octree. Has geometry metadata and attribute names but cannot be created locally.
+- **Subblocked**: imported from Evo only. Types include fully-sub-blocked, flexible, octree. Has geometry metadata and attribute names but cannot be created locally.
 
 Both types can be staged and inspected locally.
 
@@ -27,7 +27,7 @@ Both types can be staged and inspected locally.
 ### Quick Selection Guide
 
 - `regular_block_model_design_from_extents`: Design a new regular block model from explicit min/max extents and block sizes.
-- `block_model_get_definition_details`: Inspect and summarize any staged block model (regular or standard).
+- `block_model_get_definition_details`: Inspect and summarize any staged block model (regular or subblocked).
 
 ## Decision Flow
 
@@ -50,7 +50,7 @@ User needs block model help
 
 ## Rules
 
-- Regular block models can be designed locally; standard block models are import-only.
+- Regular block models can be designed locally; subblocked block models are import-only.
 - Keep payloads strict and canonical.
 - Keep derivation results explicit: origin, n_blocks, block_size, total_blocks, and resulting bounding box.
 - Both tools are local operations — no Evo API calls.
@@ -80,7 +80,7 @@ Canonical regular block model payload:
 - Invalid extents (`min >= max` on any axis): reject and identify the offending axis.
 - Zero-volume grid (extents collapse on any axis): reject before computing block counts.
 - Block model name not found in session: report that the name could not be resolved and suggest checking staged objects.
-- Standard block model used with design tool: explain that standard block models are import-only and cannot be redesigned locally.
+- Subblocked block model used with design tool: explain that subblocked block models are import-only and cannot be redesigned locally.
 
 ## Required Inputs
 

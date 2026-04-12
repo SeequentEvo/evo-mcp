@@ -118,7 +118,7 @@ async def _publish_one(
             context, typed_payload, path=object_path
         )
     elif object_type == "block_model":        raise ValueError(
-            "Standard block models are import-only and cannot be published."
+            "Subblocked block models are import-only and cannot be published."
         )
     else:
         raise ValueError(f"Unknown object_type '{object_type}'.")

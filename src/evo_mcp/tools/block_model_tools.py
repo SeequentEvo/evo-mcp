@@ -242,7 +242,7 @@ def register_block_model_tools(mcp) -> None:
             )
             result: dict[str, Any] = {
                 "status": "success",
-                "block_model_kind": "standard",
+                "block_model_kind": "subblocked",
                 "model_type": g.model_type,
                 "name": parsed.name,
                 "description": parsed.description,
