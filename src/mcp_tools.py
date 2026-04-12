@@ -15,7 +15,7 @@ Configuration:
 
     Set MCP_TOOL_FILTER environment variable to filter tools and prompts:
     - "admin" : Workspace management tools
-    - "data"    : Object query and management tools
+    - "data"  : Object query, file operations, and management tools
     - "compute" : Compute and geostatistics tools
     - "all"       : All tools (default)
 
@@ -45,6 +45,7 @@ from evo_mcp.tools import (
     register_general_tools,
     register_filesystem_tools,
     register_object_builder_tools,
+    register_file_tools,
     register_object_management_tools,
     register_instance_users_admin_tools,
     register_point_set_tools,
@@ -148,7 +149,7 @@ if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
-    # Import/publish tools in object_management_tools
+    register_file_tools(mcp)
     register_object_management_tools(mcp)
     register_point_set_tools(mcp)
     register_block_model_tools(mcp)
