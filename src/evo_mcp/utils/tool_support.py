@@ -4,13 +4,15 @@
 
 """Shared support helpers for Evo MCP tool modules."""
 
+import asyncio
 from typing import Annotated, Any
 from uuid import UUID
 
-from evo.common import StaticContext
+from evo.common import IFeedback, StaticContext
 from evo.common.utils import Cache
 from evo.objects.typed import EpsgCode
 from evo.widgets import get_portal_url, get_viewer_url
+from fastmcp import Context
 from pydantic import Field
 
 from evo_mcp.context import ensure_initialized, evo_context
@@ -22,6 +24,21 @@ VariogramObjectId = Annotated[
         description=("UUID of the variogram object to use for kriging."),
     ),
 ]
+
+
+class MCPFeedback(IFeedback):
+    """IFeedback implementation that forwards progress to a FastMCP Context.
+
+    Bridges the synchronous IFeedback.progress() contract to FastMCP's async
+    ctx.report_progress() by scheduling the coroutine on the running event loop.
+    Progress values (0.0–1.0) are scaled to a 0–100 range.
+    """
+
+    def __init__(self, ctx: Context) -> None:
+        self._ctx = ctx
+
+    def progress(self, progress: float, message: str | None = None) -> None:
+        asyncio.ensure_future(self._ctx.report_progress(progress * 100, 100, message))
 
 
 def require_object_role(

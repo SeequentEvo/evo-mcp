@@ -10,6 +10,7 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
+from fastmcp import Context
 
 from evo.common import StaticContext
 from evo.objects.typed import object_from_uuid
@@ -29,6 +30,7 @@ from evo.compute.tasks.kriging import (
 )
 from evo_mcp.context import evo_context
 from evo_mcp.utils.tool_support import (
+    MCPFeedback,
     VariogramObjectId,
     get_workspace_environment,
     build_links_from_metadata,
@@ -208,6 +210,7 @@ def register_compute_tools(mcp) -> None:
     async def kriging_run(
         workspace_id: str,
         scenarios: list[KrigingParameters],
+        ctx: Context,
     ) -> dict[str, Any]:
         """Run one or more kriging compute tasks in parallel.
 
@@ -224,7 +227,9 @@ def register_compute_tools(mcp) -> None:
         environment = await get_workspace_environment(workspace_id)
         context = StaticContext.from_environment(environment, evo_context.connector)
 
-        results = await run_compute(context, scenarios, preview=True)
+        results = await run_compute(
+            context, scenarios, preview=True, fb=MCPFeedback(ctx)
+        )
         return {
             "status": "success",
             "scenarios_completed": len(results),
