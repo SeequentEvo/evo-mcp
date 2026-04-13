@@ -28,7 +28,7 @@ Use this skill when the user needs to:
 
 ## Notes
 
-- Subblocked block models can be imported but not published.
+- Subblocked block models can be imported but not published. (Not yet supported by SDK.)
 - Only regular block models can be published to Evo.
 
 ## Error Handling
