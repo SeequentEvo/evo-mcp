@@ -8,8 +8,6 @@ Tools for designing and inspecting block model definitions.
 Objects are tracked by name via the session registry.
 """
 
-from __future__ import annotations
-
 import math
 from typing import Any
 
@@ -25,19 +23,7 @@ from evo.objects.typed import (
 from evo_mcp.session import object_registry, ResolutionError
 from evo_mcp.staging.errors import StageError
 from evo_mcp.staging.service import staging_service
-from evo_mcp.utils.tool_support import (
-    coerce_float,
-    normalize_crs,
-)
-
-def _coerce_int(value: Any, field_name: str) -> int:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be an integer; got {value!r}.") from exc
-    if parsed < 1:
-        raise ValueError(f"{field_name} must be greater than or equal to 1.")
-    return parsed
+from evo_mcp.utils.tool_support import normalize_crs
 
 
 def _bounding_box_to_dict(bounding_box: BoundingBox) -> dict[str, float]:

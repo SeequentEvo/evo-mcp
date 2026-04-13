@@ -8,8 +8,6 @@ Validates CRS compatibility between staged objects using the session
 registry. No Evo API calls required.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 from evo_mcp.session import object_registry, ResolutionError

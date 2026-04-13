@@ -8,8 +8,6 @@ Centralised import/publish tools for all domain object types
 (variogram, point_set, block_model).
 """
 
-from __future__ import annotations
-
 from typing import Any, Literal
 
 from evo.blockmodels.typed import RegularBlockModelData

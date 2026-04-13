@@ -8,8 +8,6 @@ Tools for building and inspecting point set data. Objects are tracked
 by name via the session registry.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, Literal
 
@@ -251,7 +249,9 @@ def register_point_set_tools(mcp) -> None:
         except (StageError, ResolutionError) as exc:
             raise ValueError(str(exc)) from exc
         summary = dict(entry.summary)
-        summary["bounding_box"] = _point_set_summary(point_set_data_model.locations).get("bounding_box")
+        summary["bounding_box"] = _point_set_summary(
+            point_set_data_model.locations
+        ).get("bounding_box")
         return {
             "name": point_set_data_model.name,
             "coordinate_reference_system": point_set_data_model.coordinate_reference_system,

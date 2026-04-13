@@ -8,8 +8,6 @@ This is the sole backend for initial implementation. A durable backend
 (sqlite/redis) can be swapped in later by replacing this module.
 """
 
-from __future__ import annotations
-
 import copy
 import sys
 import uuid

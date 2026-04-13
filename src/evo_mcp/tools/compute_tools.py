@@ -4,8 +4,6 @@
 
 """MCP tools for compute task execution."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 from typing import Annotated, Any

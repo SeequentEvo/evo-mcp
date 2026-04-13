@@ -12,8 +12,6 @@ Tools:
   - seed, reset_staging
 """
 
-from __future__ import annotations
-
 import json
 import logging
 from datetime import datetime, timezone
@@ -117,7 +115,8 @@ async def _publish_one(
         published_obj = await BlockModel.create_regular(
             context, typed_payload, path=object_path
         )
-    elif object_type == "block_model":        raise ValueError(
+    elif object_type == "block_model":
+        raise ValueError(
             "Subblocked block models are import-only and cannot be published."
         )
     else:

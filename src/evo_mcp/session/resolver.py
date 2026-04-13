@@ -4,10 +4,6 @@
 
 """Object name resolver with case-insensitive matching and type scoping."""
 
-from __future__ import annotations
-
-from typing import Any
-
 from evo_mcp.session.models import RegistryEntry
 from evo_mcp.staging.models import ObjectType
 
@@ -59,8 +55,7 @@ class ObjectResolver:
         # 1. Exact name + type
         if object_type is not None:
             exact = [
-                e for e in candidates
-                if e.name == name and e.object_type == object_type
+                e for e in candidates if e.name == name and e.object_type == object_type
             ]
             if len(exact) == 1:
                 return exact[0]
@@ -106,9 +101,7 @@ class ObjectResolver:
         available = sorted({e.name for e in candidates})
         hint = f" Available objects: {', '.join(available)}" if available else ""
         type_hint = f" (type={object_type})" if object_type else ""
-        raise ResolutionError(
-            f"No object found with name '{name}'{type_hint}.{hint}"
-        )
+        raise ResolutionError(f"No object found with name '{name}'{type_hint}.{hint}")
 
     def _resolve_latest_by_type(
         self,
@@ -118,9 +111,7 @@ class ObjectResolver:
         """Return the most recently registered object of the given type."""
         typed = [e for e in candidates if e.object_type == object_type]
         if not typed:
-            raise ResolutionError(
-                f"No {object_type} objects in the current session."
-            )
+            raise ResolutionError(f"No {object_type} objects in the current session.")
         return self._pick_latest(typed)
 
     @staticmethod

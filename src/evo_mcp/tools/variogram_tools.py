@@ -8,8 +8,6 @@ Tools for creating and inspecting variogram data. Objects are tracked by name
 via the session registry.
 """
 
-from __future__ import annotations
-
 import math
 from typing import Any, Literal
 
@@ -35,6 +33,11 @@ from evo.objects.typed.variogram import _evaluate_structure
 from evo_mcp.session import object_registry, ResolutionError
 from evo_mcp.staging.errors import StageError
 from evo_mcp.staging.service import staging_service
+from evo.compute.tasks import (
+    Ellipsoid as ComputeEllipsoid,
+    EllipsoidRanges as ComputeEllipsoidRanges,
+    Rotation as ComputeRotation,
+)
 
 
 def _variogram_structure_from_inputs(
@@ -417,7 +420,9 @@ def register_variogram_tools(mcp) -> None:
             raise ValueError("scale_factor must be greater than zero.")
 
         try:
-            _, variogram_data = object_registry.get_payload(name=variogram_name, object_type="variogram")
+            _, variogram_data = object_registry.get_payload(
+                name=variogram_name, object_type="variogram"
+            )
         except (StageError, ResolutionError) as exc:
             raise ValueError(str(exc)) from exc
 
@@ -463,7 +468,9 @@ def register_variogram_tools(mcp) -> None:
     ) -> dict[str, Any]:
         """Return structure details from a variogram for inspection and selection."""
         try:
-            _, variogram_data = object_registry.get_payload(name=variogram_name, object_type="variogram")
+            _, variogram_data = object_registry.get_payload(
+                name=variogram_name, object_type="variogram"
+            )
         except (StageError, ResolutionError) as exc:
             raise ValueError(str(exc)) from exc
         structures = variogram_data.get_structures_as_dicts()
@@ -498,7 +505,9 @@ def register_variogram_tools(mcp) -> None:
     ) -> dict[str, Any]:
         """Return ellipsoid details and optional 3D plotting points from a variogram."""
         try:
-            _, variogram_data = object_registry.get_payload(name=variogram_name, object_type="variogram")
+            _, variogram_data = object_registry.get_payload(
+                name=variogram_name, object_type="variogram"
+            )
         except (StageError, ResolutionError) as exc:
             raise ValueError(str(exc)) from exc
         structures = variogram_data.get_structures_as_dicts()
@@ -534,12 +543,6 @@ def register_variogram_tools(mcp) -> None:
             raise ValueError(
                 "Cannot generate ellipsoid points: selected structure has non-positive ranges."
             )
-
-        from evo.compute.tasks import (
-            Ellipsoid as ComputeEllipsoid,
-            EllipsoidRanges as ComputeEllipsoidRanges,
-            Rotation as ComputeRotation,
-        )
 
         ranges = structure_details["ranges"]
         rotation = structure_details["rotation"]
@@ -593,7 +596,9 @@ def register_variogram_tools(mcp) -> None:
             )
 
         try:
-            _, variogram_data = object_registry.get_payload(name=variogram_name, object_type="variogram")
+            _, variogram_data = object_registry.get_payload(
+                name=variogram_name, object_type="variogram"
+            )
         except (StageError, ResolutionError) as exc:
             raise ValueError(str(exc)) from exc
 

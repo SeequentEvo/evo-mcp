@@ -19,8 +19,6 @@ Each codec also provides to_dict() / from_dict() for round-trip serialization.
 Serialization/deserialization logic lives here, not in evo-python-sdk.
 """
 
-from __future__ import annotations
-
 import math
 import uuid as _uuid
 from typing import Any, Protocol, runtime_checkable

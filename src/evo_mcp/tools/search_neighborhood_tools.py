@@ -4,8 +4,6 @@
 
 """MCP tools for designing estimation search neighborhoods."""
 
-from __future__ import annotations
-
 from typing import Any, Literal
 
 from evo.compute.tasks.common import SearchNeighborhood
@@ -38,6 +36,7 @@ def _resolve_scale_factor(
     if preset == "broad":
         return 3.0
     return scale_factor
+
 
 def _select_local_structure(
     structures: list[dict[str, Any]],

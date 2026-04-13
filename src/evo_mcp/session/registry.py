@@ -25,8 +25,6 @@ Usage::
     entry, payload = object_registry.get_payload("CU variogram")
 """
 
-from __future__ import annotations
-
 from dataclasses import replace
 from typing import Any
 
@@ -193,6 +191,7 @@ class ObjectRegistry:
 # Module-level singleton shared by all tool modules.
 def _create_default_registry() -> ObjectRegistry:
     from evo_mcp.staging.service import staging_service
+
     return ObjectRegistry(staging_service)
 
 

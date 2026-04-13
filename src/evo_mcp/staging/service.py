@@ -11,8 +11,6 @@ tool modules. Tool modules should import it as:
 
 """
 
-from __future__ import annotations
-
 import uuid
 from typing import Any
 
@@ -79,7 +77,9 @@ class StagingService:
         summary = codec.summarize(payload)
         stage_id = str(uuid.uuid4())
         ts = now_iso()
-        effective_ttl = ttl_seconds if ttl_seconds is not None else self._store.ttl_seconds
+        effective_ttl = (
+            ttl_seconds if ttl_seconds is not None else self._store.ttl_seconds
+        )
         envelope = StagedEnvelope(
             stage_id=stage_id,
             object_type=object_type,
