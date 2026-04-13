@@ -48,6 +48,7 @@ When the user wants to compare different kriging configurations, build each vari
 Common variation patterns:
 
 - **Multiple target attributes**: Same source/variogram/neighborhood, different `target_attribute` per scenario.
+- **Multiple target domains**: Same source/variogram/neighborhood, different `target_region_filter` per scenario.
 - **Method comparison**: Same inputs, one scenario with ordinary kriging, another with simple kriging using `{"type": "simple", "mean": ...}`.
 - **Neighborhood sensitivity**: Same inputs, different `search` neighborhood configurations such as moderate versus broad search extents.
 

@@ -254,7 +254,7 @@ requested_dip = 15.0
 fig = go.Figure()
 
 # Add principal directions in light colors
-for direction, color in [("major", "lightcoral"), ("semi_major", "lightgreen"), ("minor", "lightblue")]:
+for direction, color in [("major", "red"), ("semi_major", "green"), ("minor", "blue")]:
     curve = curves_data["variogram_curves"][direction]
     fig.add_trace(go.Scatter(
         x=curve["distance"],
