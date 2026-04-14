@@ -9,9 +9,10 @@ This package provides tools for interacting with the Evo platform,
 including workspace management, object operations, and data transfer capabilities.
 """
 
-from .context import EvoContext, ensure_initialized
 import importlib.metadata
 from pathlib import Path
+
+from .context import EvoContext, ensure_initialized
 
 try:
     import tomllib
@@ -23,7 +24,7 @@ try:
     # __name__ will be 'evo_mcp' when this file is imported.
     # packages_distributions() returns a dict like {'evo_mcp': ['evo-mcp']}
     __dist_name__ = importlib.metadata.packages_distributions()[__name__][0]
-    
+
     # Now use the dynamically found distribution name to get the version
     __version__ = importlib.metadata.version(__dist_name__)
 
@@ -43,4 +44,4 @@ except (KeyError, IndexError, importlib.metadata.PackageNotFoundError):
         # If tomllib is not available or file is not found, use hardcoded defaults.
         pass
 
-__all__ = ['EvoContext', 'ensure_initialized', "__version__", "__dist_name__"]
+__all__ = ["EvoContext", "__dist_name__", "__version__", "ensure_initialized"]
