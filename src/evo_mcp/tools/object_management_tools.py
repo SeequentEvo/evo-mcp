@@ -2,10 +2,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Object management tools — import and publish workflows.
+"""Object management tools — generic import and publish workflows.
 
-Centralised import/publish tools for all domain object types
-(variogram, point_set, block_model).
+Two tools cover all supported domain object types:
+  - import_object  — fetches any Variogram, PointSet, or BlockModel from Evo
+                     into the local session, auto-detecting the type.
+  - publish_object — pushes a staged session object back to Evo, dispatching
+                     on payload type (VariogramData / PointSetData /
+                     RegularBlockModelData / BlockModelData).
 """
 
 from typing import Any, Literal
@@ -40,7 +44,7 @@ def _coerce_point_set_crs(point_set_data: PointSetData) -> PointSetData:
     """Return a copy of *point_set_data* with its CRS converted to EpsgCode.
 
     The PointSet publish API rejects plain ``"EPSG:NNNNN"`` strings; it requires
-    an ``EpsgCode`` object.  This mirrors the same conversion in dev_tools.py.
+    an ``EpsgCode`` object.
     """
     crs = point_set_data.coordinate_reference_system
     if isinstance(crs, str) and crs.upper().startswith("EPSG:"):
@@ -58,521 +62,239 @@ def _coerce_point_set_crs(point_set_data: PointSetData) -> PointSetData:
 
 
 def register_object_management_tools(mcp) -> None:
-    """Register import/publish tools for all domain object types."""
-
-    # -- Variogram import/publish ------------------------------------------
+    """Register generic import/publish tools."""
 
     @mcp.tool()
-    async def variogram_import(
+    async def import_object(
         workspace_id: str,
-        variogram_object_id: str,
+        object_id: str,
         version_id: str | None = None,
     ) -> dict[str, Any]:
-        """Import a published variogram from Evo into the session."""
+        """Import a published object from Evo into the session.
+
+        Supports Variogram, PointSet, and BlockModel objects. The object type is
+        detected automatically from the Evo schema.
+
+        For block models, regular models can later be published back with
+        publish_object(mode='new_version'). Non-regular (subblocked) models are
+        imported as read-only references.
+        """
         context = await get_workspace_context(workspace_id)
         try:
-            variogram = await object_from_uuid(
-                context,
-                variogram_object_id,
-                version=version_id,
-            )
+            obj = await object_from_uuid(context, object_id, version=version_id)
         except Exception as exc:
             raise ValueError(
-                f"Could not resolve variogram '{variogram_object_id}' for import."
+                f"Could not resolve object '{object_id}' for import."
             ) from exc
 
-        require_object_role(variogram, Variogram, "Variogram", "a Variogram")
-
-        variogram_data = VariogramData(
-            name=variogram.name,
-            description=getattr(variogram, "description", None) or None,
-            sill=variogram.sill,
-            is_rotation_fixed=variogram.is_rotation_fixed,
-            structures=variogram.structures,
-            nugget=variogram.nugget,
-            data_variance=variogram.data_variance,
-            modelling_space=variogram.modelling_space,
-            domain=variogram.domain,
-            attribute=variogram.attribute,
-        )
-
         source_ref = {
-            "object_id": str(variogram.metadata.id),
-            "version_id": str(variogram.metadata.version_id)
-            if variogram.metadata.version_id
+            "object_id": str(obj.metadata.id),
+            "version_id": str(obj.metadata.version_id)
+            if obj.metadata.version_id
             else None,
-            "path": getattr(variogram.metadata, "path", None),
+            "path": getattr(obj.metadata, "path", None),
         }
+
+        if isinstance(obj, Variogram):
+            data = VariogramData(
+                name=obj.name,
+                description=getattr(obj, "description", None) or None,
+                sill=obj.sill,
+                is_rotation_fixed=obj.is_rotation_fixed,
+                structures=obj.structures,
+                nugget=obj.nugget,
+                data_variance=obj.data_variance,
+                modelling_space=obj.modelling_space,
+                domain=obj.domain,
+                attribute=obj.attribute,
+            )
+            object_type = "variogram"
+            message = "Variogram imported."
+
+        elif isinstance(obj, PointSet):
+            dataframe = await obj.to_dataframe()
+            data = PointSetData(
+                name=obj.name,
+                description=getattr(obj, "description", None),
+                coordinate_reference_system=format_crs(extract_crs(obj)),
+                locations=dataframe,
+            )
+            object_type = "point_set"
+            message = "Point set imported."
+
+        elif isinstance(obj, BlockModel):
+            source_ref["schema_id"] = schema_label(obj)
+            data = BlockModelData(
+                name=obj.name,
+                description=getattr(obj, "description", None),
+                coordinate_reference_system=format_crs(extract_crs(obj)),
+                block_model_uuid=obj.block_model_uuid,
+                block_model_version_uuid=getattr(obj, "block_model_version_uuid", None),
+                geometry=obj.geometry,
+                attributes=list(obj.attributes),
+            )
+            object_type = "block_model"
+            is_regular = getattr(obj.geometry, "model_type", None) == "regular"
+            message = (
+                "Regular block model imported. Can be published as a new version with publish_object(mode='new_version')."
+                if is_regular
+                else "Block model imported as reference (read-only; only regular block models can be published)."
+            )
+
+        else:
+            raise ValueError(
+                f"Object '{object_id}' has an unsupported type '{schema_label(obj)}'. "
+                "Supported types: Variogram, PointSet, BlockModel."
+            )
+
         envelope = staging_service.stage_imported_object(
-            object_type="variogram",
-            typed_payload=variogram_data,
+            object_type=object_type,
+            typed_payload=data,
             workspace_id=workspace_id,
             source_ref=source_ref,
         )
-
         object_registry.register(
-            name=variogram_data.name,
-            object_type="variogram",
+            name=data.name,
+            object_type=object_type,
             stage_id=envelope.stage_id,
             source="imported",
             workspace_id=workspace_id,
             summary=envelope.summary,
         )
         return {
-            "name": variogram_data.name,
+            "name": data.name,
             "imported_from": source_ref,
-            "message": "Variogram imported.",
+            "message": message,
         }
 
     @mcp.tool()
-    async def variogram_publish(
+    async def publish_object(
         workspace_id: str,
-        variogram_name: str,
+        object_name: str,
         mode: Literal["create", "new_version"],
         object_path: str | None = None,
         object_id: str | None = None,
     ) -> dict[str, Any]:
-        """Publish a variogram to Evo by name."""
-        if mode == "create":
-            if not object_path:
-                raise ValueError("object_path is required when mode='create'.")
-        else:
-            if not object_id:
-                raise ValueError("object_id is required when mode='new_version'.")
+        """Publish a local session object to Evo.
+
+        Supports Variogram, PointSet, and regular BlockModel objects. The object
+        type is detected automatically from the staged payload.
+
+        - mode='create': Creates a new Evo object. Requires object_path.
+        - mode='new_version': Publishes as a new version of an existing object.
+          Requires object_id. Only supported for imported objects (Variogram,
+          PointSet, regular BlockModel).
+
+        Note: Imported (subblocked) BlockModelData can only use mode='new_version'.
+        Locally designed RegularBlockModelData can only use mode='create'.
+        """
+        if mode == "create" and not object_path:
+            raise ValueError("object_path is required when mode='create'.")
+        if mode == "new_version" and not object_id:
+            raise ValueError("object_id is required when mode='new_version'.")
 
         try:
-            entry = object_registry.resolve(
-                name=variogram_name, object_type="variogram"
-            )
+            entry = object_registry.resolve(name=object_name)
         except ResolutionError as exc:
             raise ValueError(str(exc)) from exc
 
         try:
-            _, variogram_data = staging_service.get_stage_payload(entry.stage_id)
+            _, data = staging_service.get_stage_payload(entry.stage_id)
         except StageError as exc:
             raise ValueError(str(exc)) from exc
 
-        if not isinstance(variogram_data, VariogramData):
-            raise ValueError(
-                f"Variogram '{variogram_name}' does not contain a VariogramData payload."
-            )
-
         context = await get_workspace_context(workspace_id)
+        staged_type = entry.object_type
 
-        if mode == "create":
+        if isinstance(data, VariogramData):
+            if mode == "create":
+                try:
+                    published = await Variogram.create(context, data, path=object_path)
+                except Exception as exc:
+                    raise ValueError(f"Failed to publish variogram as a new object: {exc}") from exc
+            else:
+                try:
+                    existing = await object_from_uuid(context, object_id)
+                except Exception as exc:
+                    raise ValueError(
+                        f"Could not resolve variogram '{object_id}' for new-version publish."
+                    ) from exc
+                require_object_role(existing, Variogram, "Variogram", "a Variogram")
+                try:
+                    published = await Variogram.replace(
+                        context, str(existing.metadata.url), data
+                    )
+                except Exception as exc:
+                    raise ValueError(f"Failed to publish variogram as a new version: {exc}") from exc
+
+        elif isinstance(data, PointSetData):
+            data = _coerce_point_set_crs(data)
+            if mode == "create":
+                try:
+                    published = await PointSet.create(context, data, path=object_path)
+                except Exception as exc:
+                    raise ValueError(f"Failed to publish point set as a new object: {exc}") from exc
+            else:
+                try:
+                    existing = await object_from_uuid(context, object_id)
+                except Exception as exc:
+                    raise ValueError(
+                        f"Could not resolve point set '{object_id}' for new-version publish."
+                    ) from exc
+                require_object_role(existing, PointSet, "PointSet", "a PointSet")
+                try:
+                    published = await PointSet.replace(
+                        context, str(existing.metadata.url), data
+                    )
+                except Exception as exc:
+                    raise ValueError(f"Failed to publish point set as a new version: {exc}") from exc
+
+        elif isinstance(data, RegularBlockModelData):
+            if mode != "create":
+                raise ValueError(
+                    f"'{object_name}' is a locally designed block model and can only be published with "
+                    "mode='create'. To publish a new version, import the existing object first."
+                )
             try:
-                published_variogram = await Variogram.create(
-                    context,
-                    variogram_data,
-                    path=object_path,
+                published = await BlockModel.create_regular(
+                    context, data, path=object_path
                 )
             except Exception as exc:
+                raise ValueError(f"Failed to publish block model as a new object: {exc}") from exc
+
+        elif isinstance(data, BlockModelData):
+            if mode != "new_version":
                 raise ValueError(
-                    f"Failed to publish variogram as a new object: {exc}"
-                ) from exc
-        else:
-            try:
-                existing_variogram = await object_from_uuid(context, object_id)
-            except Exception as exc:
-                raise ValueError(
-                    f"Could not resolve variogram '{object_id}' for new-version publish."
-                ) from exc
-            require_object_role(
-                existing_variogram,
-                Variogram,
-                "Variogram",
-                "a Variogram",
-            )
-            try:
-                published_variogram = await Variogram.replace(
-                    context,
-                    str(existing_variogram.metadata.url),
-                    variogram_data,
+                    f"'{object_name}' is an imported block model and can only be published with "
+                    "mode='new_version'. To create a new block model, design one locally first."
                 )
-            except Exception as exc:
-                raise ValueError(
-                    f"Failed to publish variogram as a new version: {exc}"
-                ) from exc
-
-        staging_service.publish_stage(entry.stage_id)
-        environment = await get_workspace_environment(workspace_id)
-        metadata = published_variogram.metadata
-        object_registry.mark_published(
-            name=variogram_name,
-            object_type="variogram",
-            object_id=str(metadata.id),
-            version_id=metadata.version_id,
-            workspace_id=workspace_id,
-        )
-        return {
-            "object_id": str(metadata.id),
-            "version_id": metadata.version_id,
-            "path": getattr(metadata, "path", None),
-            "links": build_links_from_metadata(environment, str(metadata.id)),
-        }
-
-    # -- PointSet import/publish -------------------------------------------
-
-    @mcp.tool()
-    async def point_set_import(
-        workspace_id: str,
-        point_set_object_id: str,
-        version_id: str | None = None,
-    ) -> dict[str, Any]:
-        """Import a published PointSet from Evo into the session."""
-        context = await get_workspace_context(workspace_id)
-        try:
-            point_set_object = await object_from_uuid(
-                context,
-                point_set_object_id,
-                version=version_id,
-            )
-        except Exception as exc:
-            raise ValueError(
-                f"Could not resolve point set '{point_set_object_id}' for import."
-            ) from exc
-
-        require_object_role(point_set_object, PointSet, "PointSet", "a PointSet")
-
-        dataframe = await point_set_object.to_dataframe()
-        point_set_data = PointSetData(
-            name=point_set_object.name,
-            description=getattr(point_set_object, "description", None),
-            coordinate_reference_system=format_crs(extract_crs(point_set_object)),
-            locations=dataframe,
-        )
-        metadata = point_set_object.metadata
-        source_ref = {
-            "object_id": str(metadata.id),
-            "version_id": str(metadata.version_id) if metadata.version_id else None,
-            "path": getattr(metadata, "path", None),
-        }
-        envelope = staging_service.stage_imported_object(
-            object_type="point_set",
-            typed_payload=point_set_data,
-            workspace_id=workspace_id,
-            source_ref=source_ref,
-        )
-        object_registry.register(
-            name=point_set_data.name,
-            object_type="point_set",
-            stage_id=envelope.stage_id,
-            source="imported",
-            workspace_id=workspace_id,
-            summary=envelope.summary,
-        )
-        return {
-            "name": point_set_data.name,
-            "imported_from": source_ref,
-            "message": "Point set imported.",
-        }
-
-    @mcp.tool()
-    async def point_set_publish(
-        workspace_id: str,
-        point_set_name: str,
-        mode: Literal["create", "new_version"],
-        object_path: str | None = None,
-        object_id: str | None = None,
-    ) -> dict[str, Any]:
-        """Publish a point set to Evo by name."""
-        if mode == "create":
-            if not object_path:
-                raise ValueError("object_path is required when mode='create'.")
-        else:
-            if not object_id:
-                raise ValueError("object_id is required when mode='new_version'.")
-
-        try:
-            entry = object_registry.resolve(
-                name=point_set_name, object_type="point_set"
-            )
-        except ResolutionError as exc:
-            raise ValueError(str(exc)) from exc
-
-        try:
-            _, point_set_data = staging_service.get_stage_payload(entry.stage_id)
-        except StageError as exc:
-            raise ValueError(str(exc)) from exc
-
-        if not isinstance(point_set_data, PointSetData):
-            raise ValueError(
-                f"Point set '{point_set_name}' does not contain a PointSetData payload."
-            )
-
-        context = await get_workspace_context(workspace_id)
-        point_set_data = _coerce_point_set_crs(point_set_data)
-
-        if mode == "create":
-            try:
-                published = await PointSet.create(
-                    context,
-                    point_set_data,
-                    path=object_path,
-                )
-            except Exception as exc:
-                raise ValueError(
-                    f"Failed to publish point set as a new object: {exc}"
-                ) from exc
-        else:
             try:
                 existing = await object_from_uuid(context, object_id)
             except Exception as exc:
                 raise ValueError(
-                    f"Could not resolve point set '{object_id}' for new-version publish."
+                    f"Could not resolve block model '{object_id}' for new-version publish."
                 ) from exc
-
-            require_object_role(existing, PointSet, "PointSet", "a PointSet")
+            require_object_role(existing, BlockModel, "Block model", "a BlockModel")
+            # The staged BlockModelData already carries block_model_uuid — no extra
+            # API round-trip needed to reconstruct it from the workspace object.
             try:
-                published = await PointSet.replace(
-                    context,
-                    str(existing.metadata.url),
-                    point_set_data,
+                published = await BlockModel.replace(
+                    context, str(existing.metadata.url), data
                 )
             except Exception as exc:
-                raise ValueError(
-                    f"Failed to publish point set as a new version: {exc}"
-                ) from exc
+                raise ValueError(f"Failed to publish block model as a new version: {exc}") from exc
+
+        else:
+            raise ValueError(
+                f"'{object_name}' has an unsupported payload type '{type(data).__name__}'. "
+                "Supported types: VariogramData, PointSetData, RegularBlockModelData, BlockModelData."
+            )
 
         staging_service.publish_stage(entry.stage_id)
         environment = await get_workspace_environment(workspace_id)
         metadata = published.metadata
         object_registry.mark_published(
-            name=point_set_name,
-            object_type="point_set",
-            object_id=str(metadata.id),
-            version_id=metadata.version_id,
-            workspace_id=workspace_id,
-        )
-        return {
-            "object_id": str(metadata.id),
-            "version_id": metadata.version_id,
-            "path": getattr(metadata, "path", None),
-            "links": build_links_from_metadata(environment, str(metadata.id)),
-        }
-
-    # -- BlockModel import/publish -----------------------------------------
-
-    @mcp.tool()
-    async def block_model_import(
-        workspace_id: str,
-        block_model_object_id: str,
-        version_id: str | None = None,
-    ) -> dict[str, Any]:
-        """Import a published BlockModel from Evo into the session."""
-        context = await get_workspace_context(workspace_id)
-        try:
-            block_model = await object_from_uuid(
-                context,
-                block_model_object_id,
-                version=version_id,
-            )
-        except Exception as exc:
-            raise ValueError(
-                f"Could not resolve block model '{block_model_object_id}' for import."
-            ) from exc
-
-        require_object_role(block_model, BlockModel, "Block model", "a BlockModel")
-
-        block_model_data = BlockModelData(
-            name=block_model.name,
-            description=getattr(block_model, "description", None),
-            coordinate_reference_system=format_crs(extract_crs(block_model)),
-            block_model_uuid=block_model.block_model_uuid,
-            block_model_version_uuid=getattr(
-                block_model, "block_model_version_uuid", None
-            ),
-            geometry=block_model.geometry,
-            attributes=list(block_model.attributes),
-        )
-        source_ref = {
-            "object_id": str(block_model.metadata.id),
-            "version_id": str(block_model.metadata.version_id)
-            if block_model.metadata.version_id
-            else None,
-            "path": getattr(block_model.metadata, "path", None),
-            "schema_id": schema_label(block_model),
-        }
-        envelope = staging_service.stage_imported_object(
-            object_type="block_model",
-            typed_payload=block_model_data,
-            workspace_id=workspace_id,
-            source_ref=source_ref,
-        )
-        object_registry.register(
-            name=block_model_data.name,
-            object_type="block_model",
-            stage_id=envelope.stage_id,
-            source="imported",
-            workspace_id=workspace_id,
-            summary=envelope.summary,
-        )
-        return {
-            "name": block_model_data.name,
-            "imported_from": source_ref,
-            "message": "Block model imported as reference (read-only).",
-        }
-
-    @mcp.tool()
-    async def regular_block_model_import(
-        workspace_id: str,
-        block_model_object_id: str,
-        version_id: str | None = None,
-    ) -> dict[str, Any]:
-        """Import a published regular BlockModel from Evo into the session.
-
-        Only accepts regular block models (model_type='regular'). The imported object
-        is staged as BlockModelData (preserving block_model_uuid) and can be published
-        as a new version using regular_block_model_publish with mode='new_version'.
-        """
-        context = await get_workspace_context(workspace_id)
-        try:
-            block_model = await object_from_uuid(
-                context,
-                block_model_object_id,
-                version=version_id,
-            )
-        except Exception as exc:
-            raise ValueError(
-                f"Could not resolve block model '{block_model_object_id}' for import."
-            ) from exc
-
-        require_object_role(block_model, BlockModel, "Block model", "a BlockModel")
-
-        geometry = block_model.geometry
-        if geometry.model_type != "regular":
-            raise ValueError(
-                f"Block model '{block_model_object_id}' is not a regular block model "
-                f"(model_type={geometry.model_type!r}). Use block_model_import for non-regular models."
-            )
-
-        # Store as BlockModelData (preserves block_model_uuid) so mode=new_version
-        # can call BlockModel.replace() directly without an extra API round-trip.
-        block_model_data = BlockModelData(
-            name=block_model.name,
-            description=getattr(block_model, "description", None),
-            coordinate_reference_system=format_crs(extract_crs(block_model)),
-            block_model_uuid=block_model.block_model_uuid,
-            block_model_version_uuid=getattr(
-                block_model, "block_model_version_uuid", None
-            ),
-            geometry=block_model.geometry,
-            attributes=list(block_model.attributes),
-        )
-        source_ref = {
-            "object_id": str(block_model.metadata.id),
-            "version_id": str(block_model.metadata.version_id)
-            if block_model.metadata.version_id
-            else None,
-            "path": getattr(block_model.metadata, "path", None),
-            "schema_id": schema_label(block_model),
-        }
-        envelope = staging_service.stage_imported_object(
-            object_type="block_model",
-            typed_payload=block_model_data,
-            workspace_id=workspace_id,
-            source_ref=source_ref,
-        )
-        object_registry.register(
-            name=block_model_data.name,
-            object_type="block_model",
-            stage_id=envelope.stage_id,
-            source="imported",
-            workspace_id=workspace_id,
-            summary=envelope.summary,
-        )
-        return {
-            "name": block_model_data.name,
-            "imported_from": source_ref,
-            "message": "Regular block model imported (staged as block_model reference with UUID).",
-        }
-
-    @mcp.tool()
-    async def regular_block_model_publish(
-        workspace_id: str,
-        block_model_name: str,
-        mode: Literal["create", "new_version"],
-        object_path: str | None = None,
-        object_id: str | None = None,
-    ) -> dict[str, Any]:
-        """Publish a regular block model to Evo by name. Only regular block models can be published."""
-        if mode == "create":
-            if not object_path:
-                raise ValueError("object_path is required when mode='create'.")
-        else:
-            if not object_id:
-                raise ValueError("object_id is required when mode='new_version'.")
-
-        # mode=create: locally designed model (RegularBlockModelData, no UUID)
-        # mode=new_version: imported model (BlockModelData, has block_model_uuid)
-        staged_type = "regular_block_model" if mode == "create" else "block_model"
-        try:
-            entry = object_registry.resolve(
-                name=block_model_name, object_type=staged_type
-            )
-        except ResolutionError as exc:
-            raise ValueError(str(exc)) from exc
-
-        try:
-            _, block_model_data = staging_service.get_stage_payload(entry.stage_id)
-        except StageError as exc:
-            raise ValueError(str(exc)) from exc
-
-        context = await get_workspace_context(workspace_id)
-
-        if mode == "create":
-            if not isinstance(block_model_data, RegularBlockModelData):
-                raise ValueError(
-                    f"Block model '{block_model_name}' does not contain a RegularBlockModelData payload."
-                )
-            try:
-                published_block_model = await BlockModel.create_regular(
-                    context,
-                    block_model_data,
-                    path=object_path,
-                )
-            except Exception as exc:
-                raise ValueError(
-                    f"Failed to publish block model as a new object: {exc}"
-                ) from exc
-        else:
-            if not isinstance(block_model_data, BlockModelData):
-                raise ValueError(
-                    f"Block model '{block_model_name}' was not imported as a block_model reference. "
-                    "Use regular_block_model_import to import the block model first, then publish "
-                    "with mode='new_version'."
-                )
-            try:
-                existing_block_model = await object_from_uuid(context, object_id)
-            except Exception as exc:
-                raise ValueError(
-                    f"Could not resolve block model '{object_id}' for new-version publish."
-                ) from exc
-
-            require_object_role(
-                existing_block_model,
-                BlockModel,
-                "Block model",
-                "a BlockModel",
-            )
-            # The staged BlockModelData already carries the block_model_uuid — call
-            # BlockModel.replace() directly without reconstructing from the workspace object.
-            try:
-                published_block_model = await BlockModel.replace(
-                    context,
-                    str(existing_block_model.metadata.url),
-                    block_model_data,
-                )
-            except Exception as exc:
-                raise ValueError(
-                    f"Failed to publish block model as a new version: {exc}"
-                ) from exc
-
-        staging_service.publish_stage(entry.stage_id)
-        environment = await get_workspace_environment(workspace_id)
-        metadata = published_block_model.metadata
-        object_registry.mark_published(
-            name=block_model_name,
+            name=object_name,
             object_type=staged_type,
             object_id=str(metadata.id),
             version_id=metadata.version_id,

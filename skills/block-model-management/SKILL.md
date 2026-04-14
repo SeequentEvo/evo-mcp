@@ -108,4 +108,4 @@ Canonical regular block model payload:
 
 1. Design the block model using `regular_block_model_design_from_extents(...)` with the desired extents.
 2. Review the block model payload locally.
-3. Publish to Evo using `regular_block_model_publish`.
+3. Publish to Evo using `publish_object`.

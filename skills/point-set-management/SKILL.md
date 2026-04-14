@@ -62,7 +62,7 @@ User needs point-set help
 ### Example 2: Build local payload then persist
 
 1. Call `point_set_build_local(object_name="Assays", csv_file="path/to/file.csv", x_column="Easting", y_column="Northing", z_column="RL")`.
-2. Publish to Evo using `point_set_publish`.
+2. Publish to Evo using `publish_object`.
 
 ## Error Handling
 

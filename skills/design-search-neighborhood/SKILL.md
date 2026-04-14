@@ -34,9 +34,9 @@ Provide `major`, `semi_major`, and `minor` directly. All three are required toge
 
 ### 2. Variogram Derivation (Preferred for local workflows)
 
-When a variogram is available (for example, from `variogram_create` or `variogram_import`), derive ranges from the variogram:
+When a variogram is available (for example, from `variogram_create` or `import_object`), derive ranges from the variogram:
 
-1. Know the variogram name from a prior `variogram_create` or `variogram_import` call.
+1. Know the variogram name from a prior `variogram_create` or `import_object` call.
 2. Call `design_search_neighborhood(variogram_name="CU variogram", scale_factor=2.0, max_samples=20)`.
 
 The tool retrieves the variogram data and scales ranges by `scale_factor`. This keeps the workflow fully local.

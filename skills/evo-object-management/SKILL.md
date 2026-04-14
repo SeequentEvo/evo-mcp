@@ -9,9 +9,8 @@ This skill manages the **Evo boundary** — importing objects from Evo into the 
 
 ## Tools
 
-- `variogram_import` / `variogram_publish`
-- `point_set_import` / `point_set_publish`
-- `block_model_import` / `regular_block_model_publish`
+- `import_object` — imports any supported Evo object into the session (type auto-detected)
+- `publish_object` — publishes a staged session object back to Evo (type auto-detected from payload)
 
 ## Trigger Conditions
 
@@ -24,7 +23,7 @@ Use this skill when the user needs to:
 
 1. Confirm `workspace_id` and object role.
 2. Locate object identifiers if needed (by name or search).
-3. Import with the appropriate `*_import` tool, or publish with `*_publish`.
+3. Call `import_object` with the object's UUID, or `publish_object` with the object's session name.
 
 ## Notes
 
