@@ -134,13 +134,19 @@ async def test_list_objects_maps_shape(monkeypatch):
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
 
     health = SimpleNamespace(raise_for_status=lambda: None)
+    created_at = datetime(2026, 1, 3, tzinfo=timezone.utc)
+    modified_at = datetime(2026, 1, 4, tzinfo=timezone.utc)
     obj = SimpleNamespace(
         id=uuid4(),
         name="Block Model",
         path="/models/block.json",
         schema_id=SimpleNamespace(sub_classification="pointset"),
         version_id="v1",
-        created_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
+        created_at=created_at,
+        created_by="user-a",
+        modified_at=modified_at,
+        modified_by="user-b",
+        stage="ACTIVE",
     )
     object_client = SimpleNamespace(
         get_service_health=AsyncMock(return_value=health),
@@ -162,7 +168,11 @@ async def test_list_objects_maps_shape(monkeypatch):
             "path": "/models/block.json",
             "schema_id": "pointset",
             "version_id": "v1",
-            "created_at": "2026-01-03T00:00:00+00:00",
+            "created_at": created_at,
+            "created_by": "user-a",
+            "modified_at": modified_at,
+            "modified_by": "user-b",
+            "stage": "ACTIVE",
         }
     ]
     object_client.list_objects.assert_awaited_once_with(schema_id=None, deleted=True, limit=5)
@@ -174,13 +184,19 @@ async def test_get_object_by_path_maps_metadata(monkeypatch):
     """Given an object path, when object metadata is fetched, then the downloaded metadata is mapped correctly."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
 
+    created_at = datetime(2026, 1, 4, tzinfo=timezone.utc)
+    modified_at = datetime(2026, 1, 5, tzinfo=timezone.utc)
     metadata = SimpleNamespace(
         id=uuid4(),
         name="Samples",
         path="/samples/points.json",
         schema_id=SimpleNamespace(sub_classification="pointset"),
         version_id="version-7",
-        created_at=datetime(2026, 1, 4, tzinfo=timezone.utc),
+        created_at=created_at,
+        created_by="user-c",
+        modified_at=modified_at,
+        modified_by="user-d",
+        stage="ACTIVE",
     )
     object_client = SimpleNamespace(download_object_by_path=AsyncMock(return_value=SimpleNamespace(metadata=metadata)))
     get_object_client = AsyncMock(return_value=object_client)
@@ -203,7 +219,11 @@ async def test_get_object_by_path_maps_metadata(monkeypatch):
         "path": "/samples/points.json",
         "schema_id": "pointset",
         "version_id": "version-7",
-        "created_at": "2026-01-04T00:00:00+00:00",
+        "created_at": created_at,
+        "created_by": "user-c",
+        "modified_at": modified_at,
+        "modified_by": "user-d",
+        "stage": "ACTIVE",
     }
     object_client.download_object_by_path.assert_awaited_once_with(
         "/samples/points.json",

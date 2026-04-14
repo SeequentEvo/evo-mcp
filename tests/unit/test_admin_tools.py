@@ -65,9 +65,17 @@ async def test_get_workspace_summary_counts_by_schema(monkeypatch):
         SimpleNamespace(schema_id=SimpleNamespace(sub_classification="pointset")),
         SimpleNamespace(schema_id=SimpleNamespace(sub_classification="line_segments")),
     ]
+    files = [
+        SimpleNamespace(name="samples.csv"),
+        SimpleNamespace(name="mesh.obj"),
+        SimpleNamespace(name="README"),
+    ]
     object_client = SimpleNamespace(list_all_objects=AsyncMock(return_value=objects))
+    file_client = SimpleNamespace(list_all_files=AsyncMock(return_value=files))
     get_object_client = AsyncMock(return_value=object_client)
+    get_file_client = AsyncMock(return_value=file_client)
     monkeypatch.setattr(admin_tools.evo_context, "get_object_client", get_object_client)
+    monkeypatch.setattr(admin_tools.evo_context, "get_file_client", get_file_client)
 
     mcp = _register_admin_tools()
     tool = mcp.tools["get_workspace_summary"]
@@ -79,8 +87,11 @@ async def test_get_workspace_summary_counts_by_schema(monkeypatch):
         "workspace_id": workspace_id,
         "total_objects": 3,
         "objects_by_schema": {"pointset": 2, "line_segments": 1},
+        "total_files": 3,
+        "files_by_extension": {"csv": 1, "obj": 1, "(no extension)": 1},
     }
     get_object_client.assert_awaited_once_with(admin_tools.UUID(workspace_id))
+    get_file_client.assert_awaited_once_with(admin_tools.UUID(workspace_id))
 
 
 @pytest.mark.asyncio
