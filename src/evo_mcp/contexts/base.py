@@ -15,8 +15,8 @@ from evo.aio import AioTransport
 from evo.common import APIConnector
 from evo.discovery import DiscoveryAPIClient
 from evo.files import FileAPIClient
-from evo.objects import ObjectAPIClient
 from evo.oauth import AccessTokenAuthorizer
+from evo.objects import ObjectAPIClient
 from evo.workspaces import WorkspaceAPIClient
 
 logger = logging.getLogger(__name__)
@@ -43,13 +43,11 @@ class EvoContextBase(ABC):
 
     @abstractmethod
     async def initialize(self) -> None:
-        """Ensure the context is ready for API calls.
-        """
+        """Ensure the context is ready for API calls."""
 
     @abstractmethod
     async def get_authorizer(self) -> AccessTokenAuthorizer:
         """Get the access token authorizer to be used for API calls."""
-
 
     # -- Shared helpers -----------------------------------------------------
 
@@ -57,6 +55,7 @@ class EvoContextBase(ABC):
         if self.transport is not None:
             return self.transport
         from evo_mcp import __dist_name__, __version__
+
         self.transport = AioTransport(user_agent=f"{__dist_name__}/{__version__}")
         return self.transport
 
@@ -103,9 +102,7 @@ class EvoContextBase(ABC):
     async def switch_instance(self, org_id: UUID, hub_url: str) -> None:
         self.org_id = org_id
         self.hub_url = hub_url
-        self.connector = APIConnector(
-            hub_url, self.get_transport(), await self.get_authorizer()
-        )
+        self.connector = APIConnector(hub_url, self.get_transport(), await self.get_authorizer())
         self.workspace_client = WorkspaceAPIClient(self.connector, org_id)
 
     async def get_object_client(self, workspace_id: UUID) -> ObjectAPIClient:

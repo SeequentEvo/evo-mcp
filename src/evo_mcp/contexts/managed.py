@@ -69,7 +69,6 @@ class ManagedAuthContext(EvoContextBase):
             json.dump({"access_token": access_token}, f)
         logger.info("Access token saved to cache at %s", token_cache_path)
 
-
     # -- Variables cache -----------------------------------------------------
 
     def load_variables_from_cache(self) -> None:
@@ -100,9 +99,7 @@ class ManagedAuthContext(EvoContextBase):
         client_secret = os.getenv("EVO_CLIENT_SECRET")
         issuer_url = os.getenv("ISSUER_URL")
         if not client_id or not client_secret:
-            raise ValueError(
-                "EVO_CLIENT_ID and EVO_CLIENT_SECRET are required for client_credentials auth"
-            )
+            raise ValueError("EVO_CLIENT_ID and EVO_CLIENT_SECRET are required for client_credentials auth")
         transport = self.get_transport()
         oauth_connector = OAuthConnector(
             transport=transport, client_id=client_id, client_secret=client_secret, base_uri=issuer_url

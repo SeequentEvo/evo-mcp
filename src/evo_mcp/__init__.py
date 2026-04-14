@@ -24,7 +24,7 @@ try:
     # __name__ will be 'evo_mcp' when this file is imported.
     # packages_distributions() returns a dict like {'evo_mcp': ['evo-mcp']}
     __dist_name__ = importlib.metadata.packages_distributions()[__name__][0]
-    
+
     # Now use the dynamically found distribution name to get the version
     __version__ = importlib.metadata.version(__dist_name__)
 
@@ -44,4 +44,4 @@ except (KeyError, IndexError, importlib.metadata.PackageNotFoundError):
         # If tomllib is not available or file is not found, use hardcoded defaults.
         pass
 
-__all__ = ['get_evo_context', "__version__", "__dist_name__"]
+__all__ = ["__dist_name__", "__version__", "get_evo_context"]

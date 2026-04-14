@@ -86,7 +86,9 @@ SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "3600"))
 MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "1000"))
 session_locks: dict[str, asyncio.Lock] = {}
 delegated_contexts: TTLCache[str, DelegatedAuthContext] = _CleanupTTLCache(
-    maxsize=MAX_SESSIONS, ttl=SESSION_TTL_SECONDS, locks=session_locks,
+    maxsize=MAX_SESSIONS,
+    ttl=SESSION_TTL_SECONDS,
+    locks=session_locks,
 )
 
 # TODO: Move this to an environment manager module

@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from evo.oauth import EvoScopes
 from fastmcp.server.auth.oidc_proxy import OIDCProxy
 
+
 def create_auth_provider(base_url: str):
     """Create an OIDCProxy auth provider for HTTP transport.
 
@@ -66,9 +67,6 @@ def create_auth_provider(base_url: str):
     )
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # Monkey-patch: RFC 8252 §7.3 loopback redirect URI port matching
 # ---------------------------------------------------------------------------
@@ -108,11 +106,7 @@ def _apply_loopback_redirect_patch() -> None:
         _pattern_host: "str | None" = None,
     ) -> bool:
         # RFC 8252 §7.3: loopback pattern with no explicit port → any port
-        if (
-            pattern_port is None
-            and _pattern_host is not None
-            and _pattern_host.lower() in _LOOPBACK_HOSTS
-        ):
+        if pattern_port is None and _pattern_host is not None and _pattern_host.lower() in _LOOPBACK_HOSTS:
             return True
         return _original_match_port(uri_port, pattern_port, uri_scheme)
 
@@ -140,7 +134,9 @@ def _apply_loopback_redirect_patch() -> None:
             return False
 
         if not _patched_match_port(
-            uri_port, pattern_port, uri_parsed.scheme.lower(),
+            uri_port,
+            pattern_port,
+            uri_parsed.scheme.lower(),
             _pattern_host=pattern_host,
         ):
             return False

@@ -8,7 +8,7 @@ including workspace management, object ops, and data transfer.
 
 Configuration:
     Set MCP_TOOL_FILTER environment variable to filter tools and prompts:
-    - "admin" : Workspace management tools 
+    - "admin" : Workspace management tools
     - "data"  : Object query, file operations, and management tools
     - "all"   : All tools (default)
 
@@ -20,7 +20,7 @@ Configuration:
     - MCP_HTTP_HOST: Host to bind to (default: localhost)
     - MCP_HTTP_PORT: Port to listen on (default: 5000)
 
-The environment variables can be set in a .env file or 
+The environment variables can be set in a .env file or
 passed directly to the MCP server as input parameters.
 """
 
@@ -73,7 +73,7 @@ HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
 # Defaults to False. Set to true only when MCP_TRANSPORT=http.
 
 CLIENT_DELEGATED_AUTH = os.getenv("CLIENT_DELEGATED_AUTH", "").lower() in ("1", "true")
-     
+
 if CLIENT_DELEGATED_AUTH and TRANSPORT != "http":
     logging.warning(
         "CLIENT_DELEGATED_AUTH=true has no effect with MCP_TRANSPORT='%s' — "
@@ -84,19 +84,18 @@ if CLIENT_DELEGATED_AUTH and TRANSPORT != "http":
 
 # Get agent type from environment variable
 # This can either be set via MCP inputs, or the .env file used by the agent example
-TOOL_FILTER = os.getenv("MCP_TOOL_FILTER",
+TOOL_FILTER = os.getenv(
+    "MCP_TOOL_FILTER",
     os.getenv(
         "MCP_AGENT_TYPE",  # Kept for backwards compatibility
         "all",
-    )).lower()
+    ),
+).lower()
 VALID_TOOL_FILTERS = ["admin", "data", "all"]
 
 if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
     TOOL_FILTER = "all"
-
-
-
 
 
 # Initialize FastMCP server with agent type in name for clarity
@@ -110,6 +109,7 @@ mcp = FastMCP(server_name, auth=auth_provider)
 # Show more traceback frame for now, we may want to disabled the rich
 # traceback formatting entirely too.
 configure_logging(tracebacks_max_frames=20)
+
 
 def _get_objects_reference_content() -> str:
     """Load the objects reference content from a markdown file."""
@@ -134,7 +134,7 @@ if TOOL_FILTER in ["all", "admin"]:
     # Includes: workspace creation, snapshots, duplication, permissions management
     register_admin_tools(mcp)
     register_instance_users_admin_tools(mcp)
-if TOOL_FILTER in ["all", "data"]: #  "data_agent"
+if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
@@ -148,11 +148,12 @@ if TOOL_FILTER in ["all", "data"]: #  "data_agent"
 # Resources (not currently supported in ADK)
 # =============================================================================
 
+
 @mcp.resource("evo://objects/schema-reference")
 def get_objects_reference() -> str:
     """
     Comprehensive technical reference for Evo Geoscience Objects (GOs).
-    
+
     Provides detailed schema information for all available geoscience object types,
     including required and optional parameters for each object type.
     """
@@ -165,6 +166,7 @@ def get_objects_reference() -> str:
 
 if TOOL_FILTER == "all":
     print("Registering prompt for all tool types.")
+
     @mcp.prompt(name="all_prompt")
     def all_prompt() -> str:
         """All prompt that encompasses the functionality of all tool without a filter applied."""
@@ -213,6 +215,7 @@ if TOOL_FILTER == "all":
 
 # Register prompts based on agent type
 if TOOL_FILTER in ["all", "admin"]:
+
     @mcp.prompt(name="admin_prompt")
     def admin_prompt() -> str:
         """Prompt for management operations."""
@@ -237,6 +240,7 @@ if TOOL_FILTER in ["all", "admin"]:
 
 
 if TOOL_FILTER in ["all", "data"]:
+
     @mcp.prompt(name="data_prompt")
     def data_prompt() -> str:
         """Prompt for local file system data connector and object creation operations."""
@@ -342,7 +346,7 @@ if TOOL_FILTER in ["all", "data"]:
 
         If an error occurs when calling a tool, return the full error message.
         """
-    
+
 
 # Note: Evo context initialization happens lazily on first tool call
 # via get_evo_context() because OAuth requires browser interaction
@@ -409,35 +413,38 @@ if __name__ == "__main__":
                     patched = _json.dumps(data).encode()
 
                     # Update content-length header
-                    new_headers = [
-                        (k, v) for k, v in original_headers
-                        if k != b"content-length"
-                    ]
-                    new_headers.append(
-                        (b"content-length", str(len(patched)).encode())
-                    )
+                    new_headers = [(k, v) for k, v in original_headers if k != b"content-length"]
+                    new_headers.append((b"content-length", str(len(patched)).encode()))
 
-                    await send({
-                        "type": "http.response.start",
-                        "status": original_status,
-                        "headers": new_headers,
-                    })
-                    await send({
-                        "type": "http.response.body",
-                        "body": patched,
-                    })
+                    await send(
+                        {
+                            "type": "http.response.start",
+                            "status": original_status,
+                            "headers": new_headers,
+                        }
+                    )
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": patched,
+                        }
+                    )
                     logger.debug("Patched auth metadata: added 'none' to token_endpoint_auth_methods_supported")
                 except Exception:
                     # If parsing fails, send original response unchanged
-                    await send({
-                        "type": "http.response.start",
-                        "status": original_status,
-                        "headers": original_headers,
-                    })
-                    await send({
-                        "type": "http.response.body",
-                        "body": bytes(response_body),
-                    })
+                    await send(
+                        {
+                            "type": "http.response.start",
+                            "status": original_status,
+                            "headers": original_headers,
+                        }
+                    )
+                    await send(
+                        {
+                            "type": "http.response.body",
+                            "body": bytes(response_body),
+                        }
+                    )
 
         logger.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
         middleware = [Middleware(AuthMetadataPatchMiddleware)] if CLIENT_DELEGATED_AUTH else []

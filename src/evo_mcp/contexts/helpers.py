@@ -31,6 +31,7 @@ def get_client_session_upstream_access_token() -> str:
         raise RuntimeError("No FastMCP access token available in delegated auth mode")
     return token_obj.token
 
+
 def get_client_session_id() -> str:
     """Return a stable identifier for the current MCP client session.
 

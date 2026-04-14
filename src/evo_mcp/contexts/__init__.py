@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from .base import EvoContextBase
-from .managed import ManagedAuthContext
 from .delegated import DelegatedAuthContext
+from .managed import ManagedAuthContext
 
-__all__ = ["EvoContextBase", "ManagedAuthContext", "DelegatedAuthContext"]
+__all__ = ["DelegatedAuthContext", "EvoContextBase", "ManagedAuthContext"]
