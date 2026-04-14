@@ -22,7 +22,7 @@ All builders follow the same pattern:
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Type, TypeVar
+from typing import Any, Optional, Type, TypeVar, Union
 
 import pandas as pd
 import numpy as np
@@ -34,6 +34,7 @@ from evo_schemas.components import (
     ContinuousAttribute_V1_1_0,
     NanCategorical_V1_0_1,
     NanContinuous_V1_0_1,
+    Crs_V1_0_1_EpsgCode
 )
 from evo_schemas.elements import (
     FloatArray1_V1_0_1,
@@ -365,6 +366,22 @@ class BaseObjectBuilder(ABC):
     # Abstract methods for subclasses
     # =========================================================================
     
+    def resolve_crs(self, crs: Union[str, int]) -> Union[str, 'Crs_V1_0_1_EpsgCode']:
+        """Resolve the coordinate reference system parameter.
+
+        Args:
+            crs: Either "unspecified" (or other string) or an integer EPSG code.
+                 Also handles EPSG codes passed as strings (e.g., "32650").
+
+        Returns:
+            "unspecified" string or Crs_V1_0_1_EpsgCode object.
+        """
+        if isinstance(crs, int):
+            return Crs_V1_0_1_EpsgCode(epsg_code=crs)
+        if isinstance(crs, str) and crs.isdigit():
+            return Crs_V1_0_1_EpsgCode(epsg_code=int(crs))
+        return crs
+
     @abstractmethod
     def build(self, **kwargs) -> Any:
         """Build the geoscience object. Implemented by subclasses."""
@@ -388,7 +405,7 @@ class PointsetBuilder(BaseObjectBuilder):
         attribute_columns: Optional[list[str]] = None,
         description: str = "",
         tags: Optional[dict] = None,
-        crs: str = "unspecified",
+        crs: Union[str, int] = "unspecified",
     ) -> 'Pointset_V1_3_0':
         """Build a Pointset object from DataFrame data.
         
@@ -399,7 +416,7 @@ class PointsetBuilder(BaseObjectBuilder):
             attribute_columns: Columns to include as attributes (None = auto-detect)
             description: Object description
             tags: Optional tags dictionary
-            crs: Coordinate reference system string
+            crs: Coordinate reference system - either "unspecified" or an EPSG code (int)
             
         Returns:
             Pointset_V1_3_0 object (call .as_dict() for dict form)
@@ -439,7 +456,7 @@ class PointsetBuilder(BaseObjectBuilder):
             description=description,
             tags=tags or {},
             bounding_box=bbox,
-            coordinate_reference_system=crs,
+            coordinate_reference_system=self.resolve_crs(crs),
             locations=locations,
         )
 
@@ -466,7 +483,7 @@ class LineSegmentsBuilder(BaseObjectBuilder):
         segment_attribute_columns: Optional[list[str]] = None,
         description: str = "",
         tags: Optional[dict] = None,
-        crs: str = "unspecified",
+        crs: Union[str, int] = "unspecified",
     ) -> 'LineSegments_V2_2_0':
         """Build a LineSegments object from vertex and segment data.
         
@@ -481,7 +498,7 @@ class LineSegmentsBuilder(BaseObjectBuilder):
             segment_attribute_columns: Columns from segments_df for attributes (None = auto-detect)
             description: Object description
             tags: Optional tags dictionary
-            crs: Coordinate reference system string
+            crs: Coordinate reference system - either "unspecified" or an EPSG code (int)
             
         Returns:
             LineSegments_V2_2_0 object (call .as_dict() for dict form)
@@ -549,7 +566,7 @@ class LineSegmentsBuilder(BaseObjectBuilder):
             description=description,
             tags=tags or {},
             bounding_box=bbox,
-            coordinate_reference_system=crs,
+            coordinate_reference_system=self.resolve_crs(crs),
             segments=segments,
         )
 
@@ -784,7 +801,7 @@ class DownholeCollectionBuilder(BaseObjectBuilder):
         max_depth_col: Optional[str] = None,
         interval_collections: Optional[list[dict]] = None,
         tags: Optional[dict] = None,
-        crs: str = "unspecified",
+        crs: Union[str, int] = "unspecified",
         invert_z: bool = False,
     ) -> 'DownholeCollection_V1_3_0':
         """Build a complete DownholeCollection object.
@@ -810,7 +827,7 @@ class DownholeCollectionBuilder(BaseObjectBuilder):
                 - to_col: Column with to depths
                 - attribute_columns: List of columns to include as attributes (optional)
             tags: Optional tags dictionary
-            crs: Coordinate reference system string
+            crs: Coordinate reference system - either "unspecified" or an EPSG code (int)
             invert_z: If True, negate dip values in the survey data. Use this when
                       drillholes appear upside down (going up instead of into the ground).
                       This handles the convention where negative dip = drilling down.
@@ -874,7 +891,7 @@ class DownholeCollectionBuilder(BaseObjectBuilder):
             description=description,
             tags=tags or {},
             bounding_box=bbox,
-            coordinate_reference_system=crs,
+            coordinate_reference_system=self.resolve_crs(crs),
             location=location,
             collections=collections if collections else None,
         )
@@ -913,7 +930,7 @@ class DownholeIntervalsBuilder(BaseObjectBuilder):
         is_composited: bool = False,
         description: str = "",
         tags: Optional[dict] = None,
-        crs: str = "unspecified",
+        crs: Union[str, int] = "unspecified",
     ) -> 'DownholeIntervals_V1_3_0':
         """Build a DownholeIntervals object from DataFrame data.
         
@@ -930,7 +947,7 @@ class DownholeIntervalsBuilder(BaseObjectBuilder):
             is_composited: Whether the intervals are composited
             description: Object description
             tags: Optional tags dictionary
-            crs: Coordinate reference system string
+            crs: Coordinate reference system - either "unspecified" or an EPSG code (int)
             
         Returns:
             DownholeIntervals_V1_3_0 object
@@ -1010,7 +1027,7 @@ class DownholeIntervalsBuilder(BaseObjectBuilder):
             description=description,
             tags=tags or {},
             bounding_box=bbox,
-            coordinate_reference_system=crs,
+            coordinate_reference_system=self.resolve_crs(crs),
             is_composited=is_composited,
             start=start,
             end=end,
