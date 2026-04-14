@@ -4,13 +4,10 @@
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from evo_mcp.tools.filesystem_tools import register_filesystem_tools
 from tests.helpers import FakeMCP
-
 
 pytestmark = pytest.mark.unit
 

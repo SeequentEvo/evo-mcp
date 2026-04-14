@@ -19,30 +19,30 @@ All tools follow a similar pattern:
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID
 
 import pandas as pd
-
 from evo.common.utils import Cache
-from evo_mcp.context import evo_context, ensure_initialized
-from evo_mcp.utils.object_builders import (
-    PointsetBuilder,
-    LineSegmentsBuilder,
-    DownholeCollectionBuilder,
-    DownholeIntervalsBuilder,
-)
-from evo_schemas.objects.pointset import Pointset_V1_3_0
-from evo_schemas.objects.line_segments import LineSegments_V2_2_0
 from evo_schemas.objects.downhole_collection import DownholeCollection_V1_3_0
 from evo_schemas.objects.downhole_intervals import DownholeIntervals_V1_3_0
+from evo_schemas.objects.line_segments import LineSegments_V2_2_0
+from evo_schemas.objects.pointset import Pointset_V1_3_0
+
+from evo_mcp.context import ensure_initialized, evo_context
+from evo_mcp.utils.object_builders import (
+    DownholeCollectionBuilder,
+    DownholeIntervalsBuilder,
+    LineSegmentsBuilder,
+    PointsetBuilder,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def register_object_builder_tools(mcp):
     """Register all object builder tools."""
-    
+
     @mcp.tool()
     async def build_and_create_pointset(
         workspace_id: str,
@@ -55,14 +55,14 @@ def register_object_builder_tools(mcp):
         z_column: str,
         attribute_columns: list[str] = [],
         tags: dict = {},
-        coordinate_reference_system: str = "unspecified",
+        coordinate_reference_system: Union[str, int] = "unspecified",
         dry_run: bool = True,
     ) -> dict:
         """Build and create a Pointset object from a CSV file.
-        
+
         A Pointset is a set of points in 3D space with optional attributes.
         Common uses: sample locations, sensor positions, survey points.
-        
+
         Args:
             workspace_id: Target Evo workspace UUID
             object_path: Path for the new object (e.g., "/samples/locations.json")
@@ -74,14 +74,14 @@ def register_object_builder_tools(mcp):
             z_column: Z coordinate column name
             attribute_columns: Columns to include as attributes (empty = auto-detect all)
             tags: Optional tags dictionary
-            coordinate_reference_system: CRS string (default: "unspecified")
+            coordinate_reference_system: CRS - either "unspecified" or an EPSG code (int)
             dry_run: If True, validate only without creating (default: True)
-        
+
         Returns:
             Dict with validation results and object info
         """
         result = {"errors": [], "warnings": [], "data_summary": {}}
-        
+
         # Load CSV
         try:
             csv_path = Path(csv_file)
@@ -92,19 +92,19 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["columns"] = list(df.columns)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read CSV file: {e}"}
-        
+
         # Validate required columns
         required = [x_column, y_column, z_column]
         missing = [c for c in required if c not in df.columns]
         if missing:
             result["errors"].append(f"Missing required columns: {missing}")
             return {"status": "validation_failed", "validation": result}
-        
+
         # Clean string columns
         for col in df.columns:
-            if df[col].dtype == 'object':
-                df[col] = df[col].fillna('').astype(str)
-        
+            if df[col].dtype == "object":
+                df[col] = df[col].fillna("").astype(str)
+
         # Check NaN in coordinates
         coord_cols = [x_column, y_column, z_column]
         nan_count = df[coord_cols].isna().any(axis=1).sum()
@@ -113,7 +113,7 @@ def register_object_builder_tools(mcp):
         if nan_count == len(df):
             result["errors"].append("All rows have NaN coordinates")
             return {"status": "validation_failed", "validation": result}
-        
+
         # Calculate bounding box for preview
         try:
             valid_mask = df[coord_cols].notna().all(axis=1)
@@ -130,7 +130,7 @@ def register_object_builder_tools(mcp):
         except Exception as e:
             result["errors"].append(f"Failed to calculate bounding box: {e}")
             return {"status": "validation_failed", "validation": result}
-        
+
         # Determine attribute columns
         attr_cols = attribute_columns if attribute_columns else None
         if attr_cols is None:
@@ -138,7 +138,7 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["auto_detected_attributes"] = auto_attrs
         else:
             result["data_summary"]["specified_attributes"] = attr_cols
-        
+
         if dry_run:
             return {
                 "status": "validation_passed",
@@ -149,19 +149,19 @@ def register_object_builder_tools(mcp):
                     "path": object_path,
                     "points": result["data_summary"]["valid_points"],
                     "attributes": attr_cols or auto_attrs,
-                }
+                },
             }
-        
+
         # Create the object
         await ensure_initialized()
-        
+
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
             _cache = Cache(evo_context.cache_path)
             data_client = object_client.get_data_client(_cache)
-            
+
             builder = PointsetBuilder(data_client)
-            
+
             obj = builder.build(
                 name=object_name,
                 df=df,
@@ -173,9 +173,9 @@ def register_object_builder_tools(mcp):
                 tags=tags,
                 crs=coordinate_reference_system,
             )
-            
+
             obj_dict = obj.as_dict()
-            
+
             # Validate by reconstructing
             try:
                 Pointset_V1_3_0.from_dict(obj_dict)
@@ -185,10 +185,10 @@ def register_object_builder_tools(mcp):
                     "error": str(e),
                     "validation": result,
                 }
-            
+
             await data_client.upload_referenced_data(obj_dict)
             metadata = await object_client.create_geoscience_object(object_path, obj_dict)
-            
+
             return {
                 "status": "created",
                 "object_id": str(metadata.id),
@@ -198,11 +198,11 @@ def register_object_builder_tools(mcp):
                 "validation": result,
                 "builder_warnings": builder.warnings,
             }
-            
+
         except Exception as e:
             logger.exception("Failed to create pointset")
             return {"status": "creation_failed", "error": str(e), "validation": result}
-    
+
     @mcp.tool()
     async def build_and_create_line_segments(
         workspace_id: str,
@@ -219,18 +219,18 @@ def register_object_builder_tools(mcp):
         vertex_attribute_columns: list[str] = [],
         segment_attribute_columns: list[str] = [],
         tags: dict = {},
-        coordinate_reference_system: str = "unspecified",
+        coordinate_reference_system: Union[str, int] = "unspecified",
         dry_run: bool = True,
     ) -> dict:
         """Build and create a LineSegments object from CSV files.
-        
+
         A LineSegments object is a collection of line segments in 3D space.
         Common uses: fault traces, geological contacts, survey lines.
-        
+
         Requires two CSV files:
         - vertices_file: Contains X/Y/Z coordinates for each vertex (row 0 = vertex index 0)
         - segments_file: Contains start/end vertex indices defining each segment
-        
+
         Args:
             workspace_id: Target Evo workspace UUID
             object_path: Path for the new object (e.g., "/lines/faults.json")
@@ -246,14 +246,14 @@ def register_object_builder_tools(mcp):
             vertex_attribute_columns: Vertex attributes (empty = auto-detect)
             segment_attribute_columns: Segment attributes (empty = auto-detect)
             tags: Optional tags dictionary
-            coordinate_reference_system: CRS string (default: "unspecified")
+            coordinate_reference_system: CRS - either "unspecified" or an EPSG code (int)
             dry_run: If True, validate only without creating (default: True)
-        
+
         Returns:
             Dict with validation results and object info
         """
         result = {"errors": [], "warnings": [], "data_summary": {}}
-        
+
         # Load vertices
         try:
             vertices_path = Path(vertices_file)
@@ -264,7 +264,7 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["vertex_columns"] = list(vertices_df.columns)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read vertices file: {e}"}
-        
+
         # Load segments
         try:
             segments_path = Path(segments_file)
@@ -275,27 +275,27 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["segment_columns"] = list(segments_df.columns)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read segments file: {e}"}
-        
+
         # Validate required columns
         required_vertex = [x_column, y_column, z_column]
         missing = [c for c in required_vertex if c not in vertices_df.columns]
         if missing:
             result["errors"].append(f"Missing vertex columns: {missing}")
-        
+
         required_segment = [start_index_column, end_index_column]
         missing = [c for c in required_segment if c not in segments_df.columns]
         if missing:
             result["errors"].append(f"Missing segment columns: {missing}")
-        
+
         if result["errors"]:
             return {"status": "validation_failed", "validation": result}
-        
+
         # Clean string columns
         for df in [vertices_df, segments_df]:
             for col in df.columns:
-                if df[col].dtype == 'object':
-                    df[col] = df[col].fillna('').astype(str)
-        
+                if df[col].dtype == "object":
+                    df[col] = df[col].fillna("").astype(str)
+
         # Validate segment indices
         max_vertex_idx = len(vertices_df) - 1
         start_max = segments_df[start_index_column].max()
@@ -306,7 +306,7 @@ def register_object_builder_tools(mcp):
                 f"found start max: {start_max}, end max: {end_max}"
             )
             return {"status": "validation_failed", "validation": result}
-        
+
         # Calculate bounding box
         try:
             coord_cols = [x_column, y_column, z_column]
@@ -315,7 +315,7 @@ def register_object_builder_tools(mcp):
             if len(valid_df) == 0:
                 result["errors"].append("No valid vertex coordinates found")
                 return {"status": "validation_failed", "validation": result}
-            
+
             result["data_summary"]["bounding_box"] = {
                 "min_x": float(valid_df[x_column].min()),
                 "max_x": float(valid_df[x_column].max()),
@@ -327,7 +327,7 @@ def register_object_builder_tools(mcp):
         except Exception as e:
             result["errors"].append(f"Failed to calculate bounding box: {e}")
             return {"status": "validation_failed", "validation": result}
-        
+
         if dry_run:
             return {
                 "status": "validation_passed",
@@ -338,19 +338,19 @@ def register_object_builder_tools(mcp):
                     "path": object_path,
                     "vertices": len(vertices_df),
                     "segments": len(segments_df),
-                }
+                },
             }
-        
+
         # Create the object
         await ensure_initialized()
-        
+
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
             _cache = Cache(evo_context.cache_path)
             data_client = object_client.get_data_client(_cache)
-            
+
             builder = LineSegmentsBuilder(data_client)
-            
+
             obj = builder.build(
                 name=object_name,
                 vertices_df=vertices_df,
@@ -366,9 +366,9 @@ def register_object_builder_tools(mcp):
                 tags=tags,
                 crs=coordinate_reference_system,
             )
-            
+
             obj_dict = obj.as_dict()
-            
+
             # Validate by reconstructing
             try:
                 LineSegments_V2_2_0.from_dict(obj_dict)
@@ -378,10 +378,10 @@ def register_object_builder_tools(mcp):
                     "error": str(e),
                     "validation": result,
                 }
-            
+
             await data_client.upload_referenced_data(obj_dict)
             metadata = await object_client.create_geoscience_object(object_path, obj_dict)
-            
+
             return {
                 "status": "created",
                 "object_id": str(metadata.id),
@@ -391,11 +391,11 @@ def register_object_builder_tools(mcp):
                 "validation": result,
                 "builder_warnings": builder.warnings,
             }
-            
+
         except Exception as e:
             logger.exception("Failed to create line segments")
             return {"status": "creation_failed", "error": str(e), "validation": result}
-    
+
     @mcp.tool()
     async def build_and_create_downhole_collection(
         workspace_id: str,
@@ -411,23 +411,23 @@ def register_object_builder_tools(mcp):
         z_column: str,
         depth_column: str,
         azimuth_column: str,
-        dip_column: str,        
+        dip_column: str,
         max_depth_column: Optional[str] = None,
         interval_files: list[dict] = [],
         tags: dict = {},
-        coordinate_reference_system: str = "unspecified",
+        coordinate_reference_system: Union[str, int] = "unspecified",
         invert_z: bool = False,
         dry_run: bool = True,
     ) -> dict:
         """Build and create a DownholeCollection object from CSV files.
-        
+
         This is a high-level tool that:
         1. Reads and validates all CSV files
         2. Constructs the complete object with proper schema structure
         3. Uploads all data blobs (parquet files)
         4. Validates the final object against the schema
         5. Creates the object in the workspace (if not dry_run)
-        
+
         Args:
             workspace_id: Target Evo workspace UUID
             object_path: Path for the new object (e.g., "/drillholes/my_data.json")
@@ -442,8 +442,8 @@ def register_object_builder_tools(mcp):
             z_column: Z coordinate column in collar
             depth_column: Depth/distance column in survey
             azimuth_column: Azimuth column in survey
-            dip_column: Dip column in survey            
-            max_depth_column: Max depth column in collar file (optional - if not provided, 
+            dip_column: Dip column in survey
+            max_depth_column: Max depth column in collar file (optional - if not provided,
                 will be calculated from survey data)
             interval_files: List of interval file configs, each with:
                 - file: Path to CSV file
@@ -453,15 +453,15 @@ def register_object_builder_tools(mcp):
                 - to_column: To depth column name
                 - attribute_columns: (optional) List of columns to include as attributes
             tags: Optional tags dictionary
-            coordinate_reference_system: CRS string (default: "unspecified")
+            coordinate_reference_system: CRS - either "unspecified" or an EPSG code (int)
             invert_z: If True, negate dip values in survey data. Set depending on the convention followed. Default: False.
             dry_run: If True, validate only without creating (default: True)
-        
+
         Returns:
             Dict with validation results and object info (or creation result if not dry_run)
         """
         result = {"errors": [], "warnings": [], "data_summary": {}}
-        
+
         # Load collar file
         try:
             collar_path = Path(collar_file)
@@ -471,7 +471,7 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["collar_rows"] = len(collar_df)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read collar file: {e}"}
-        
+
         # Load survey file
         try:
             survey_path = Path(survey_file)
@@ -481,50 +481,46 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["survey_rows"] = len(survey_df)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read survey file: {e}"}
-        
+
         # Validate required columns
         required_collar = [collar_id_column, x_column, y_column, z_column]
         missing = [c for c in required_collar if c not in collar_df.columns]
         if missing:
             result["errors"].append(f"Missing collar columns: {missing}")
-        
+
         # Validate max_depth_column if provided
         if max_depth_column and max_depth_column not in collar_df.columns:
             result["errors"].append(f"Max depth column '{max_depth_column}' not found in collar file")
-        
+
         required_survey = [survey_id_column, depth_column, azimuth_column, dip_column]
         missing = [c for c in required_survey if c not in survey_df.columns]
         if missing:
             result["errors"].append(f"Missing survey columns: {missing}")
-        
+
         if result["errors"]:
             return {"status": "validation_failed", "validation": result}
-        
+
         # Clean string columns
         for df in [collar_df, survey_df]:
             for col in df.columns:
-                if df[col].dtype == 'object':
-                    df[col] = df[col].fillna('').astype(str)
-        
+                if df[col].dtype == "object":
+                    df[col] = df[col].fillna("").astype(str)
+
         # Check NaN in coordinates
         coord_cols = [x_column, y_column, z_column]
         nan_count = collar_df[coord_cols].isna().any(axis=1).sum()
         if nan_count > 0:
-            result["warnings"].append(
-                f"{nan_count} collar rows have NaN coordinates (excluded from bounding box)"
-            )
+            result["warnings"].append(f"{nan_count} collar rows have NaN coordinates (excluded from bounding box)")
         if nan_count == len(collar_df):
             result["errors"].append("All collar rows have NaN coordinates")
             return {"status": "validation_failed", "validation": result}
-        
+
         # Count unique holes
         unique_holes = collar_df[collar_id_column].nunique()
         if len(collar_df) != unique_holes:
-            result["warnings"].append(
-                f"Collar has duplicate hole IDs: {len(collar_df)} rows, {unique_holes} unique"
-            )
+            result["warnings"].append(f"Collar has duplicate hole IDs: {len(collar_df)} rows, {unique_holes} unique")
         result["data_summary"]["unique_holes"] = unique_holes
-        
+
         # Calculate bounding box for preview
         try:
             valid_mask = collar_df[coord_cols].notna().all(axis=1)
@@ -540,46 +536,48 @@ def register_object_builder_tools(mcp):
         except Exception as e:
             result["errors"].append(f"Failed to calculate bounding box: {e}")
             return {"status": "validation_failed", "validation": result}
-        
+
         # Load interval files
         interval_configs = []
         for i, cfg in enumerate(interval_files):
             try:
-                interval_path = Path(cfg.get('file', ''))
+                interval_path = Path(cfg.get("file", ""))
                 if not interval_path.exists():
                     result["errors"].append(f"Interval file not found: {interval_path}")
                     continue
-                
+
                 interval_df = pd.read_csv(interval_path)
                 for col in interval_df.columns:
-                    if interval_df[col].dtype == 'object':
-                        interval_df[col] = interval_df[col].fillna('').astype(str)
-                
-                req_cols = [cfg.get('id_column'), cfg.get('from_column'), cfg.get('to_column')]
+                    if interval_df[col].dtype == "object":
+                        interval_df[col] = interval_df[col].fillna("").astype(str)
+
+                req_cols = [cfg.get("id_column"), cfg.get("from_column"), cfg.get("to_column")]
                 missing = [c for c in req_cols if c and c not in interval_df.columns]
                 if missing:
                     result["errors"].append(f"Interval '{cfg.get('name')}' missing columns: {missing}")
                     continue
-                
-                attr_cols = cfg.get('attribute_columns', [])
+
+                attr_cols = cfg.get("attribute_columns", [])
                 if not attr_cols:
                     attr_cols = [c for c in interval_df.columns if c not in set(req_cols)]
-                
-                interval_configs.append({
-                    'name': cfg.get('name', f'collection_{i}'),
-                    'dataframe': interval_df,
-                    'id_col': cfg.get('id_column'),
-                    'from_col': cfg.get('from_column'),
-                    'to_col': cfg.get('to_column'),
-                    'attribute_columns': attr_cols,
-                })
+
+                interval_configs.append(
+                    {
+                        "name": cfg.get("name", f"collection_{i}"),
+                        "dataframe": interval_df,
+                        "id_col": cfg.get("id_column"),
+                        "from_col": cfg.get("from_column"),
+                        "to_col": cfg.get("to_column"),
+                        "attribute_columns": attr_cols,
+                    }
+                )
                 result["data_summary"][f"interval_{cfg.get('name')}_rows"] = len(interval_df)
             except Exception as e:
                 result["errors"].append(f"Failed to load interval file {i}: {e}")
-        
+
         if result["errors"]:
             return {"status": "validation_failed", "validation": result}
-        
+
         # Dry run - just return validation results
         if dry_run:
             return {
@@ -590,20 +588,20 @@ def register_object_builder_tools(mcp):
                     "name": object_name,
                     "path": object_path,
                     "holes": unique_holes,
-                    "collections": [c['name'] for c in interval_configs],
-                }
+                    "collections": [c["name"] for c in interval_configs],
+                },
             }
-        
+
         # Create the object
         await ensure_initialized()
-        
+
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
             _cache = Cache(evo_context.cache_path)
             data_client = object_client.get_data_client(_cache)
-            
+
             builder = DownholeCollectionBuilder(data_client)
-            
+
             obj = builder.build(
                 name=object_name,
                 description=description,
@@ -623,9 +621,9 @@ def register_object_builder_tools(mcp):
                 crs=coordinate_reference_system,
                 invert_z=invert_z,
             )
-            
+
             obj_dict = obj.as_dict()
-            
+
             # Validate by reconstructing
             try:
                 DownholeCollection_V1_3_0.from_dict(obj_dict)
@@ -635,10 +633,10 @@ def register_object_builder_tools(mcp):
                     "error": str(e),
                     "validation": result,
                 }
-            
+
             await data_client.upload_referenced_data(obj_dict)
             metadata = await object_client.create_geoscience_object(object_path, obj_dict)
-            
+
             return {
                 "status": "created",
                 "object_id": str(metadata.id),
@@ -648,11 +646,11 @@ def register_object_builder_tools(mcp):
                 "validation": result,
                 "builder_warnings": builder.warnings,
             }
-            
+
         except Exception as e:
             logger.exception("Failed to create object")
             return {"status": "creation_failed", "error": str(e), "validation": result}
-    
+
     @mcp.tool()
     async def build_and_create_downhole_intervals(
         workspace_id: str,
@@ -675,18 +673,18 @@ def register_object_builder_tools(mcp):
         attribute_columns: list[str] = [],
         is_composited: bool = False,
         tags: dict = {},
-        coordinate_reference_system: str = "unspecified",
+        coordinate_reference_system: Union[str, int] = "unspecified",
         dry_run: bool = True,
     ) -> dict:
         """Build and create a DownholeIntervals object from a CSV file.
-        
+
         A DownholeIntervals object represents downhole intervals with pre-computed
         3D coordinates for start, end, and midpoint of each interval.
         Common uses: composited assay data, geological intervals with desurvey applied.
-        
+
         Unlike DownholeCollection (which stores collar + survey data), this format
         stores the final computed coordinates for each interval directly.
-        
+
         Args:
             workspace_id: Target Evo workspace UUID
             object_path: Path for the new object (e.g., "/intervals/assay.json")
@@ -708,14 +706,14 @@ def register_object_builder_tools(mcp):
             attribute_columns: Columns to include as attributes (empty = auto-detect)
             is_composited: Whether the intervals are composited (default: False)
             tags: Optional tags dictionary
-            coordinate_reference_system: CRS string (default: "unspecified")
+            coordinate_reference_system: CRS - either "unspecified" or an EPSG code (int)
             dry_run: If True, validate only without creating (default: True)
-        
+
         Returns:
             Dict with validation results and object info
         """
         result = {"errors": [], "warnings": [], "data_summary": {}}
-        
+
         # Load CSV
         try:
             csv_path = Path(csv_file)
@@ -726,24 +724,32 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["columns"] = list(df.columns)
         except Exception as e:
             return {"status": "error", "error": f"Failed to read CSV file: {e}"}
-        
+
         # Validate required columns
         required = [
-            hole_id_column, from_column, to_column,
-            start_x_column, start_y_column, start_z_column,
-            end_x_column, end_y_column, end_z_column,
-            mid_x_column, mid_y_column, mid_z_column,
+            hole_id_column,
+            from_column,
+            to_column,
+            start_x_column,
+            start_y_column,
+            start_z_column,
+            end_x_column,
+            end_y_column,
+            end_z_column,
+            mid_x_column,
+            mid_y_column,
+            mid_z_column,
         ]
         missing = [c for c in required if c not in df.columns]
         if missing:
             result["errors"].append(f"Missing required columns: {missing}")
             return {"status": "validation_failed", "validation": result}
-        
+
         # Clean string columns
         for col in df.columns:
-            if df[col].dtype == 'object':
-                df[col] = df[col].fillna('').astype(str)
-        
+            if df[col].dtype == "object":
+                df[col] = df[col].fillna("").astype(str)
+
         # Check NaN in midpoint coordinates (used for bounding box)
         coord_cols = [mid_x_column, mid_y_column, mid_z_column]
         nan_count = df[coord_cols].isna().any(axis=1).sum()
@@ -752,7 +758,7 @@ def register_object_builder_tools(mcp):
         if nan_count == len(df):
             result["errors"].append("All rows have NaN midpoint coordinates")
             return {"status": "validation_failed", "validation": result}
-        
+
         # Calculate bounding box for preview
         try:
             valid_mask = df[coord_cols].notna().all(axis=1)
@@ -769,12 +775,12 @@ def register_object_builder_tools(mcp):
         except Exception as e:
             result["errors"].append(f"Failed to calculate bounding box: {e}")
             return {"status": "validation_failed", "validation": result}
-        
+
         # Count unique holes
         unique_holes = df[hole_id_column].nunique()
         result["data_summary"]["unique_holes"] = unique_holes
         result["data_summary"]["total_intervals"] = len(df)
-        
+
         # Determine attribute columns
         exclude_cols = set(required)
         attr_cols = attribute_columns if attribute_columns else None
@@ -783,7 +789,7 @@ def register_object_builder_tools(mcp):
             result["data_summary"]["auto_detected_attributes"] = auto_attrs
         else:
             result["data_summary"]["specified_attributes"] = attr_cols
-        
+
         if dry_run:
             return {
                 "status": "validation_passed",
@@ -796,19 +802,19 @@ def register_object_builder_tools(mcp):
                     "holes": unique_holes,
                     "is_composited": is_composited,
                     "attributes": attr_cols or auto_attrs,
-                }
+                },
             }
-        
+
         # Create the object
         await ensure_initialized()
-        
+
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
             _cache = Cache(evo_context.cache_path)
             data_client = object_client.get_data_client(_cache)
-            
+
             builder = DownholeIntervalsBuilder(data_client)
-            
+
             obj = builder.build(
                 name=object_name,
                 df=df,
@@ -830,9 +836,9 @@ def register_object_builder_tools(mcp):
                 tags=tags,
                 crs=coordinate_reference_system,
             )
-            
+
             obj_dict = obj.as_dict()
-            
+
             # Validate by reconstructing
             try:
                 DownholeIntervals_V1_3_0.from_dict(obj_dict)
@@ -842,10 +848,10 @@ def register_object_builder_tools(mcp):
                     "error": str(e),
                     "validation": result,
                 }
-            
+
             await data_client.upload_referenced_data(obj_dict)
             metadata = await object_client.create_geoscience_object(object_path, obj_dict)
-            
+
             return {
                 "status": "created",
                 "object_id": str(metadata.id),
@@ -855,7 +861,7 @@ def register_object_builder_tools(mcp):
                 "validation": result,
                 "builder_warnings": builder.warnings,
             }
-            
+
         except Exception as e:
             logger.exception("Failed to create downhole intervals")
             return {"status": "creation_failed", "error": str(e), "validation": result}

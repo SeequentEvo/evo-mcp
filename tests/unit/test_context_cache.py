@@ -13,7 +13,6 @@ import pytest
 
 from evo_mcp.context import EvoContext
 
-
 pytestmark = pytest.mark.unit
 
 

@@ -5,14 +5,14 @@ description = "An MCP server implementation using Evo SDK"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
-    "fastmcp>=3.0.2",
+    "fastmcp>=3.2.0",
     "google-adk==1.22.1",
+    "evo-files>=0.2.4",
     "evo-objects>=0.3.3",
     "evo-sdk-common>=0.5.13",
     "evo-schemas>=2025.9.2",
-    "aiohttp>=3.13.2",
+    "aiohttp>=3.13.4",
     "pyarrow>=14.0.0",
-    "python-dotenv>=1.2.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "tomli; python_version < '3.11'",
@@ -23,11 +23,16 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pre-commit>=4",
+    "ruff==0.15.4",
     "reuse",
 ]
 
-[tool.pytest.ini_options]
-markers = [
-    "unit: fast isolated tests with no external services",
-    "integration: tests that may call live Evo APIs",
-]
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+extend-select = ["I", "RUF022"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["evo_mcp"]

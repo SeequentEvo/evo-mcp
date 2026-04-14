@@ -55,6 +55,7 @@ DEFAULT_HTTP_PORT = "5000"
 TOOL_FILTER_CHOICES = {"1": "all", "2": "admin", "3": "data"}
 AUTH_METHOD_CHOICES = {"1": "native_app", "2": "client_credentials"}
 
+
 def mask_value(value: str, visible: int = 3) -> str:
     """Mask sensitive values for safe terminal output."""
     if not value:
@@ -122,6 +123,7 @@ def prompt_with_confirmation(label: str, current_value: str, default: str) -> st
     if is_confirmed():
         return current_value
     return input(f"Enter {label} (default: {default}): ").strip() or default
+
 
 def prompt_auth_method(current_value: str | None) -> str:
     """Prompt for MCP authentication method selection."""
@@ -259,15 +261,14 @@ def configure_env_settings(project_dir: Path) -> dict[str, str]:
     new_values["EVO_CLIENT_ID"] = prompt_for_env_value(
         "EVO_CLIENT_ID",
         current_values.get("EVO_CLIENT_ID"),
-        "Your Evo application client ID from the iTwin Developer Portal."
+        "Your Evo application client ID from the iTwin Developer Portal.",
     )
-
 
     if new_values["AUTH_METHOD"] == "client_credentials":
         new_values["EVO_CLIENT_SECRET"] = prompt_for_env_value(
             "EVO_CLIENT_SECRET",
             mask_value(current_values.get("EVO_CLIENT_SECRET")),
-            "Your Evo application client secret from the iTwin Developer Portal."
+            "Your Evo application client secret from the iTwin Developer Portal.",
         )
     else:
         new_values["EVO_REDIRECT_URL"] = prompt_for_env_value(
@@ -360,7 +361,7 @@ def get_client_choice() -> ClientChoice:
     choice_list = ", ".join(sorted(choice_keys, key=int))
 
     choice = prompt_choice(
-        f"Enter your choice (default: 1): ",
+        "Enter your choice (default: 1): ",
         choice_keys,
         "1",
         f"Invalid choice. Please enter one of: {choice_list}.",
@@ -394,7 +395,7 @@ def get_protocol_choice(
             "Invalid choice. Please enter 1 or 2.",
         )
         protocol = "stdio" if choice == "1" else "http"
-    
+
     env_values["MCP_TRANSPORT"] = protocol
 
     if protocol == "http":
@@ -522,10 +523,7 @@ def get_python_executable() -> str:
 
 def is_virtual_environment_active() -> bool:
     """Return True when setup is running inside a Python virtual environment."""
-    return (
-        sys.prefix != getattr(sys, "base_prefix", sys.prefix)
-        or bool(os.environ.get("VIRTUAL_ENV"))
-    )
+    return sys.prefix != getattr(sys, "base_prefix", sys.prefix) or bool(os.environ.get("VIRTUAL_ENV"))
 
 
 def resolve_python_executable(python_command: str) -> str | None:
@@ -749,4 +747,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

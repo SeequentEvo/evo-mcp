@@ -7,10 +7,8 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock
 
 import pytest
-
 
 pytestmark = pytest.mark.unit
 
@@ -34,7 +32,7 @@ def test_load_env_file_parses_exported_and_quoted_values(tmp_path):
     env_file.write_text(
         "# comment\n"
         "export EVO_CLIENT_ID=client-id\n"
-        "EVO_REDIRECT_URL=\"http://localhost/callback\"\n"
+        'EVO_REDIRECT_URL="http://localhost/callback"\n'
         "MCP_TOOL_FILTER='data'\n",
         encoding="utf-8",
     )
@@ -52,9 +50,7 @@ def test_write_env_file_updates_existing_keys_and_appends_new_ones(tmp_path):
 
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "# existing settings\n"
-        "EVO_CLIENT_ID=old-client\n"
-        "MCP_TOOL_FILTER=all\n",
+        "# existing settings\nEVO_CLIENT_ID=old-client\nMCP_TOOL_FILTER=all\n",
         encoding="utf-8",
     )
 
@@ -67,10 +63,7 @@ def test_write_env_file_updates_existing_keys_and_appends_new_ones(tmp_path):
     )
 
     assert env_file.read_text(encoding="utf-8") == (
-        "# existing settings\n"
-        "EVO_CLIENT_ID=new-client\n"
-        "MCP_TOOL_FILTER=all\n"
-        "MCP_HTTP_PORT=5000\n"
+        "# existing settings\nEVO_CLIENT_ID=new-client\nMCP_TOOL_FILTER=all\nMCP_HTTP_PORT=5000\n"
     )
 
 
@@ -154,7 +147,11 @@ def test_setup_mcp_config_accepts_empty_existing_json_file(tmp_path, monkeypatch
     monkeypatch.setattr(setup_mcp, "get_config_dir", lambda client: config_dir)
     monkeypatch.setattr(setup_mcp, "get_python_executable", lambda: "/current/python")
     monkeypatch.setattr(setup_mcp, "choose_python_executable", lambda default: "/chosen/python")
-    monkeypatch.setattr(setup_mcp, "start_http_server", lambda *args, **kwargs: pytest.fail("start_http_server should not be called for stdio"))
+    monkeypatch.setattr(
+        setup_mcp,
+        "start_http_server",
+        lambda *args, **kwargs: pytest.fail("start_http_server should not be called for stdio"),
+    )
 
     client = setup_mcp.ClientChoice("VS Code", "vscode", "Code")
     setup_mcp.setup_mcp_config(

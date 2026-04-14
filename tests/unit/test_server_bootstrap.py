@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-
 pytestmark = pytest.mark.unit
 
 
@@ -31,11 +30,7 @@ def _reload_mcp_tools(monkeypatch, tool_filter: str, transport: str):
 
 def _registered_component_names(module, prefix: str) -> set[str]:
     components = module.mcp._local_provider._components
-    return {
-        key.removeprefix(f"{prefix}:").split("@", 1)[0]
-        for key in components
-        if key.startswith(f"{prefix}:")
-    }
+    return {key.removeprefix(f"{prefix}:").split("@", 1)[0] for key in components if key.startswith(f"{prefix}:")}
 
 
 def test_invalid_transport_defaults_to_stdio(monkeypatch):

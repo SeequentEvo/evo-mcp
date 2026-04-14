@@ -6,14 +6,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from uuid import uuid4
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 
 import evo_mcp.tools.admin_tools as admin_tools
 from tests.helpers import FakeMCP
-
 
 pytestmark = pytest.mark.unit
 

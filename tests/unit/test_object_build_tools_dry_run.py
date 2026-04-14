@@ -9,7 +9,6 @@ import pytest
 from evo_mcp.tools.object_build_tools import register_object_builder_tools
 from tests.helpers import FakeMCP
 
-
 pytestmark = pytest.mark.unit
 
 

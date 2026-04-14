@@ -1,4 +1,4 @@
-name: Tests on pull request
+name: Tests and Linting
 
 permissions:
   contents: read
@@ -7,5 +7,20 @@ on:
   pull_request:
 
 jobs:
+  run-pre-commit:
+    name: Run pre-commit hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+      - uses: pre-commit/action@v3.0.1
+
+  run-linting:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/linting
+
   run-tests:
     uses: ./.github/workflows/run-all-tests.yaml

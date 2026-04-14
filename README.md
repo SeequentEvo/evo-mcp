@@ -238,7 +238,7 @@ Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app
 
 ##### Evo app credentials
 
-You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account in access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
+You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account to access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
 
 Fill in your app credentials in the `.env` file:
 ```bash
@@ -375,7 +375,7 @@ python scripts/setup_mcp.py
   - For HTTP mode, use `templates/cursor-http-config.json` instead.
   - Update the template URL host and port to match `MCP_HTTP_HOST` and `MCP_HTTP_PORT` in your `.env`, and ensure the HTTP server is running.
 2. Open the **Command Palette** (press `Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
-3. Search for "mcp". Select either **View: Open MCP Settings** to update the user settings.
+3. Search for "mcp". Select **View: Open MCP Settings** to update the user settings.
   ![Cursor Command Palette](images/cursor-command-palette.png)
 
 4. Click the **Add Custom MCP** button.
@@ -555,6 +555,39 @@ To run live integration tests, set these environment variables:
 - `EVO_DISCOVERY_URL`
 
 See `tests/README.md` for full details on test structure, markers, and CI workflow files.
+
+### Linting
+
+This repository uses Ruff for linting and formatting checks.
+Linting also verifies that Python files include the required SPDX license header.
+
+Run lint checks:
+
+```bash
+make lint
+```
+
+Auto-fix lint and formatting issues:
+
+```bash
+make lint-fix
+```
+
+### Pre-commit
+
+Install pre-commit hooks:
+
+The local pre-commit hook will also auto-insert missing SPDX headers in Python files.
+
+```bash
+uv run --extra dev pre-commit install
+```
+
+Run hooks on all files:
+
+```bash
+uv run --extra dev pre-commit run --all-files
+```
 
 ## Contributing
 

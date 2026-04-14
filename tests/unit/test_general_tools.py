@@ -6,14 +6,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from uuid import uuid4
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 
 import evo_mcp.tools.general_tools as general_tools
 from tests.helpers import FakeMCP, FakePage
-
 
 pytestmark = pytest.mark.unit
 
@@ -41,9 +40,7 @@ async def test_get_workspace_by_name_not_found(monkeypatch):
     """Given no matching workspace name, when looked up, then a not-found ValueError is raised."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
 
-    workspace_client = SimpleNamespace(
-        list_workspaces=AsyncMock(return_value=FakePage(items=[]))
-    )
+    workspace_client = SimpleNamespace(list_workspaces=AsyncMock(return_value=FakePage(items=[])))
     monkeypatch.setattr(general_tools.evo_context, "workspace_client", workspace_client)
 
     mcp = _register_general_tools()
@@ -185,9 +182,7 @@ async def test_get_object_by_path_maps_metadata(monkeypatch):
         version_id="version-7",
         created_at=datetime(2026, 1, 4, tzinfo=timezone.utc),
     )
-    object_client = SimpleNamespace(
-        download_object_by_path=AsyncMock(return_value=SimpleNamespace(metadata=metadata))
-    )
+    object_client = SimpleNamespace(download_object_by_path=AsyncMock(return_value=SimpleNamespace(metadata=metadata)))
     get_object_client = AsyncMock(return_value=object_client)
 
     monkeypatch.setattr(general_tools.evo_context, "get_object_client", get_object_client)

@@ -12,7 +12,6 @@ from evo_mcp.context import ensure_initialized, evo_context
 from evo_mcp.tools.admin_tools import register_admin_tools
 from tests.helpers import FakeMCP
 
-
 _REQUIRED_ENV_VARS = [
     "EVO_CLIENT_ID",
     "EVO_REDIRECT_URL",

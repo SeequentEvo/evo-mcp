@@ -10,7 +10,6 @@ import pytest
 
 from evo_mcp.context import ensure_initialized, evo_context
 
-
 _REQUIRED_ENV_VARS = [
     "EVO_CLIENT_ID",
     "EVO_REDIRECT_URL",
