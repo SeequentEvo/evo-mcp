@@ -23,5 +23,16 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pre-commit>=4",
+    "ruff==0.15.4",
     "reuse",
 ]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+extend-select = ["I", "RUF022"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["evo_mcp"]
