@@ -11,13 +11,11 @@ repos:
     hooks:
       - id: reuse-license-headers
         name: Annotate SPDX license headers with reuse
-        entry: uv
-        language: system
-        args:
-          - run
-          - --extra
-          - dev
+        entry: reuse
+        language: python
+        additional_dependencies:
           - reuse
+        args:
           - annotate
           - --skip-existing
           - --copyright=Bentley Systems, Incorporated
