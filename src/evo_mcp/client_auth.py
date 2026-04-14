@@ -3,10 +3,41 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-from urllib.parse import urlparse
+from typing import Any
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from evo.oauth import EvoScopes
 from fastmcp.server.auth.oidc_proxy import OIDCProxy
+
+
+# ---------------------------------------------------------------------------
+# Subclass: strip MCP ``resource`` indicator from upstream IdP requests
+# ---------------------------------------------------------------------------
+# MCP clients (VS Code Copilot, Copilot CLI, …) send an RFC 8707 ``resource``
+# parameter identifying the MCP server URL.  The base OIDCProxy validates it
+# locally (good) but also forwards it to the upstream IdP.  Bentley IMS does
+# not recognise the MCP server URL as a valid resource and rejects the request
+# with ``invalid_target``.
+#
+# In a third-party authorization flow the upstream IdP has its own resource
+# model; the downstream MCP resource indicator should not be forwarded.
+#
+# Tracked upstream: https://github.com/PrefectHQ/fastmcp/issues/3939
+# This subclass can be removed once fastmcp strips ``resource`` itself.
+# ---------------------------------------------------------------------------
+class _BentleyOIDCProxy(OIDCProxy):
+
+    def _build_upstream_authorize_url(
+        self, txn_id: str, transaction: dict[str, Any]
+    ) -> str:
+        url = super()._build_upstream_authorize_url(txn_id, transaction)
+        parsed = urlparse(url)
+        params = parse_qs(parsed.query, keep_blank_values=True)
+        if "resource" in params:
+            del params["resource"]
+            return urlunparse(parsed._replace(query=urlencode(params, doseq=True)))
+        return url
+
 
 def create_auth_provider(base_url: str):
     """Create an OIDCProxy auth provider for HTTP transport.
@@ -49,7 +80,7 @@ def create_auth_provider(base_url: str):
 
     _apply_loopback_redirect_patch()
 
-    return OIDCProxy(
+    return _BentleyOIDCProxy(
         config_url=config_url,
         client_id=client_id,
         client_secret="unused",
