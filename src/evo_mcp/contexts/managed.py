@@ -12,7 +12,6 @@ from typing import Optional
 from uuid import UUID
 
 import jwt
-from evo.common import APIConnector
 from evo.oauth import (
     AccessTokenAuthorizer,
     AuthorizationCodeAuthorizer,
@@ -20,7 +19,6 @@ from evo.oauth import (
     EvoScopes,
     OAuthConnector,
 )
-from evo.workspaces import WorkspaceAPIClient
 
 from .base import EvoContextBase
 
@@ -154,11 +152,7 @@ class ManagedAuthContext(EvoContextBase):
     # -- Lifecycle ----------------------------------------------------------
 
     async def initialize(self) -> None:
-        """Initialize or reuse the single shared context.
-
-        ``access_token`` is accepted for interface compatibility but
-        ignored — managed mode obtains its own tokens.
-        """
+        """Initialize or reuse the single shared context."""
         if self.initialized and self.get_access_token_from_cache() is not None:
             return
 

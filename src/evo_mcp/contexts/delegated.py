@@ -7,11 +7,8 @@
 import logging
 import tempfile
 from pathlib import Path
-from uuid import UUID
 
-from evo.common import APIConnector
 from evo.oauth import AccessTokenAuthorizer
-from evo.workspaces import WorkspaceAPIClient
 
 from evo_mcp.contexts.helpers import get_client_session_upstream_access_token
 

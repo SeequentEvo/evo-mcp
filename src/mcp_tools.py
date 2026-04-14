@@ -37,12 +37,12 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from evo_mcp.client_auth import create_auth_provider
 from evo_mcp.tools import (
     register_admin_tools,
+    register_file_tools,
+    register_filesystem_tools,
     # register_data_tools,
     register_general_tools,
-    register_filesystem_tools,
+    register_instance_users_admin_tools,
     register_object_builder_tools,
-    register_file_tools,
-    register_instance_users_admin_tools
 )
 
 # Get transport mode from environment variable
@@ -101,7 +101,10 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
 
 # Initialize FastMCP server with agent type in name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
-auth_provider = create_auth_provider(f"http://{HTTP_HOST}:{HTTP_PORT}") if CLIENT_DELEGATED_AUTH else None
+# MCP_PUBLIC_BASE_URL supports reverse proxy / TLS deployments where the
+# bind address differs from the public URL clients use for OAuth callbacks.
+public_base_url = os.getenv("MCP_PUBLIC_BASE_URL", f"http://{HTTP_HOST}:{HTTP_PORT}")
+auth_provider = create_auth_provider(public_base_url) if CLIENT_DELEGATED_AUTH else None
 mcp = FastMCP(server_name, auth=auth_provider)
 
 # Show more traceback frame for now, we may want to disabled the rich
@@ -437,11 +440,12 @@ if __name__ == "__main__":
                     })
 
         logger.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
+        middleware = [Middleware(AuthMetadataPatchMiddleware)] if CLIENT_DELEGATED_AUTH else []
         mcp.run(
             transport="http",
             host=HTTP_HOST,
             port=HTTP_PORT,
-            middleware=[Middleware(AuthMetadataPatchMiddleware)],
+            middleware=middleware,
         )
     else:
         # Default STDIO mode
