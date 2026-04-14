@@ -9,7 +9,7 @@ Execute all eval tasks for skill: <skill-name>
 
 Inputs:
 - Skill path: skills/<skill-name>/SKILL.md
-- Evals file: skills/<skill-name>/evals/evals.json
+- Evals file: skills-dev/mcp-skill-eval/skill-evals/<skill-name>/evals.json
 - Workspace ID: <workspace_id>
 
 Context:
@@ -19,6 +19,8 @@ Context:
 Execution requirements:
 - Run every eval entry in evals.json.
 - Run evals serially unless skill instructions require another order.
+- Treat each eval as independent: never terminate the whole skill run because one eval fails.
+- Do not retry or reattempt a failed eval in the same iteration.
 - Save per-eval artifacts to:
   skills-eval-workspace/iteration-N/<skill-name>/eval-<id>/outputs/
 - Write per-eval metrics.json in each eval outputs directory.

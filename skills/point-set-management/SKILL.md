@@ -15,10 +15,6 @@ Use this skill when the user needs to:
 - inspect a point-set payload
 - inspect point-set attribute columns and null patterns
 
-## Sample Data
-
-A reference CSV is available at `skills/point-set-management/evals/samples.csv` (columns: Easting, Northing, RL, GRADE, LITHOLOGY). A variant with invalid coordinate rows is at `skills/point-set-management/evals/samples_with_invalid.csv`. Use these paths in evals and examples.
-
 ## When to Use Each Tool
 
 ### Quick Selection Guide
@@ -59,13 +55,13 @@ User needs point-set help
 
 ### Example 1: Build and inspect local payload
 
-1. Call `point_set_build_local(object_name="Assays", csv_file="skills/point-set-management/evals/samples.csv", x_column="Easting", y_column="Northing", z_column="RL")`.
+1. Call `point_set_build_local(object_name="Assays", csv_file="path/to/file.csv", x_column="Easting", y_column="Northing", z_column="RL")`.
 2. Call `point_set_summarize(point_set_name="Assays")`.
 3. Call `point_set_attribute_details(point_set_name="Assays")`.
 
 ### Example 2: Build local payload then persist
 
-1. Call `point_set_build_local(...)`.
+1. Call `point_set_build_local(object_name="Assays", csv_file="path/to/file.csv", x_column="Easting", y_column="Northing", z_column="RL")`.
 2. Publish to Evo using `point_set_publish`.
 
 ## Error Handling

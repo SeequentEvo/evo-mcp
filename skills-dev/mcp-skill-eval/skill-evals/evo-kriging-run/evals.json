@@ -3,7 +3,7 @@
   "setup": {
     "steps": [
       {"step": 0, "tool": "reset_staging", "args": {}},
-      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills/evo-kriging-run/evals/fixtures.json"]}}
+      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/evo-kriging-run/fixtures.json"]}}
     ]
   },
   "evals": [

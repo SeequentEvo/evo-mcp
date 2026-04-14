@@ -1,9 +1,9 @@
 ---
-name: evo-skill-eval
+name: mcp-skill-eval
 description: Runs and evaluates evo-mcp skill evals against a workspace — tests, benchmarks, and assesses skill behaviour.
 ---
 
-# Evo Skill Eval
+# MCP Skill Eval
 
 Run multi-skill evals with one shared seeded workspace, one executor subagent per skill, then grade and aggregate the results.
 
@@ -13,12 +13,15 @@ Run multi-skill evals with one shared seeded workspace, one executor subagent pe
 - Spawn one executor subagent per skill, not per eval.
 - Spawn all skill subagents in the same turn unless user asks for serial execution.
 - Fixtures must be unique per skill test suite. If fixture keys/object names overlap across skills, stop and fix before seeding.
+- Fail fast per eval: stop that specific eval attempt immediately when it fails.
+- Eval independence is mandatory: a failed eval must not stop remaining evals in the same skill.
+- Do not retry or reattempt a failed eval in the same iteration.
 - Always write iteration summary artifacts: `summary.json` and `recommendations.md`.
 
 ## Fast checklist
 
-1. Select target skills and load each `evals/evals.json`.
-2. Build `fixture_files` from selected skills where `evals/fixtures.json` exists.
+1. Select target skills and load each `skill-evals/<skill-name>/evals.json`.
+2. Build `fixture_files` from selected skills where `skill-evals/<skill-name>/fixtures.json` exists.
 3. Reset and seed once; capture `workspace_id`.
 4. Spawn one executor subagent per skill.
 5. Draft assertions while executors run; write `eval_metadata.json` per eval.
@@ -32,7 +35,7 @@ Do not advance until required files for the current step exist.
 
 ### 1) Select scope
 
-- If user says "all", select directories under `skills/` that have both `SKILL.md` and `evals/evals.json`.
+- If user says "all", select directories under `skills/` that have `SKILL.md` and have a matching entry under `skill-evals/<skill-name>/evals.json` in this skill.
 - If a skill defines preconditions/setup in its docs/eval metadata, run those before spawning its executor.
 
 Done when: final skill list is locked and all eval prompts are loaded.
@@ -57,8 +60,11 @@ Done when: shared workspace is seeded once and `workspace_id` is recorded.
 ### 3) Execute (one subagent per skill)
 
 - Spawn exactly one executor subagent for each selected skill.
-- Executor must run all evals in that skill's `evals/evals.json`.
+- Executor must run all evals in that skill's `skill-evals/<skill-name>/evals.json`.
 - Evals run serially inside each skill executor unless the skill requires otherwise.
+- If an eval fails, mark it failed
+- Do not retry any failed eval in the same run.
+- Do not stop the entire skill run on a single eval failure unless the user explicitly requests `halt_on_first_error=true`.
 - Use prompt template in `references/templates.md`.
 
 Done when: each selected skill has exactly one active or completed executor subagent.
@@ -126,7 +132,7 @@ Keep prior iterations (`iteration-1`, `iteration-2`, ...). Do not delete old run
 ## Required Inputs
 
 - One or more skill names (or "all" to select every skill with evals)
-- Each target skill must have `evals/evals.json`
+- Each target skill must have `skill-evals/<skill-name>/evals.json`
 
 ## Optional Inputs
 
@@ -139,6 +145,7 @@ Keep prior iterations (`iteration-1`, `iteration-2`, ...). Do not delete old run
 - **Missing evals.json for a selected skill**: Skip that skill with a warning rather than aborting the entire run.
 - **Seed failure**: Report the seed error and do not proceed to execution. Common causes: malformed fixture JSON, unsupported object types, or connectivity issues.
 - **Executor subagent failure**: Capture partial output and continue with remaining skills. Report which skill failed and at which eval.
+- **Eval failure inside executor**: Stop only the failing eval attempt, mark that eval as failed, and continue with the remaining evals.
 - **Grading mismatch**: If grading.json cannot be written (e.g., missing outputs), mark the eval as "ungraded" with an explanation.
 
 ## Reference files

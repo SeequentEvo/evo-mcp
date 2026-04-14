@@ -3,7 +3,7 @@
   "setup": {
     "steps": [
       {"step": 0, "tool": "reset_staging", "args": {}},
-      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills/design-search-neighborhood/evals/fixtures.json"], "fixture_names": ["dsn_standard_variogram"]}}
+      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/design-search-neighborhood/fixtures.json"], "fixture_names": ["dsn_standard_variogram"]}}
     ]
   },
   "evals": [

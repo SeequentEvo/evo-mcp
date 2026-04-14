@@ -3,7 +3,7 @@
   "setup": {
     "steps": [
       {"step": 0, "tool": "reset_staging", "args": {}},
-      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills/kriging-reporting/evals/fixtures.json"]}},
+      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/kriging-reporting/fixtures.json"]}},
       {"step": 2, "tool": "kriging_run", "args": {}, "note": "Run a kriging scenario using the published objects to produce estimated attributes on the block model"}
     ]
   },
