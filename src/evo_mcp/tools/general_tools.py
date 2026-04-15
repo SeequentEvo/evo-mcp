@@ -297,7 +297,7 @@ def register_general_tools(mcp):
             if ctx:
                 await ctx.debug("Fetching objects from service")
             objects = await object_client.list_objects(
-                schema_id=None,
+                schema_id=schema_id or None,
                 deleted=deleted,
                 limit=limit,
             )
