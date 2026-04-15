@@ -6,9 +6,9 @@
 
 import asyncio
 import logging
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from fastmcp import Context
 
@@ -36,43 +36,43 @@ from evo_mcp.utils.tool_support import (
     build_links_from_metadata,
 )
 
-TargetObjectId = Annotated[
-    str,
-    Field(
+
+class KrigingBuildParams(BaseModel):
+    """Parameters for building a validated kriging payload."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    target_object_id: str = Field(
         description=(
             "UUID of the target object for an estimation or spatial-validation workflow. "
             "For kriging, this should identify an existing BlockModel or Regular3DGrid in the provided workspace."
         ),
-    ),
-]
-
-PointSetAttributeName = Annotated[
-    str,
-    Field(
-        description=(
-            "Existing numeric source attribute name on the point set object, "
-            "for example 'CU_pct'."
-        )
-    ),
-]
-
-PointSetObjectId = Annotated[
-    str,
-    Field(
-        description=(
-            "UUID of the source PointSet object containing known sample values."
-        ),
-    ),
-]
-
-TargetAttributeName = Annotated[
-    str,
-    Field(
-        description=(
-            "Target attribute name to create or update on the target object for estimation results."
-        )
-    ),
-]
+    )
+    target_attribute: str = Field(
+        description="Target attribute name to create or update on the target object for estimation results.",
+    )
+    point_set_object_id: str = Field(
+        description="UUID of the source PointSet object containing known sample values.",
+    )
+    point_set_attribute: str = Field(
+        description="Existing numeric source attribute name on the point set object, for example 'CU_pct'.",
+    )
+    variogram_object_id: VariogramObjectId
+    search: SearchNeighborhood = Field(
+        description="Search neighborhood parameters including ellipsoid and sample counts.",
+    )
+    method: SimpleKriging | OrdinaryKriging = Field(
+        default_factory=OrdinaryKriging,
+        description="Kriging method object. Defaults to ordinary kriging.",
+    )
+    target_region_filter: RegionFilter | None = Field(
+        default=None,
+        description="Optional region filter for the target object.",
+    )
+    block_discretisation: BlockDiscretisation | None = Field(
+        default=None,
+        description="Optional sub-block discretisation settings.",
+    )
 
 
 logger = logging.getLogger(__name__)
@@ -112,39 +112,23 @@ def register_compute_tools(mcp) -> None:
     @mcp.tool()
     async def kriging_build_parameters(
         workspace_id: str,
-        target_object_id: TargetObjectId,
-        target_attribute: TargetAttributeName,
-        point_set_object_id: PointSetObjectId,
-        point_set_attribute: PointSetAttributeName,
-        variogram_object_id: VariogramObjectId,
-        search: SearchNeighborhood,
-        method: SimpleKriging | OrdinaryKriging = OrdinaryKriging(),
-        target_region_filter: RegionFilter | None = None,
-        block_discretisation: BlockDiscretisation | None = None,
+        params: KrigingBuildParams,
     ) -> dict[str, Any]:
         """Build a validated kriging payload from primitive inputs.
 
         Args:
             workspace_id: Workspace UUID where the task should run.
-            target_object_id: UUID of the target BlockModel or Regular3DGrid object.
-            target_attribute: Name of the target attribute to create.
-            point_set_object_id: UUID of the source PointSet object.
-            point_set_attribute: Existing source attribute name on the PointSet.
-            variogram_object_id: UUID of the variogram object.
-            search: Search neighborhood parameters including ellipsoid and sample counts.
-            method: Kriging method object. Defaults to ordinary kriging.
-            target_region_filter: Optional region filter for the target object.
-            block_discretisation: Optional sub-block discretisation settings.
+            params: Kriging build parameters including source, target, variogram, search neighborhood, and optional filters.
 
         Returns:
             A validated payload object suitable for kriging_run.
         """
-        if not point_set_attribute or not point_set_attribute.strip():
+        if not params.point_set_attribute or not params.point_set_attribute.strip():
             raise ValueError(
                 "point_set_attribute must be a non-empty string. "
                 "Specify the attribute name on the point set to use as the estimation input (e.g. 'CU_pct')."
             )
-        if not target_attribute or not target_attribute.strip():
+        if not params.target_attribute or not params.target_attribute.strip():
             raise ValueError(
                 "target_attribute must be a non-empty string. "
                 "Specify the name of the attribute to create on the target block model (e.g. 'OK_estimate')."
@@ -152,19 +136,19 @@ def register_compute_tools(mcp) -> None:
         environment = await get_workspace_environment(workspace_id)
         context = StaticContext.from_environment(environment, evo_context.connector)
         source_object, target_object, variogram_object = await asyncio.gather(
-            object_from_uuid(context, point_set_object_id),
-            object_from_uuid(context, target_object_id),
-            object_from_uuid(context, variogram_object_id),
+            object_from_uuid(context, params.point_set_object_id),
+            object_from_uuid(context, params.target_object_id),
+            object_from_uuid(context, params.variogram_object_id),
         )
-        source_attribute = source_object.attributes[point_set_attribute]
+        source_attribute = source_object.attributes[params.point_set_attribute]
         payload = KrigingParameters(
             source=Source(object=source_object, attribute=source_attribute),
-            target=Target.new_attribute(target_object, target_attribute),
+            target=Target.new_attribute(target_object, params.target_attribute),
             variogram=variogram_object,
-            search=search,
-            method=method,
-            target_region_filter=target_region_filter,
-            block_discretisation=block_discretisation,
+            search=params.search,
+            method=params.method,
+            target_region_filter=params.target_region_filter,
+            block_discretisation=params.block_discretisation,
         )
 
         return _normalize_kriging_payload(payload.model_dump(mode="json"))
