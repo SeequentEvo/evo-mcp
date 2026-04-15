@@ -4,33 +4,41 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import sys
-from pathlib import Path
 
 import pytest
 
 pytestmark = pytest.mark.unit
 
 
-SRC_PATH = Path(__file__).resolve().parents[2] / "src"
-if str(SRC_PATH) not in sys.path:
-    sys.path.insert(0, str(SRC_PATH))
+def _clear_bootstrap_modules() -> None:
+    for module_name in list(sys.modules):
+        if module_name == "mcp_tools" or module_name.startswith("evo_mcp.tools"):
+            del sys.modules[module_name]
 
 
 def _reload_mcp_tools(monkeypatch, tool_filter: str, transport: str):
     monkeypatch.setenv("MCP_TOOL_FILTER", tool_filter)
     monkeypatch.setenv("MCP_TRANSPORT", transport)
 
-    if "mcp_tools" in sys.modules:
-        del sys.modules["mcp_tools"]
+    _clear_bootstrap_modules()
 
     return importlib.import_module("mcp_tools")
 
 
-def _registered_component_names(module, prefix: str) -> set[str]:
-    components = module.mcp._local_provider._components
-    return {key.removeprefix(f"{prefix}:").split("@", 1)[0] for key in components if key.startswith(f"{prefix}:")}
+def _registered_component_names(module, component_type: str) -> set[str]:
+    async def _list_names() -> set[str]:
+        if component_type == "tool":
+            return {tool.name for tool in await module.mcp.list_tools()}
+        if component_type == "prompt":
+            return {prompt.name for prompt in await module.mcp.list_prompts()}
+        if component_type == "resource":
+            return {str(resource.uri) for resource in await module.mcp.list_resources()}
+        raise ValueError(f"Unsupported component type: {component_type}")
+
+    return asyncio.run(_list_names())
 
 
 def test_invalid_transport_defaults_to_stdio(monkeypatch):
