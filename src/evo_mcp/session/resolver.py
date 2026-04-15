@@ -4,8 +4,7 @@
 
 """Object name resolver with case-insensitive matching and type scoping."""
 
-from evo_mcp.session.models import RegistryEntry
-from evo_mcp.staging.models import ObjectType
+from evo_mcp.session.models import ObjectType, RegistryEntry
 
 
 class ResolutionError(Exception):

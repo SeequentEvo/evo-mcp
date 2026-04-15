@@ -14,13 +14,8 @@ from .general_tools import register_general_tools
 from .filesystem_tools import register_filesystem_tools
 from .object_build_tools import register_object_builder_tools
 from .file_tools import register_file_tools
-from .object_management_tools import register_object_management_tools
+from .object_staging_tools import register_object_staging_tools
 from .instance_users_admin_tools import register_instance_users_admin_tools
-from .point_set_tools import register_point_set_tools
-from .block_model_tools import register_block_model_tools
-from .variogram_tools import register_variogram_tools
-from .search_neighborhood_tools import register_search_neighborhood_tools
-from .spatial_tools import register_spatial_tools
 from .dev_tools import register_dev_tools
 from .visualisation_tools import register_visualisation_tools
 
@@ -33,13 +28,8 @@ __all__ = [
     "register_filesystem_tools",
     "register_object_builder_tools",
     "register_file_tools",
-    "register_object_management_tools",
+    "register_object_staging_tools",
     "register_instance_users_admin_tools",
-    "register_point_set_tools",
-    "register_block_model_tools",
-    "register_variogram_tools",
-    "register_search_neighborhood_tools",
-    "register_spatial_tools",
     "register_dev_tools",
     "register_visualisation_tools",
 ]

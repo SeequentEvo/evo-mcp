@@ -54,13 +54,6 @@ def require_object_role(
     raise ValueError(f"{role} object must be {expected_label}; got {actual_type}.")
 
 
-def coerce_float(value: Any, field_name: str) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be numeric; got {value!r}.") from exc
-
-
 def extract_crs(obj: Any) -> Any:
     if hasattr(obj, "coordinate_reference_system"):
         return getattr(obj, "coordinate_reference_system")
@@ -160,7 +153,6 @@ def normalize_crs(
 __all__ = [
     "VariogramObjectId",
     "require_object_role",
-    "coerce_float",
     "extract_crs",
     "format_crs",
     "schema_label",

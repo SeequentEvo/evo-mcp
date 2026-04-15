@@ -8,8 +8,8 @@ All tools in this module are gated behind MCP_DEV_MODE=true and are NOT
 exposed in production. Staging is an internal implementation detail.
 
 Tools:
-  - stage_get_info, stage_clone, stage_discard, stage_list, stage_gc
-  - seed, reset_staging
+  - staging_get_info, staging_clone, staging_gc
+  - staging_seed, staging_reset
 """
 
 import json
@@ -18,18 +18,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from evo.objects.typed import (
-    BlockModel,
-    BlockModelData,
-    EpsgCode,
-    PointSet,
-    PointSetData,
-    Variogram,
-)
+from evo.objects.typed import BlockModelData
 
 from evo_mcp.context import ensure_initialized, evo_context
 from evo_mcp.session import object_registry
-from evo_mcp.staging.codecs import get_codec
+from evo_mcp.staging.objects import staged_object_type_registry
 from evo_mcp.staging.errors import StageError
 from evo_mcp.staging.service import staging_service
 from evo_mcp.utils.tool_support import get_workspace_context
@@ -50,8 +43,8 @@ def _stage_one(name: str, raw: dict, fixture_file: str) -> str:
     raw = dict(raw)
     object_type = raw.pop("object_type")
     raw.pop("seed_mode", None)
-    codec = get_codec(object_type)
-    typed_payload = codec.from_dict(raw)
+    descriptor = staged_object_type_registry.get_or_raise(object_type)
+    typed_payload = descriptor.from_dict(raw)
     envelope = staging_service.stage_local_build(
         object_type=object_type,
         typed_payload=typed_payload,
@@ -88,39 +81,18 @@ async def _publish_one(
     raw = dict(raw)
     object_type = raw.pop("object_type")
     raw.pop("seed_mode", None)
-    codec = get_codec(object_type)
-    typed_payload = codec.from_dict(raw)
+    descriptor = staged_object_type_registry.get_or_raise(object_type)
+    typed_payload = descriptor.from_dict(raw)
 
-    if object_type == "variogram":
-        object_path = f"{path_prefix}/variograms/{name}.json"
-        published_obj = await Variogram.create(context, typed_payload, path=object_path)
-    elif object_type == "point_set":
-        object_path = f"{path_prefix}/pointsets/{name}.json"
-        # The point set API requires EpsgCode objects, not plain "EPSG:NNNNN" strings.
-        crs = typed_payload.coordinate_reference_system
-        if isinstance(crs, str) and crs.upper().startswith("EPSG:"):
-            try:
-                typed_payload = PointSetData(
-                    name=typed_payload.name,
-                    description=typed_payload.description,
-                    tags=typed_payload.tags,
-                    coordinate_reference_system=EpsgCode(int(crs.split(":", 1)[1])),
-                    locations=typed_payload.locations,
-                )
-            except (ValueError, IndexError):
-                pass
-        published_obj = await PointSet.create(context, typed_payload, path=object_path)
-    elif object_type == "regular_block_model":
-        object_path = f"{path_prefix}/blockmodels/{name}.json"
-        published_obj = await BlockModel.create_regular(
-            context, typed_payload, path=object_path
-        )
-    elif object_type == "block_model":
+    if "create" not in descriptor.supported_publish_modes:
         raise ValueError(
-            "Subblocked block models are import-only and cannot be published."
+            f"{descriptor.display_name} fixtures are import-only and cannot be published."
         )
-    else:
-        raise ValueError(f"Unknown object_type '{object_type}'.")
+
+    typed_payload = descriptor.pre_publish_hook(typed_payload)
+
+    object_path = f"{path_prefix}/{descriptor.fixture_path_segment}/{name}.json"
+    published_obj = await descriptor.publish_create(context, typed_payload, object_path)
 
     metadata = published_obj.metadata
     obj_id = str(metadata.id)
@@ -183,7 +155,7 @@ def register_dev_tools(mcp) -> None:
     """Register dev-only tools for staging inspection and fixture management."""
 
     @mcp.tool()
-    async def stage_get_info(
+    async def staging_get_info(
         stage_id: str,
     ) -> dict[str, Any]:
         """Return the stage envelope for a given stage_id. Raises an error if stage not found or expired."""
@@ -194,7 +166,7 @@ def register_dev_tools(mcp) -> None:
         return {"stage": envelope.to_dict()}
 
     @mcp.tool()
-    async def stage_clone(
+    async def staging_clone(
         stage_id: str,
     ) -> dict[str, Any]:
         """Clone an active stage into a new stage with source_type='cloned'. Returns the new stage envelope."""
@@ -205,44 +177,14 @@ def register_dev_tools(mcp) -> None:
         return {"stage": envelope.to_dict()}
 
     @mcp.tool()
-    async def stage_discard(
-        stage_id: str,
-    ) -> dict[str, Any]:
-        """Discard a stage by stage_id, releasing its stored payload."""
-        try:
-            staging_service.discard_stage(stage_id)
-        except StageError as exc:
-            raise ValueError(str(exc)) from exc
-        return {"status": "discarded", "stage_id": stage_id}
-
-    @mcp.tool()
-    async def stage_list(
-        object_type: str | None = None,
-        workspace_id: str | None = None,
-        status: str | None = None,
-        limit: int = 100,
-    ) -> dict[str, Any]:
-        """List active or filtered stages. Optionally filter by object_type, workspace_id, or status."""
-        envelopes = staging_service.list_stages(
-            object_type=object_type,
-            workspace_id=workspace_id,
-            status=status,
-            limit=limit,
-        )
-        return {
-            "stages": [e.to_dict() for e in envelopes],
-            "count": len(envelopes),
-        }
-
-    @mcp.tool()
-    async def stage_gc(
+    async def staging_gc(
         dry_run: bool = True,
     ) -> dict[str, Any]:
         """Garbage-collect expired and discarded stages. Set dry_run=False to actually remove them."""
         return staging_service.gc_stages(dry_run=dry_run)
 
     @mcp.tool()
-    async def seed(
+    async def staging_seed(
         fixture_files: list[str],
         fixture_names: list[str] | None = None,
     ) -> dict[str, Any]:
@@ -421,7 +363,7 @@ def register_dev_tools(mcp) -> None:
         }
 
     @mcp.tool()
-    async def reset_staging() -> dict[str, Any]:
+    async def staging_reset() -> dict[str, Any]:
         """Clear all staged objects and the session registry. Use before eval runs for a clean slate."""
         stages = staging_service.list_stages()
         discarded = 0

@@ -4,10 +4,11 @@
 
 """Staged envelope model and enums. Payload stays internal in the store."""
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
-ObjectType = Literal["point_set", "block_model", "regular_block_model", "variogram"]
+# Object type is an open string — the registry is the authoritative source.
+ObjectType = str
 SourceType = Literal["imported", "built_local", "cloned", "mutated"]
 StageStatus = Literal["active", "published", "expired", "discarded"]
 
@@ -25,7 +26,6 @@ class StagedEnvelope:
 
     stage_id: str
     object_type: ObjectType
-    format_version: str
     workspace_id: str | None
     source_type: SourceType
     source_ref: dict[str, str | None]
@@ -35,7 +35,6 @@ class StagedEnvelope:
     created_at: str
     updated_at: str
     expires_at: str
-    size_hints: dict[str, int | float | None] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

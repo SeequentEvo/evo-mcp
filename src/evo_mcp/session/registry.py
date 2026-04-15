@@ -28,11 +28,9 @@ Usage::
 from dataclasses import replace
 from typing import Any
 
-from evo_mcp.session.models import RegistryEntry
+from evo_mcp.session.models import ObjectType, RegistryEntry
 from evo_mcp.session.resolver import ObjectResolver, ResolutionError
-from evo_mcp.staging.models import ObjectType
-from evo_mcp.staging.service import StagingService
-from evo_mcp.staging.store import now_iso
+from evo_mcp.staging.service import StagingService, now_iso
 
 __all__ = [
     "ObjectRegistry",
@@ -179,6 +177,15 @@ class ObjectRegistry:
     @staticmethod
     def _make_key(name: str, object_type: ObjectType) -> str:
         return f"{object_type}::{name.lower()}"
+
+    def deregister(self, name: str, object_type: ObjectType | None = None) -> None:
+        """Remove a registry entry by name (and optional type).
+
+        Raises ResolutionError if not found.
+        """
+        entry = self.resolve(name, object_type)
+        key = self._make_key(entry.name, entry.object_type)
+        del self._entries[key]
 
     def clear(self) -> None:
         """Clear all entries. Used by test infrastructure."""

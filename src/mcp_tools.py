@@ -9,8 +9,8 @@ including workspace management, object ops, and data transfer.
 Configuration:
     Set MCP_DEV_MODE=true to enable dev mode:
     - Enables dev tools for staging inspection and fixture management
-    - Use seed_fixtures(fixture_file, fixture_names) to load skill-specific fixtures
-    - Use reset_staging() to clear state between eval runs
+    - Use staging_seed(fixture_file, fixture_names) to load skill-specific fixtures
+    - Use staging_reset() to clear state between eval runs
     - Fixtures are available for the full session (24-hour TTL)
 
     Set MCP_TOOL_FILTER environment variable to filter tools and prompts:
@@ -46,16 +46,16 @@ from evo_mcp.tools import (
     register_filesystem_tools,
     register_object_builder_tools,
     register_file_tools,
-    register_object_management_tools,
+    register_object_staging_tools,
     register_instance_users_admin_tools,
-    register_point_set_tools,
-    register_block_model_tools,
-    register_variogram_tools,
-    register_search_neighborhood_tools,
-    register_spatial_tools,
     register_dev_tools,
     register_visualisation_tools,
 )
+from evo_mcp.staging import runtime as staging_runtime
+from evo_mcp.staging.service import staging_service
+from evo_mcp.session import object_registry
+
+staging_runtime.configure(object_registry, staging_service)
 
 
 logger = logging.getLogger(__name__)
@@ -150,10 +150,7 @@ if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
     register_file_tools(mcp)
-    register_object_management_tools(mcp)
-    register_point_set_tools(mcp)
-    register_block_model_tools(mcp)
-    register_variogram_tools(mcp)
+    register_visualisation_tools(mcp)
     if TOOL_FILTER == "data":
         print("Evo MCP Server configured for Data Agent")
     else:
@@ -161,9 +158,7 @@ if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
 
 if TOOL_FILTER in ["all", "compute"]:
     register_compute_tools(mcp)
-    register_search_neighborhood_tools(mcp)
-    register_spatial_tools(mcp)
-    register_visualisation_tools(mcp)
+    register_object_staging_tools(mcp)
     if TOOL_FILTER == "compute":
         print("Evo MCP Server configured for Compute Agent")
     else:

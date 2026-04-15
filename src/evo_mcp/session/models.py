@@ -7,7 +7,8 @@
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from evo_mcp.staging.models import ObjectType
+# Object type is an open string — mirrors staging.models.ObjectType
+ObjectType = str
 
 RegistryStatus = Literal["staged", "published"]
 
