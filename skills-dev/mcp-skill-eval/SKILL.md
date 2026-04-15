@@ -9,7 +9,7 @@ Run multi-skill evals with one shared seeded workspace, one executor subagent pe
 
 ## Hard rules
 
-- Run setup exactly once per iteration: `mcp_evo-mcp_reset_staging()` then `mcp_evo-mcp_seed(...)`.
+- Run setup exactly once per iteration: `mcp_evo-mcp_staging_reset()` then `mcp_evo-mcp_staging_seed(...)`.
 - Spawn one executor subagent per skill, not per eval.
 - Spawn all skill subagents in the same turn unless user asks for serial execution.
 - Fixtures must be unique per skill test suite. If fixture keys/object names overlap across skills, stop and fix before seeding.
@@ -48,8 +48,8 @@ Done when: final skill list is locked and all eval prompts are loaded.
 - Run:
 
 ```
-mcp_evo-mcp_reset_staging()
-mcp_evo-mcp_seed(fixture_files=[...])
+mcp_evo-mcp_staging_reset()
+mcp_evo-mcp_staging_seed(fixture_files=[...])
 ```
 
 - Capture `workspace_id` from seed result.

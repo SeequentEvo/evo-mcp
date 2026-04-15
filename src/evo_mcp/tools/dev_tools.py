@@ -208,7 +208,7 @@ def register_dev_tools(mcp) -> None:
             fixture_files: One or more paths to ``fixtures.json`` files.
                 Pass a single-element list for a per-skill run, or multiple
                 paths to seed several skills in one call.
-                Example: ``["skills/evo-kriging-run/evals/fixtures.json"]``
+                Example: ``["skills/evo-kriging-execute/evals/fixtures.json"]``
             fixture_names: Optional allow-list of fixture keys. When provided,
                 only fixtures whose key appears in this list are seeded across
                 all provided files.

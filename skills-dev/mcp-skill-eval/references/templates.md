@@ -14,7 +14,7 @@ Inputs:
 
 Context:
 - Shared setup is already complete.
-- Do NOT call mcp_evo-mcp_reset_staging or mcp_evo-mcp_seed.
+- Do NOT call mcp_evo-mcp_staging_reset or mcp_evo-mcp_staging_seed.
 
 Execution requirements:
 - Run every eval entry in evals.json.

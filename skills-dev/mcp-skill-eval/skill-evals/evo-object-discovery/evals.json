@@ -2,8 +2,8 @@
   "skill_name": "evo-object-discovery",
   "setup": {
     "steps": [
-      {"step": 0, "tool": "reset_staging", "args": {}},
-      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/evo-object-discovery/fixtures.json"]}}
+      {"step": 0, "tool": "staging_reset", "args": {}},
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/evo-object-discovery/fixtures.json"]}}
     ]
   },
   "evals": [

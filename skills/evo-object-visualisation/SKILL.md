@@ -1,19 +1,31 @@
 ---
 name: evo-object-visualisation
-description: Generates Evo Viewer and Portal links for point sets, block models, and grids. Does not support variogram or ellipsoid visualisation.
+description: Use this skill when the user wants to view Evo objects in the Viewer or generate portal links — even if they just say "show me" or "open in Evo." Requires explicit object IDs. Note: variograms are not currently supported.
 ---
 
 # Object Visualisation
 
-Use this skill to build a combined viewer link from user-supplied object IDs.
+Use this skill to build a combined viewer link from user-supplied Evo object IDs.
 
 ## Trigger Conditions
 
 Use this skill when the user wants to:
 
-- view multiple objects together
+- view one or more Evo objects together
 - generate viewer links from explicit object IDs
 - generate portal links for each object in the same response
+
+Do not use this skill when:
+
+- object IDs are not yet known and discovery is required first
+- the user wants variogram visualisation (currently unsupported)
+- the request is not limited to generating viewer or portal links from known object IDs
+
+## Tools
+
+| Tool | Use |
+|---|---|
+| `viewer_generate_multi_object_links` | Generate a combined viewer URL and per-object portal links for a list of object IDs |
 
 ## Workflow
 
@@ -24,24 +36,15 @@ Use this skill when the user wants to:
 
 ## Rules
 
-- This skill is generic and not kriging-specific.
+- This skill is generic and not workflow-specific.
 - Require explicit user-supplied object IDs.
 - Do not infer or discover objects unless the user asks for that separately.
 
-## Code-Generated Visualization
+## Gotchas
 
-Some geoscience objects -- particularly **variograms** and **search ellipsoids** -- are not supported by the Evo Viewer. This skill does not handle visualization for those object types. When a user requests visualization for an unsupported type, explain that it cannot be shown in the Evo Viewer and that code-generated visualization (e.g., plotly) is required.
-
-### Supported Object Types
-
-| Object Type | Evo Viewer? |
-|---|---|
-| Point sets | [Y] Yes |
-| Block models | [Y] Yes |
-| Regular 3D grids | [Y] Yes |
-| Variogram ellipsoids | [N] Not supported by this skill |
-| Variogram curves | [N] Not supported by this skill |
-| Search ellipsoids | [N] Not supported by this skill |
+- Variograms are not supported by `viewer_generate_multi_object_links`; fail clearly and suggest alternatives.
+- A valid workspace ID with invalid object IDs still fails link generation; report exactly which IDs failed resolution.
+- This skill is link-only; do not mutate objects or start discovery unless explicitly requested.
 
 ## Required Inputs
 
@@ -53,3 +56,10 @@ Some geoscience objects -- particularly **variograms** and **search ellipsoids**
 - Empty object ID list: fail with a message indicating at least one object ID is required.
 - Invalid object ID: fail with a resolution error identifying which ID could not be found.
 - Workspace not accessible: fail with an explicit workspace resolution message.
+- Variogram request: fail with a clear "currently unsupported" message.
+
+## References
+
+Load these files only when the specific condition applies — do not load them proactively:
+
+- Read `references/error_patterns.md` when link generation fails and you need standard resolution guidance by error type.

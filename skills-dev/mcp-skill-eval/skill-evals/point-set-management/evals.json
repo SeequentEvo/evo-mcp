@@ -2,7 +2,7 @@
   "skill_name": "point-set-management",
   "setup": {
     "steps": [
-      {"step": 0, "tool": "reset_staging", "args": {}}
+      {"step": 0, "tool": "staging_reset", "args": {}}
     ]
   },
   "evals": [

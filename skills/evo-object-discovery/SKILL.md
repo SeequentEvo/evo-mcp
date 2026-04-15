@@ -1,6 +1,6 @@
 ---
 name: evo-object-discovery
-description: Finds and lists geoscience objects in an Evo workspace by name, type, or path. Use to browse or locate data before running workflows.
+description: Use this skill when the user needs to find, browse, or identify objects in an Evo workspace — even if they just say "what data do I have?" or "find my copper samples." Resolves object candidates before downstream workflows.
 ---
 
 # Object Discovery
@@ -19,8 +19,15 @@ Use this skill when the user needs to:
 Do not use this skill when:
 
 - the user already has resolved object IDs
-- the user wants to create new objects locally (use domain skills instead)
-- the user wants to import or publish objects (outside this skill's scope)
+- the request is about creating or modifying objects rather than locating existing workspace objects
+- the request is about changing object state or persistence rather than discovery
+
+## Tools
+
+| Tool | Use |
+|---|---|
+| `list_objects` | List all objects in a workspace, optionally filtered by schema type |
+| `get_object` | Fetch metadata for a specific object by ID or path |
 
 ## Workflow
 
@@ -31,15 +38,7 @@ Do not use this skill when:
 5. If needed, call `get_object(...)` on the strongest matches.
 6. Return a concise shortlist grouped by intended role.
 
-## Object Type Reference
-
-| Schema type | Typical role |
-|---|---|
-| `pointset` | Sample source data |
-| `variogram` | Spatial continuity model |
-| `block-model` / `regular-3d-grid` | Estimation or analysis target |
-
-## Preferred Output
+## Output Shape
 
 Return results grouped by role with enough detail for follow-up tool calls:
 
@@ -65,6 +64,12 @@ Internal identifiers (`id`, `version_id`) are carried in the result for downstre
 - Infer role/type compatibility from `schema_id`.
 - Prefer the newest relevant candidate when multiple objects share name/path hints, using recency metadata.
 
+## Gotchas
+
+- Similar names across schemas are common; never assume the intended object without confirming type/role fit.
+- Path/name matches alone can be stale; prefer the newest relevant candidate when duplicates exist.
+- Internal IDs are for downstream tool chaining and should not be surfaced unless needed to unblock.
+
 ## Example
 
 If the user asks for a point set named like `Ag_LMS1`, list objects in the workspace, keep only pointset-like schemas, then return the best matches by name, path, and schema type. Present them to the user by name for confirmation.
@@ -83,3 +88,9 @@ If the user asks for a point set named like `Ag_LMS1`, list objects in the works
 - Empty workspace: report that no objects were found and suggest checking the workspace ID.
 - No matches for filter: report the filter criteria and the types available.
 - Ambiguous matches: present all plausible candidates and ask the user to choose.
+
+## References
+
+Load these files only when the specific condition applies — do not load them proactively:
+
+- Read `references/output_shape.md` when you need the exact candidate output contract for downstream tool chaining.

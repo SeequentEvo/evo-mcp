@@ -1,9 +1,9 @@
 {
-  "skill_name": "evo-kriging-run",
+  "skill_name": "evo-kriging-execute",
   "setup": {
     "steps": [
-      {"step": 0, "tool": "reset_staging", "args": {}},
-      {"step": 1, "tool": "seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/evo-kriging-run/fixtures.json"]}}
+      {"step": 0, "tool": "staging_reset", "args": {}},
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/evo-kriging-execute/fixtures.json"]}}
     ]
   },
   "evals": [

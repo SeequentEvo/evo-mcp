@@ -1,9 +1,9 @@
 ---
-name: kriging-orchestrator
-description: Orchestrates end-to-end kriging from discovery through reporting. Use when the full workflow is needed, not a single step.
+name: kriging-workflow
+description: Use this skill when the user wants to run kriging end to end — from selecting data through execution and reporting — or needs orchestrated help across multiple kriging setup steps. For single-step tasks (just finding objects, just creating a variogram), use the targeted skills instead.
 ---
 
-# Kriging Orchestrator
+# Kriging Workflow
 
 Guide the user through a complete kriging estimation workflow using natural-language conversation. The user describes what they want to estimate, and this orchestrator coordinates the necessary steps behind the scenes.
 
@@ -18,9 +18,17 @@ Use this skill when the user wants to:
 - compare different kriging configurations (method, neighborhood, attributes)
 - estimate into a block model or regular grid from sample data
 
+Do not use this skill when:
+
+- the user only needs a single focused task (discovery, CRS check, variogram edit, neighborhood design, or reporting)
+- no kriging workflow is being requested
+- the user is asking for generic object staging outside a kriging context
+
 ## End-to-End Workflow
 
 The orchestrator manages the conversation and assembles resolved inputs across the steps below. Some steps are handled directly by the orchestrator; others are delegated to a named skill.
+
+For all object fetch, inspect, update, and publish behavior, follow the `staging-workflow` skill patterns and keep staging internals hidden from the user.
 
 **What gets assembled:** workspace → staged objects → validated CRS → neighborhood payload → confirmed attribute names → published object IDs → kriging results
 
@@ -36,19 +44,19 @@ Identify the source point set, variogram, and target block model. Each object ma
 
 - **Object exists in Evo:**
   1. Find by name → *skill: `evo-object-discovery`*
-  2. Import into local session → *skill: `evo-object-management`*
+  2. Import into local session → *skill: `staging-workflow`*
 - **Object needs to be created locally:**
-  - Source point set from CSV → *skill: `point-set-management`*
-  - New variogram from parameters → *skill: `variogram-management`*
-  - New block model from extents → *skill: `block-model-management`*
+  - Source point set from CSV → *skill: `manage-point-set`*
+  - New variogram from parameters → *skill: `manage-variogram`*
+  - New block model from extents → *skill: `manage-block-model`*
 
 **Assembles:** locally staged objects (sourced from Evo, created locally, or a mix of both)
 
-#### Step 3: Validate spatial compatibility — *skill: `validate-crs-and-units`*
+#### Step 3: Validate spatial compatibility — *skill: `validate-crs`*
 Delegate to this skill once all objects are staged.
 Do not proceed until validation passes or the user explicitly accepts a mismatch.
 
-#### Step 4: Design the search neighborhood — *skill: `design-search-neighborhood`*
+#### Step 4: Design the search neighborhood — *skill: `manage-search-neighborhood`*
 Delegate to this skill once CRS validation has passed.
 **Assembles:** `search` neighborhood payload
 
@@ -56,7 +64,7 @@ Delegate to this skill once CRS validation has passed.
 Ask the user which attribute to estimate from (source) and what to call the result on the target.
 **Assembles:** `point_set_attribute`, `target_attribute`
 
-#### Step 6: Publish modified or new objects — *skill: `evo-object-management`*
+#### Step 6: Publish modified or new objects — *skill: `staging-workflow`*
 Before running kriging, ensure all required objects have valid workspace object IDs. Only publish objects that need it:
 
 - **New staged objects** (created in steps 2): must be published
@@ -69,7 +77,7 @@ Before running kriging, ensure all required objects have valid workspace object 
 
 ### Phase 2 — Execute
 
-#### Step 7: Build and run kriging — *skill: `evo-kriging-run`*
+#### Step 7: Build and run kriging — *skill: `evo-kriging-execute`*
 Delegate to this skill once all inputs are assembled: `workspace_id`, `point_set_object_id`, `point_set_attribute`, `variogram_object_id`, `target_object_id`, `target_attribute`, and `search`.
 **Assembles:** structured kriging results with inspection links
 
@@ -91,6 +99,13 @@ Delegate to this skill if the user wants to view the results in the Evo Viewer.
 - **Speak geoscience**: use terms the user knows — "samples", "estimation target", "search range" — not tool or parameter names.
 - **One step at a time**: confirm each step is complete before moving to the next.
 
+## Gotchas
+
+- Mixed object paths are valid (some imported, some locally created); do not force all objects down one path.
+- Unchanged imported objects usually do not need re-publish before execution.
+- Do not proceed past CRS validation on `mismatch` unless the user explicitly accepts risk.
+- Attribute-name confirmation is a required gate before execution, not an optional UX step.
+
 ## Skill Composition Map
 
 ```text
@@ -99,15 +114,15 @@ User: "Run kriging on my gold data"
 +-- 1. Confirm workspace                                        [orchestrator]
 +-- 2. Resolve or create objects (per-object, mix allowed)      [orchestrator + skills]
 |     +-- evo-object-discovery   -> find in Evo by name
-|     +-- evo-object-management  -> import from Evo to session
-|     +-- point-set-management   -> build from CSV
-|     +-- variogram-management   -> create from parameters
-|     +-- block-model-management -> design from extents
-+-- 3. validate-crs-and-units    -> check CRS                   [skill]
-+-- 4. design-search-neighborhood -> neighborhood payload       [skill]
+|     +-- staging-workflow       -> import from Evo to session
+|     +-- manage-point-set   -> build from CSV
+|     +-- manage-variogram   -> create from parameters
+|     +-- manage-block-model -> design from extents
++-- 3. validate-crs    -> check CRS                   [skill]
++-- 4. manage-search-neighborhood -> neighborhood payload       [skill]
 +-- 5. Confirm attribute names                                  [orchestrator]
-+-- 6. evo-object-management     -> publish new/modified only   [skill]
-+-- 7. evo-kriging-run            -> execute                    [skill]
++-- 6. staging-workflow          -> publish new/modified only   [skill]
++-- 7. evo-kriging-execute            -> execute                    [skill]
 +-- 8. kriging-reporting          -> summarize                  [skill]
 +-- 9. evo-object-visualisation   -> view (optional)            [skill]
 ```
@@ -120,7 +135,7 @@ Each skill is self-contained. The orchestrator passes object names between steps
 - If any step fails, explain the issue in plain geoscience language and offer to retry or take an alternative path.
 - Never surface raw error codes, stack traces, or internal identifiers to the user.
 
-## Required Context
+## Required Inputs
 
 - A workspace to publish objects into and run kriging against
 - A source point set (existing in Evo, or built locally from CSV)

@@ -1,11 +1,11 @@
 ---
 name: kriging-reporting
-description: Reports and interprets completed kriging results — estimation outcomes, attribute statistics, scenario comparisons, and inspection links.
+description: Use this skill after a kriging run completes to interpret results, summarize per-scenario estimation outcomes, compare scenario statistics, and surface inspection links. No tool calls — purely interpretive.
 ---
 
 # Kriging Reporting
 
-Use this skill after kriging estimation has completed.
+Use this skill to interpret and present completed kriging results. Reads structured output from `evo-kriging-execute`, summarizes per-scenario outcomes, and guides the user on next steps. No tool calls — purely interpretive.
 
 ## Trigger Conditions
 
@@ -14,6 +14,12 @@ Use this skill when the user needs to:
 - review per-scenario status from a completed kriging run
 - see target and attribute outcomes from estimation
 - get inspection links for the created or updated target
+
+Do not use this skill when:
+
+- kriging has not been executed yet
+- the run inputs or outputs are still incomplete
+- the request is about preparing or changing estimation inputs rather than interpreting completed results
 
 ## Workflow
 
@@ -40,25 +46,8 @@ When the user runs multiple scenarios (e.g., varying `max_samples`, methods, or 
 
 ### Scenario Comparison Visualization
 
-When the user has multiple scenarios and wants a visual comparison, generate a plotly box plot:
-
-```python
-import plotly.express as px
-import pandas as pd
-
-# Each column represents estimated values from a scenario
-df = pd.DataFrame({
-    "OK_estimate": ok_values,
-    "SK_estimate": sk_values,
-})
-
-df_melted = df.melt(var_name="Scenario", value_name="Estimated Value")
-fig = px.box(df_melted, x="Scenario", y="Estimated Value",
-             title="Kriging Results by Scenario")
-fig.show()
-```
-
-Use this when the user asks to "compare", "contrast", or "see the difference" between scenarios.
+When the user has multiple scenarios and wants a visual comparison, use `scripts/plot_scenario_comparison_boxplot.py`.
+Load the script, map scenario estimate arrays into the script input shape, and present the adapted code as ready to run.
 
 ## Rules
 
@@ -67,6 +56,12 @@ Use this when the user asks to "compare", "contrast", or "see the difference" be
 - Prefer concise reporting over verbose narrative.
 - Treat tabular or statistics retrieval as a follow-up step.
 - When multiple scenarios are reported, number them in order.
+
+## Gotchas
+
+- Multi-scenario runs can be partially successful; never collapse mixed outcomes into a single success/failure statement.
+- Scenario order is semantically important and must match input order in summaries.
+- Missing inspection links do not invalidate numerical results; report the gap and continue interpretation.
 
 ## Required Inputs
 
@@ -85,3 +80,10 @@ Use this when the user asks to "compare", "contrast", or "see the difference" be
 - No kriging results available: report that kriging must be executed first.
 - Partial failures in multi-scenario runs: report which scenarios succeeded and which failed, with per-scenario detail.
 - Missing inspection links: note the absence and suggest checking the target object directly in Evo.
+
+## References
+
+Load these files only when the specific condition applies — do not load them proactively:
+
+- Read `scripts/plot_scenario_comparison_boxplot.py` when the user asks to compare scenarios visually.
+- Read `references/output_shape.md` when you need exact reporting output contract fields.
