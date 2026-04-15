@@ -18,6 +18,7 @@ SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "setup_mcp.py"
 
 def _load_setup_mcp_module():
     spec = importlib.util.spec_from_file_location("setup_mcp", SCRIPT_PATH)
+    assert spec is not None, f"Unable to load module spec from {SCRIPT_PATH}"
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
