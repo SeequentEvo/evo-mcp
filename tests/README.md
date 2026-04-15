@@ -74,7 +74,7 @@ This directory contains automated tests for the Evo MCP server.
 ### Integration tests
 
 - `integration/test_live_list_workspaces.py`: Read-only smoke test for live Evo connectivity.
-	- Requires `RUN_EVO_LIVE_TESTS=1` plus the Evo auth environment variables documented below.
+	- Requires `RUN_EVO_LIVE_TESTS=1` plus the service-app auth environment variables documented below.
 	- Requires `EVO_TEST_INSTANCE_ID` so the test always targets the same Evo instance.
 	- Calls `ensure_initialized()` and then checks that `workspace_client.list_workspaces()` returns objects with basic expected fields.
 	- This is intentionally a minimal live test that validates authentication and a simple workspace listing flow without mutating server state.
@@ -116,6 +116,8 @@ uv run python -m pytest -q -m unit
 uv run python -m pytest -q -m integration
 ```
 
+At the moment, integration tests are not run by default. The default local test command and the current GitHub Actions workflow run unit tests only.
+
 If you are not using `uv`, run the same commands with your Python executable:
 
 ```bash
@@ -133,13 +135,17 @@ Markers are defined in `pyproject.toml`:
 
 Integration tests are intentionally opt-in.
 
+They are not run by default locally or in GitHub Actions. A live integration run only happens when you explicitly provide the required environment variables and invoke `pytest -m integration` yourself.
+
 Instance and workspace selection for the live tests:
 
+- The live tests require `AUTH_METHOD=client_credentials` and use service-app authentication rather than interactive user login.
 - The live tests require explicit selection env vars.
 - `EVO_TEST_INSTANCE_ID` identifies the Evo instance to use for the live run.
 - `EVO_TEST_WORKSPACE_ID` identifies the workspace used by workspace-scoped live tests.
 - `EVO_TEST_OBJECT_PATH` identifies the object path used by the live `get_object_by_path` test.
 - The helper in `tests/integration/live_test_support.py` always switches `evo_context` to `EVO_TEST_INSTANCE_ID`.
+- The helper also sets `EVO_DISABLE_TOKEN_CACHE=1` so a previously cached user token cannot leak into a service-app test run.
 
 If you hit permission errors or unexpected workspaces:
 
@@ -153,8 +159,9 @@ Known SDK caveat:
 To run them, set:
 
 - `RUN_EVO_LIVE_TESTS=1`
+- `AUTH_METHOD=client_credentials`
 - `EVO_CLIENT_ID`
-- `EVO_REDIRECT_URL`
+- `EVO_CLIENT_SECRET`
 - `EVO_DISCOVERY_URL`
 - `EVO_TEST_INSTANCE_ID`
 - `EVO_TEST_WORKSPACE_ID`
@@ -163,10 +170,16 @@ For the path-based object metadata test, also set:
 
 - `EVO_TEST_OBJECT_PATH`
 
+`ISSUER_URL` is optional for these tests and defaults to `https://ims.bentley.com` if unset.
+
 Example:
 
 ```bash
 RUN_EVO_LIVE_TESTS=1 \
+AUTH_METHOD=client_credentials \
+EVO_CLIENT_ID=your-service-client-id \
+EVO_CLIENT_SECRET=your-service-client-secret \
+EVO_DISCOVERY_URL=https://discover.api.seequent.com \
 EVO_TEST_INSTANCE_ID=00000000-0000-0000-0000-000000000000 \
 EVO_TEST_WORKSPACE_ID=11111111-1111-1111-1111-111111111111 \
 uv run python -m pytest -q -m integration
@@ -180,4 +193,4 @@ GitHub Actions test workflows are located in:
 - `.github/workflows/run-all-tests.yaml`
 - `.github/actions/testing/action.yaml`
 
-The CI matrix runs unit tests across Linux, macOS, and Windows on Python 3.10-3.14.
+The CI matrix currently runs unit tests across Linux, macOS, and Windows on Python 3.10-3.14. It does not run the live integration tests by default.

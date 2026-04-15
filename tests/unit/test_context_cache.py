@@ -70,3 +70,48 @@ def test_get_access_token_from_cache_expired_returns_none(tmp_path):
     _write_token(tmp_path / "evo_token_cache.json", token)
 
     assert ctx.get_access_token_from_cache() is None
+
+
+def test_get_access_token_from_cache_uses_auth_specific_cache_file(tmp_path, monkeypatch):
+    """Given service auth, when reading from cache, then the auth-specific token file is used."""
+    monkeypatch.setenv("AUTH_METHOD", "client_credentials")
+
+    ctx = EvoContext()
+    ctx.cache_path = tmp_path
+
+    valid_exp = datetime.now(timezone.utc) + timedelta(minutes=30)
+    token = jwt.encode(
+        {"sub": "service-app", "exp": valid_exp},
+        key="this-is-a-safely-long-test-key-123456",
+        algorithm="HS256",
+    )
+    _write_token(tmp_path / "evo_token_cache_client_credentials.json", token)
+
+    assert ctx.get_access_token_from_cache() == token
+
+
+def test_get_access_token_from_cache_can_be_disabled(tmp_path, monkeypatch):
+    """Given cache bypass is enabled, when reading from cache, then no cached token is returned."""
+    monkeypatch.setenv("EVO_DISABLE_TOKEN_CACHE", "1")
+
+    ctx = EvoContext()
+    ctx.cache_path = tmp_path
+
+    valid_exp = datetime.now(timezone.utc) + timedelta(minutes=30)
+    token = jwt.encode(
+        {"sub": "user", "exp": valid_exp},
+        key="this-is-a-safely-long-test-key-123456",
+        algorithm="HS256",
+    )
+    _write_token(tmp_path / "evo_token_cache.json", token)
+
+    assert ctx.get_access_token_from_cache() is None
+
+
+def test_get_issuer_url_defaults_to_bentley_ims(monkeypatch):
+    """Given no ISSUER_URL env var, when issuer URL is requested, then the Bentley IMS default is used."""
+    monkeypatch.delenv("ISSUER_URL", raising=False)
+
+    ctx = EvoContext()
+
+    assert ctx.get_issuer_url() == "https://ims.bentley.com"
