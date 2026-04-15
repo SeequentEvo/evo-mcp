@@ -46,7 +46,6 @@ async def _get_first_workspace():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_live_get_workspace_summary_read_only():
     """Given an accessible workspace, when summary stats are requested, then schema counts are returned."""
     mcp = await _get_admin_tools()
@@ -61,7 +60,6 @@ async def test_live_get_workspace_summary_read_only():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_live_create_workspace_snapshot_read_only_without_blobs():
     """Given an accessible workspace, when a snapshot is created without blob expansion, then snapshot metadata is returned."""
     mcp = await _get_admin_tools()

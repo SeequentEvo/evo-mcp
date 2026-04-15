@@ -16,7 +16,7 @@ This directory contains automated tests for the Evo MCP server.
 - `conftest.py`: Adds `src/` to `sys.path` so tests can import the project modules without installing the package into the active environment.
 - `helpers.py`: Contains light-weight test doubles used across the suite.
 	- `FakeMCP` records functions decorated with `@mcp.tool()` so tests can call registered tools directly.
-	- `FakePage` mimics the SDK paging interface used by methods that return an object with an `.items()` method.
+	- `FakePage` mimics the SDK paging interface used by methods that return an object with an `.items()` method and supports `len(page)`.
 
 ### Unit tests
 
@@ -69,7 +69,7 @@ This directory contains automated tests for the Evo MCP server.
 	- Verifies invalid `MCP_TRANSPORT` falls back to `stdio`.
 	- Verifies invalid `MCP_TOOL_FILTER` falls back to `all`.
 	- Verifies `all`, `admin`, and `data` modes register the expected tools, prompts, and shared schema resource.
-	- These tests import `mcp_tools` repeatedly with different environment settings and inspect the FastMCP local provider registry.
+	- These tests import `mcp_tools` repeatedly with different environment settings and inspect FastMCP registrations through its listing APIs.
 
 ### Integration tests
 
@@ -129,6 +129,23 @@ Markers are defined in `pyproject.toml`:
 ## Live integration tests
 
 Integration tests are intentionally opt-in.
+
+Instance and workspace selection for the live tests:
+
+- The live tests do not read an instance from a test fixture file.
+- On first `ensure_initialized()`, `evo_context` selects the first organization returned by Evo discovery if there is no cached instance selection.
+- The selected `org_id` and `hub_url` are then cached in `.cache/variables.json` and reused by later test runs.
+- The workspace-based live tests then use the first accessible workspace returned by `workspace_client.list_workspaces(limit=5)`.
+
+If you hit permission errors or unexpected workspaces:
+
+- Clear `.cache/variables.json` to force a fresh discovery-based instance selection on the next run.
+- Confirm that the authenticated account has access to the selected instance and at least one readable workspace there.
+- Some live tests intentionally skip when the selected instance has no accessible workspaces or no objects in the chosen workspace.
+
+Known SDK caveat:
+
+- The `test_live_get_object_by_path_when_workspace_has_objects` case in `integration/test_live_general_tools.py` can fail due to current Evo SDK path normalization behavior when an object path like `object.json` is normalized to `./object.json`. This is a false-negative risk in the SDK path handling rather than a required server-side write capability.
 
 To run them, set:
 

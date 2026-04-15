@@ -11,22 +11,9 @@ from uuid import uuid4
 import pytest
 
 import evo_mcp.tools.instance_users_admin_tools as instance_users_admin_tools
-from tests.helpers import FakeMCP
+from tests.helpers import FakeMCP, FakePage
 
 pytestmark = pytest.mark.unit
-
-
-class FakeApiPage:
-    """Small raw-API page stub with items() and len() support."""
-
-    def __init__(self, items: list):
-        self._items = items
-
-    def items(self):
-        return self._items
-
-    def __len__(self) -> int:
-        return len(self._items)
 
 
 def _register_instance_admin_tools() -> FakeMCP:
@@ -52,7 +39,7 @@ async def test_get_users_in_instance_pages_and_respects_count(monkeypatch):
     first_page = [_fake_user(index) for index in range(100)]
     second_page = [_fake_user(index) for index in range(100, 150)]
     workspace_client = SimpleNamespace(
-        list_instance_users=AsyncMock(side_effect=[FakeApiPage(first_page), FakeApiPage(second_page)])
+        list_instance_users=AsyncMock(side_effect=[FakePage(first_page), FakePage(second_page)])
     )
     monkeypatch.setattr(instance_users_admin_tools.evo_context, "workspace_client", workspace_client)
 

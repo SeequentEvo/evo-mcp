@@ -48,7 +48,6 @@ async def _get_first_workspace():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_live_workspace_health_check_read_only():
     """Given live Evo connectivity, when workspace health is checked, then a workspace service status is returned."""
     mcp = await _get_general_tools()
@@ -62,7 +61,6 @@ async def test_live_workspace_health_check_read_only():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_live_list_my_instances_read_only():
     """Given live Evo connectivity, when instances are listed, then discovery results and selected-instance context are returned."""
     mcp = await _get_general_tools()
@@ -79,7 +77,6 @@ async def test_live_list_my_instances_read_only():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_live_get_workspace_by_id_read_only():
     """Given an accessible workspace, when fetched by ID, then the mapped workspace metadata is returned."""
     mcp = await _get_general_tools()
@@ -95,7 +92,6 @@ async def test_live_get_workspace_by_id_read_only():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_live_list_objects_read_only_for_first_workspace():
     """Given an accessible workspace, when objects are listed, then a read-only object listing response is returned."""
     mcp = await _get_general_tools()
@@ -113,7 +109,6 @@ async def test_live_list_objects_read_only_for_first_workspace():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_live_get_object_by_path_when_workspace_has_objects():
     """Given a workspace with at least one object, when fetched by path, then object metadata is returned."""
     mcp = await _get_general_tools()

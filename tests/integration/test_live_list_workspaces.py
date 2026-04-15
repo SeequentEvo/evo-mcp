@@ -18,7 +18,6 @@ _REQUIRED_ENV_VARS = [
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_live_list_workspaces_read_only():
     """Given live-test env is enabled, when listing workspaces, then a valid read-only response is returned.
 

@@ -29,3 +29,6 @@ class FakePage:
 
     def items(self):
         return self._items
+
+    def __len__(self) -> int:
+        return len(self._items)
