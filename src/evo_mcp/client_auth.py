@@ -46,7 +46,7 @@ def create_auth_provider(base_url: str):
 
     # Bentley IMS native/SPA apps are public clients (no client secret).
     # The proxy authenticates upstream using PKCE only.
-    evo_scopes = f"openid {EvoScopes.all_evo}"
+    evo_scopes = str(EvoScopes.all_evo)
 
     _apply_loopback_redirect_patch()
 
