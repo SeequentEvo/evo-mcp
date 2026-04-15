@@ -1,9 +1,9 @@
 {
-  "skill_name": "kriging-orchestrator",
+  "skill_name": "kriging-workflow",
   "setup": {
     "steps": [
       {"step": 0, "tool": "staging_reset", "args": {}},
-      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/kriging-orchestrator/fixtures.json"]}}
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/kriging-workflow/fixtures.json"]}}
     ]
   },
   "evals": [

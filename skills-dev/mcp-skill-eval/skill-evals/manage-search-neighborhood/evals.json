@@ -1,9 +1,9 @@
 {
-  "skill_name": "design-search-neighborhood",
+  "skill_name": "manage-search-neighborhood",
   "setup": {
     "steps": [
       {"step": 0, "tool": "staging_reset", "args": {}},
-      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/design-search-neighborhood/fixtures.json"], "fixture_names": ["dsn_standard_variogram"]}}
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/manage-search-neighborhood/fixtures.json"], "fixture_names": ["dsn_standard_variogram"]}}
     ]
   },
   "evals": [

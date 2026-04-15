@@ -1,9 +1,9 @@
 {
-  "skill_name": "variogram-management",
+  "skill_name": "manage-variogram",
   "setup": {
     "steps": [
       {"step": 0, "tool": "staging_reset", "args": {}},
-      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/variogram-management/fixtures.json"], "fixture_names": ["vm_standard_variogram"]}}
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/manage-variogram/fixtures.json"], "fixture_names": ["vm_standard_variogram"]}}
     ]
   },
   "evals":[

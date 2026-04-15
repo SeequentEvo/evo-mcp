@@ -1,9 +1,9 @@
 {
-  "skill_name": "validate-crs-and-units",
+  "skill_name": "validate-crs",
   "setup": {
     "steps": [
       {"step": 0, "tool": "staging_reset", "args": {}},
-      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/validate-crs-and-units/fixtures.json"]}}
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/validate-crs/fixtures.json"]}}
     ]
   },
   "evals": [
