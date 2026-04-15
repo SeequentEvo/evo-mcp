@@ -25,7 +25,7 @@ if env_path.exists():
     load_dotenv(env_path)
 
 # Agent configuration from environment variables
-AGENT_TYPE = os.getenv("MCP_TOOL_FILTER", "workspace")
+TOOL_FILTER = os.getenv("MCP_TOOL_FILTER", "all")
 MODEL = os.getenv("EVO_AGENT_MODEL", "gemini-3-flash-preview")
 
 # Get the absolute path to the MCP server script (in src directory)
@@ -41,8 +41,8 @@ def _generate_dummy_auth():
 auth_scheme, auth_credential = _generate_dummy_auth()
 
 tool_env = {
-    # Pass AGENT_TYPE to MCP server for tool filtering
-    "MCP_TOOL_FILTER": AGENT_TYPE
+    # Pass the selected tool filter through to the MCP server.
+    "MCP_TOOL_FILTER": TOOL_FILTER
 }
 
 copy_env_vars = [
@@ -66,9 +66,9 @@ connection_params = StdioConnectionParams(
     timeout=DEFAULT_STDIO_TIMEOUT_SECONDS,
 )
 
-# Use the appropriate prompt based on agent type. The MCP server must provide
+# Use the prompt that matches the selected tool filter. The MCP server must provide
 # a prompt with the same name as we generate here.
-prompt_name = f"{AGENT_TYPE}_prompt"
+prompt_name = f"{TOOL_FILTER}_prompt"
 
 mcp_instruction = McpInstructionProvider(
     connection_params=connection_params,

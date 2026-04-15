@@ -54,8 +54,8 @@ if TRANSPORT == "http":
     HTTP_HOST = os.getenv("MCP_HTTP_HOST", "localhost")
     HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
 
-# Get agent type from environment variable
-# This can either be set via MCP inputs, or the .env file used by the agent example
+# Get the tool filter from the environment.
+# MCP_AGENT_TYPE is kept as a legacy alias for older configs.
 TOOL_FILTER = os.getenv(
     "MCP_TOOL_FILTER",
     os.getenv(
@@ -69,7 +69,7 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
     TOOL_FILTER = "all"
 
-# Initialize FastMCP server with agent type in name for clarity
+# Initialize FastMCP server with the tool filter in the name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
 mcp = FastMCP(server_name)
 
@@ -97,17 +97,17 @@ def _get_objects_reference_content() -> str:
 register_general_tools(mcp)
 
 if TOOL_FILTER in ["all", "admin"]:
-    # Admin Agent: Workspace and instance management tools
+    # Admin mode: Workspace and instance management tools
     # Includes: workspace creation, snapshots, duplication, permissions management
     register_admin_tools(mcp)
     register_instance_users_admin_tools(mcp)
-if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
+if TOOL_FILTER in ["all", "data"]:
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
     register_file_tools(mcp)
     if TOOL_FILTER == "data":
-        print("Evo MCP Server configured for Data Agent")
+        print("Evo MCP Server configured for data mode")
     else:
         print("Evo MCP Server configured - Data tools enabled")
 
@@ -180,7 +180,7 @@ if TOOL_FILTER == "all":
         """
 
 
-# Register prompts based on agent type
+# Register prompts based on the selected tool filter
 if TOOL_FILTER in ["all", "admin"]:
 
     @mcp.prompt(name="admin_prompt")
