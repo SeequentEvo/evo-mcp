@@ -150,6 +150,33 @@ def normalize_crs(
     return normalized
 
 
+def resolve_crs(
+    coordinate_reference_system: Any,
+    *,
+    none_value: Any = "unspecified",
+) -> int | str | None:
+    """Resolve CRS using the original minimal object-builder behavior.
+
+    - integers stay integers
+    - digit-only strings become integers
+    - all other values pass through unchanged
+    """
+    if coordinate_reference_system is None:
+        return none_value
+
+    if isinstance(coordinate_reference_system, int):
+        return coordinate_reference_system
+
+    if isinstance(coordinate_reference_system, str):
+        return (
+            int(coordinate_reference_system)
+            if coordinate_reference_system.isdigit()
+            else coordinate_reference_system
+        )
+
+    return coordinate_reference_system
+
+
 __all__ = [
     "VariogramObjectId",
     "require_object_role",
@@ -160,4 +187,5 @@ __all__ = [
     "get_workspace_context",
     "build_links_from_metadata",
     "normalize_crs",
+    "resolve_crs",
 ]

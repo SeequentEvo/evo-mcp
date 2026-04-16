@@ -35,6 +35,25 @@ _VALID_SEED_MODES = ("staged", "workspace", "both")
 # ── Private fixture helpers ───────────────────────────────────────────────────
 
 
+def _resolve_fixture_path(fpath: str) -> Path:
+    """Resolve fixture file paths from either CWD or repo root.
+
+    This keeps relative paths like ``skills-dev/.../fixtures.json`` working even
+    when the MCP process is launched from a parent directory.
+    """
+    candidate = Path(fpath).expanduser()
+    if candidate.is_absolute():
+        return candidate
+
+    repo_root = Path(__file__).resolve().parents[3]
+    for base in (Path.cwd(), repo_root):
+        resolved = (base / candidate).resolve()
+        if resolved.exists():
+            return resolved
+
+    return (repo_root / candidate).resolve()
+
+
 def _stage_one(name: str, raw: dict, fixture_file: str) -> str:
     """Stage a single fixture locally and register it in the session registry.
 
@@ -88,8 +107,6 @@ async def _publish_one(
         raise ValueError(
             f"{descriptor.display_name} fixtures are import-only and cannot be published."
         )
-
-    typed_payload = descriptor.pre_publish_hook(typed_payload)
 
     object_path = f"{path_prefix}/{descriptor.fixture_path_segment}/{name}.json"
     published_obj = await descriptor.publish_create(context, typed_payload, object_path)
@@ -225,9 +242,10 @@ def register_dev_tools(mcp) -> None:
         loaded: list[tuple[str, dict]] = []  # (file_path, fixtures_dict)
         load_errors: list[str] = []
         for fpath in fixture_files:
+            resolved_path = _resolve_fixture_path(fpath)
             try:
-                with open(fpath, "r", encoding="utf-8") as f:
-                    loaded.append((fpath, json.load(f)))
+                with open(resolved_path, "r", encoding="utf-8") as f:
+                    loaded.append((str(resolved_path), json.load(f)))
             except FileNotFoundError:
                 load_errors.append(f"File not found: {fpath}")
             except Exception as exc:

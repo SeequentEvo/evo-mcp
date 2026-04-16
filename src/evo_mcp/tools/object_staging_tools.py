@@ -331,7 +331,6 @@ def register_object_staging_tools(mcp) -> None:
                 f"{', '.join(sorted(descriptor.supported_publish_modes))}."
             )
 
-        data = descriptor.pre_publish_hook(data)
         context = await get_workspace_context(workspace_id)
 
         if mode == "create":

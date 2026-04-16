@@ -26,7 +26,20 @@ from evo_mcp.staging.objects.base import (
     staged_object_type_registry,
 )
 from evo_mcp.staging.runtime import get_registry, get_staging_service
-from evo_mcp.utils.tool_support import extract_crs, format_crs, normalize_crs
+from evo_mcp.utils.tool_support import extract_crs, format_crs, resolve_crs
+
+
+def _resolve_point_set_crs(
+    coordinate_reference_system: Any,
+    *,
+    none_value: Any = None,
+) -> EpsgCode | str | None:
+    resolved = resolve_crs(coordinate_reference_system, none_value=none_value)
+    if resolved == none_value:
+        return none_value
+    if isinstance(resolved, int):
+        return EpsgCode(resolved)
+    return resolved
 
 
 # ── Interaction parameter model ───────────────────────────────────────────────
@@ -36,7 +49,9 @@ class PointSetCreateParams(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     object_name: str = Field(..., description="Name for the new point set.")
-    csv_file: str = Field(..., description="Path to the CSV file containing point data.")
+    csv_file: str = Field(
+        ..., description="Path to the CSV file containing point data."
+    )
     x_column: str = Field(..., description="Column name for X coordinates.")
     y_column: str = Field(..., description="Column name for Y coordinates.")
     z_column: str = Field(..., description="Column name for Z coordinates.")
@@ -80,13 +95,15 @@ def _attribute_inspection(df: pd.DataFrame) -> list[dict[str, Any]]:
         if col in {"x", "y", "z"}:
             continue
         series = df[col]
-        details.append({
-            "name": col,
-            "dtype": str(series.dtype),
-            "null_count": int(series.isna().sum()),
-            "is_numeric": bool(pd.api.types.is_numeric_dtype(series)),
-            "preview_values": series.dropna().head(5).tolist(),
-        })
+        details.append(
+            {
+                "name": col,
+                "dtype": str(series.dtype),
+                "null_count": int(series.isna().sum()),
+                "is_numeric": bool(pd.api.types.is_numeric_dtype(series)),
+                "preview_values": series.dropna().head(5).tolist(),
+            }
+        )
     return details
 
 
@@ -112,9 +129,6 @@ async def _attribute_details(payload: Any, params: dict[str, Any]) -> dict[str, 
     }
 
 
-
-
-
 # ── Create interaction handler ─────────────────────────────────────────────────
 
 
@@ -135,7 +149,9 @@ async def _create(params: PointSetCreateParams) -> dict[str, Any]:
     ]
     missing_attributes = [c for c in selected_attribute_columns if c not in df.columns]
     if missing_attributes:
-        raise ValueError(f"Specified attribute columns were not found in CSV: {missing_attributes}")
+        raise ValueError(
+            f"Specified attribute columns were not found in CSV: {missing_attributes}"
+        )
 
     selected_columns = required_columns + selected_attribute_columns
     working_df = df[selected_columns].copy()
@@ -153,12 +169,10 @@ async def _create(params: PointSetCreateParams) -> dict[str, Any]:
     if len(working_df) == 0:
         raise ValueError("No valid points remain after coordinate validation.")
 
-    resolved_crs = normalize_crs(params.coordinate_reference_system, none_value=None)
-    if isinstance(resolved_crs, str) and resolved_crs.upper().startswith("EPSG:"):
-        try:
-            resolved_crs = EpsgCode(int(resolved_crs.split(":", 1)[1]))
-        except (ValueError, IndexError):
-            pass
+    resolved_crs = _resolve_point_set_crs(
+        params.coordinate_reference_system,
+        none_value=None,
+    )
 
     point_set_data = PointSetData(
         name=params.object_name,
@@ -203,24 +217,8 @@ async def _import_point_set(obj: Any, context: Any) -> tuple[Any, dict[str, Any]
     return data, {}, "Point set imported."
 
 
-# ── Object type definition ────────────────────────────────────────────────────def _normalize_crs(data: Any) -> Any:
-    """Convert plain ``"EPSG:NNNNN"`` strings to ``EpsgCode`` objects."""
-    crs = data.coordinate_reference_system
-    if isinstance(crs, str) and crs.upper().startswith("EPSG:"):
-        try:
-            return PointSetData(
-                name=data.name,
-                description=data.description,
-                tags=data.tags,
-                coordinate_reference_system=EpsgCode(int(crs.split(":", 1)[1])),
-                locations=data.locations,
-            )
-        except (ValueError, IndexError):
-            pass
-    return data
-
-
 # ── Object type definition ────────────────────────────────────────────────────
+
 
 class PointSetObjectType(StagedObjectType):
     """Staged point set with geometry and attribute inspection interactions."""
@@ -261,9 +259,15 @@ class PointSetObjectType(StagedObjectType):
         try:
             df = pd.DataFrame(
                 {
-                    "x": pd.to_numeric(pd.Series(coords["x"]), errors="raise").astype("float64"),
-                    "y": pd.to_numeric(pd.Series(coords["y"]), errors="raise").astype("float64"),
-                    "z": pd.to_numeric(pd.Series(coords["z"]), errors="raise").astype("float64"),
+                    "x": pd.to_numeric(pd.Series(coords["x"]), errors="raise").astype(
+                        "float64"
+                    ),
+                    "y": pd.to_numeric(pd.Series(coords["y"]), errors="raise").astype(
+                        "float64"
+                    ),
+                    "z": pd.to_numeric(pd.Series(coords["z"]), errors="raise").astype(
+                        "float64"
+                    ),
                 }
             )
         except KeyError as exc:
@@ -278,11 +282,20 @@ class PointSetObjectType(StagedObjectType):
             raise StageValidationError(
                 "PointSetData dict is missing required key 'name'."
             ) from exc
+
+        try:
+            resolved_crs = _resolve_point_set_crs(
+                data.get("coordinate_reference_system"),
+                none_value=None,
+            )
+        except ValueError as exc:
+            raise StageValidationError(f"Invalid point set CRS: {exc}") from exc
+
         return PointSetData(
             name=name,
             description=data.get("description"),
             tags=data.get("tags") or {},
-            coordinate_reference_system=data.get("coordinate_reference_system"),
+            coordinate_reference_system=resolved_crs,
             locations=df,
         )
 
@@ -291,18 +304,22 @@ class PointSetObjectType(StagedObjectType):
 
     def __init__(self) -> None:
         super().__init__()
-        self._register_interaction(Interaction(
-            name="get_summary",
-            display_name="Get Summary",
-            description="Return point count, attribute names, and bounding box.",
-            handler=_summarize,
-        ))
-        self._register_interaction(Interaction(
-            name="get_attribute_details",
-            display_name="Get Attribute Details",
-            description="Inspect each attribute column: dtype, null count, numeric status, and value preview.",
-            handler=_attribute_details,
-        ))
+        self._register_interaction(
+            Interaction(
+                name="get_summary",
+                display_name="Get Summary",
+                description="Return point count, attribute names, and bounding box.",
+                handler=_summarize,
+            )
+        )
+        self._register_interaction(
+            Interaction(
+                name="get_attribute_details",
+                display_name="Get Attribute Details",
+                description="Inspect each attribute column: dtype, null count, numeric status, and value preview.",
+                handler=_attribute_details,
+            )
+        )
 
     async def import_handler(self, obj, context):
         return await _import_point_set(obj, context)
@@ -312,9 +329,6 @@ class PointSetObjectType(StagedObjectType):
 
     async def publish_replace(self, context, url, data):
         return await PointSet.replace(context, url, data)
-
-    def pre_publish_hook(self, data):
-        return _normalize_crs(data)
 
 
 # Auto-register at import time.

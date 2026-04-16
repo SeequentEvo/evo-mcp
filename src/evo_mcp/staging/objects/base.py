@@ -186,10 +186,6 @@ class StagedObjectType(abc.ABC):
             f"{type(self).__name__} does not support publish_replace."
         )
 
-    def pre_publish_hook(self, data: Any) -> Any:
-        """Optional transform applied before publishing. No-op by default."""
-        return data
-
     def import_guard(self, evo_obj: Any) -> bool:
         """Predicate for disambiguation when multiple types share ``evo_class``.
 
