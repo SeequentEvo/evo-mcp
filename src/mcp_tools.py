@@ -50,6 +50,7 @@ from evo_mcp.tools import (
     register_instance_users_admin_tools,
     register_dev_tools,
     register_visualisation_tools,
+    register_skills_sync_tools,
 )
 from evo_mcp.staging import runtime as staging_runtime
 from evo_mcp.staging.service import staging_service
@@ -134,6 +135,9 @@ def _get_objects_reference_content() -> str:
 
 # Always register general tools (workspace discovery, object queries, etc.)
 register_general_tools(mcp)
+
+# Skills sync — always available so chat users can install skills locally
+register_skills_sync_tools(mcp, skills_folder)
 
 # Dev tools — only register in dev mode (staging is internal infrastructure)
 if DEV_MODE:

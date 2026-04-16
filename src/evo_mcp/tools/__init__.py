@@ -18,6 +18,7 @@ from .object_staging_tools import register_object_staging_tools
 from .instance_users_admin_tools import register_instance_users_admin_tools
 from .dev_tools import register_dev_tools
 from .visualisation_tools import register_visualisation_tools
+from .skills_tools import register_skills_sync_tools
 
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "register_instance_users_admin_tools",
     "register_dev_tools",
     "register_visualisation_tools",
+    "register_skills_sync_tools",
 ]
