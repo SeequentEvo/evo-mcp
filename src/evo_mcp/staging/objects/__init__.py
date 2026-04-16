@@ -18,22 +18,21 @@ Usage::
     vtype.list_interactions()
 """
 
+import evo_mcp.staging.objects.block_model  # noqa: F401
+import evo_mcp.staging.objects.point_set  # noqa: F401
+import evo_mcp.staging.objects.regular_block_model  # noqa: F401
+import evo_mcp.staging.objects.search_neighborhood  # noqa: F401
+
+# Eagerly load all object type modules so they self-register.
+# Safe because these modules import from staging.runtime (a leaf),
+# not from evo_mcp.session or evo_mcp.staging.service directly.
+import evo_mcp.staging.objects.variogram  # noqa: F401
 from evo_mcp.staging.objects.base import (
     Interaction,
     StagedObjectType,
     StagedObjectTypeRegistry,
     staged_object_type_registry,
 )
-
-# Eagerly load all object type modules so they self-register.
-# Safe because these modules import from staging.runtime (a leaf),
-# not from evo_mcp.session or evo_mcp.staging.service directly.
-import evo_mcp.staging.objects.variogram  # noqa: F401
-import evo_mcp.staging.objects.point_set  # noqa: F401
-import evo_mcp.staging.objects.block_model  # noqa: F401
-import evo_mcp.staging.objects.regular_block_model  # noqa: F401
-import evo_mcp.staging.objects.search_neighborhood  # noqa: F401
-
 
 __all__ = [
     "Interaction",

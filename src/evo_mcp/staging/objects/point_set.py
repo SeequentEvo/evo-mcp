@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any, Literal, Union
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field
 from evo.objects.typed import EpsgCode, PointSet, PointSetData
+from pydantic import BaseModel, ConfigDict, Field
 
 from evo_mcp.staging.errors import StageValidationError
 from evo_mcp.staging.objects.base import (

@@ -22,8 +22,8 @@ from evo.objects.typed import BlockModelData
 
 from evo_mcp.context import ensure_initialized, evo_context
 from evo_mcp.session import object_registry
-from evo_mcp.staging.objects import staged_object_type_registry
 from evo_mcp.staging.errors import StageError
+from evo_mcp.staging.objects import staged_object_type_registry
 from evo_mcp.staging.service import staging_service
 from evo_mcp.utils.tool_support import get_workspace_context
 

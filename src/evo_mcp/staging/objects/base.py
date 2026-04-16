@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass
-from typing import Any, Callable, Awaitable, ClassVar
+from typing import Any, Awaitable, Callable, ClassVar
 
 from evo_mcp.staging.errors import StageValidationError
 

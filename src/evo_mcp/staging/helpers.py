@@ -12,18 +12,17 @@ Provides:
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
-
 from evo.common.typed import BoundingBox
 from evo.objects.typed import Point3, Rotation, Size3d, Size3i
+from pydantic import BaseModel, ConfigDict
 
 __all__ = [
+    "Point3Schema",
+    "RotationSchema",
+    "Size3dSchema",
+    "Size3iSchema",
     "_bbox_dict",
     "_validate_grid_geometry",
-    "Point3Schema",
-    "Size3iSchema",
-    "Size3dSchema",
-    "RotationSchema",
 ]
 
 

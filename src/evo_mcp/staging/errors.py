@@ -5,12 +5,12 @@
 """Staging-specific error hierarchy. Tool layer maps these to ValueError messages."""
 
 __all__ = [
-    "StageError",
-    "StageNotFoundError",
-    "StageExpiredError",
-    "StageValidationError",
-    "StageRevisionConflictError",
     "StageCapacityError",
+    "StageError",
+    "StageExpiredError",
+    "StageNotFoundError",
+    "StageRevisionConflictError",
+    "StageValidationError",
 ]
 
 

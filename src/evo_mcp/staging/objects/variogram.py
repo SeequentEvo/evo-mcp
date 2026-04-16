@@ -18,7 +18,15 @@ import math
 from typing import Any, Literal
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from evo.compute.tasks import (
+    Ellipsoid as ComputeEllipsoid,
+)
+from evo.compute.tasks import (
+    EllipsoidRanges as ComputeEllipsoidRanges,
+)
+from evo.compute.tasks import (
+    Rotation as ComputeRotation,
+)
 from evo.objects.typed import (
     CubicStructure,
     Ellipsoid,
@@ -34,11 +42,7 @@ from evo.objects.typed import (
     VariogramData,
 )
 from evo.objects.typed.variogram import _evaluate_structure
-from evo.compute.tasks import (
-    Ellipsoid as ComputeEllipsoid,
-    EllipsoidRanges as ComputeEllipsoidRanges,
-    Rotation as ComputeRotation,
-)
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from evo_mcp.staging.errors import StageValidationError
 from evo_mcp.staging.helpers import RotationSchema
@@ -48,7 +52,6 @@ from evo_mcp.staging.objects.base import (
     staged_object_type_registry,
 )
 from evo_mcp.staging.runtime import get_registry, get_staging_service
-
 
 # ── Variogram-specific helpers ────────────────────────────────────────────────
 

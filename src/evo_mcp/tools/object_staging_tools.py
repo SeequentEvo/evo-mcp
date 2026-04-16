@@ -31,7 +31,7 @@ from typing import Any, Literal
 
 from evo.objects.typed import object_from_uuid
 
-from evo_mcp.session import object_registry, ResolutionError
+from evo_mcp.session import ResolutionError, object_registry
 from evo_mcp.staging.errors import StageError
 from evo_mcp.staging.objects import staged_object_type_registry
 from evo_mcp.staging.service import staging_service

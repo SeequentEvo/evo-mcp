@@ -25,13 +25,13 @@ from evo_mcp.staging.errors import (
     StageNotFoundError,
     StageValidationError,
 )
-from evo_mcp.staging.models import ObjectType, StagedEnvelope, SourceType, StageStatus
+from evo_mcp.staging.models import ObjectType, SourceType, StagedEnvelope, StageStatus
 from evo_mcp.staging.objects import staged_object_type_registry
 
 __all__ = [
     "StagingService",
-    "staging_service",
     "now_iso",
+    "staging_service",
 ]
 
 _DEFAULT_TTL_SECONDS = 3600

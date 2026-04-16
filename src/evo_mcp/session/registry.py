@@ -34,8 +34,8 @@ from evo_mcp.staging.service import StagingService, now_iso
 
 __all__ = [
     "ObjectRegistry",
-    "object_registry",
     "ResolutionError",
+    "object_registry",
 ]
 
 

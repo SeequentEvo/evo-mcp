@@ -704,19 +704,6 @@ wheels = [
 ]
 
 [[package]]
-name = "evo-files"
-version = "0.2.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "evo-sdk-common" },
-    { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/df/08/c76c3047e79ca2be4f55810ba462453d42857bd86972413a58c6d1c2e9b0/evo_files-0.2.4.tar.gz", hash = "sha256:8a3a9a240a8cec819d0d4f2c71ba937e192ad86d26060a354b6b6e0929161541", size = 15481, upload-time = "2026-02-04T00:35:28.539Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/14/96c4e066cb44f9084244591f1187a149a51620efac6369508370e21fbd9f/evo_files-0.2.4-py3-none-any.whl", hash = "sha256:8c4b8656768afec9a78c9bb8d5c8d54911ab9ceaa723bfe32efdaa72fb750f76", size = 21538, upload-time = "2026-02-04T00:35:27.543Z" },
-]
-
-[[package]]
 name = "evo-blockmodels"
 version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -753,13 +740,26 @@ wheels = [
 ]
 
 [[package]]
+name = "evo-files"
+version = "0.2.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "evo-sdk-common" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/df/08/c76c3047e79ca2be4f55810ba462453d42857bd86972413a58c6d1c2e9b0/evo_files-0.2.4.tar.gz", hash = "sha256:8a3a9a240a8cec819d0d4f2c71ba937e192ad86d26060a354b6b6e0929161541", size = 15481, upload-time = "2026-02-04T00:35:28.539Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bc/14/96c4e066cb44f9084244591f1187a149a51620efac6369508370e21fbd9f/evo_files-0.2.4-py3-none-any.whl", hash = "sha256:8c4b8656768afec9a78c9bb8d5c8d54911ab9ceaa723bfe32efdaa72fb750f76", size = 21538, upload-time = "2026-02-04T00:35:27.543Z" },
+]
+
+[[package]]
 name = "evo-mcp"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
-    { name = "evo-files" },
     { name = "evo-compute" },
+    { name = "evo-files" },
     { name = "evo-objects" },
     { name = "evo-schemas" },
     { name = "evo-sdk-common" },
@@ -786,9 +786,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.13.2" },
     { name = "aiohttp", specifier = ">=3.13.4" },
-    { name = "evo-files", specifier = ">=0.2.4" },
     { name = "evo-compute", specifier = ">=0.0.2" },
+    { name = "evo-files", specifier = ">=0.2.4" },
     { name = "evo-objects", specifier = ">=0.4.0" },
     { name = "evo-schemas", specifier = ">=2025.9.2" },
     { name = "evo-sdk-common", specifier = ">=0.5.21" },

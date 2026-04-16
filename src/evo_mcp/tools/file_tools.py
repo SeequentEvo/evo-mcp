@@ -15,8 +15,6 @@ Configuration:
 - Set EVO_LOCAL_DATA_DIR environment variable for download destination
 """
 
-from evo_mcp.tools.filesystem_tools import _get_data_directory
-
 import logging
 from pathlib import Path
 from uuid import UUID

@@ -15,10 +15,10 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 from evo.blockmodels.typed import RegularBlockModelData
 from evo.common.typed import BoundingBox
 from evo.objects.typed import BlockModel, Point3, Size3d, Size3i
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from evo_mcp.staging.errors import StageValidationError
 from evo_mcp.staging.helpers import (

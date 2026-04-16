@@ -21,8 +21,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
+from evo.compute.tasks.common import SearchNeighborhood as ComputeSearchNeighborhood
 from evo.objects.typed import (
     Ellipsoid,
     EllipsoidRanges,
@@ -30,19 +29,20 @@ from evo.objects.typed import (
     Variogram,
     object_from_uuid,
 )
-from evo.compute.tasks.common import SearchNeighborhood as ComputeSearchNeighborhood
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from evo_mcp.staging.runtime import get_registry
 from evo_mcp.staging.objects.base import (
     Interaction,
     StagedObjectType,
     staged_object_type_registry,
 )
 from evo_mcp.staging.objects.variogram import _select_structure
+from evo_mcp.staging.runtime import get_registry
 from evo_mcp.utils.tool_support import (
     get_workspace_context,
     require_object_role,
 )
+
 
 class SearchNeighborhoodData(BaseModel):
     """In-memory representation of a staged search neighborhood.
