@@ -68,7 +68,8 @@ User needs variogram help
    a. Identify the matching script from the Visualization Workflows table.
    b. **Read that script file** using `read_file` (e.g. `scripts/plot_dashboard.py`).
    c. Fill the data section of the script with the values returned by the interaction tool calls.
-   d. Return the complete, filled-in script as a runnable Python code block in your final response — do not summarise or describe the code, output it in full.
+   d. Execute the populated script locally.
+   e. Return only the execution result, generated artifact location, or a concise summary of what was produced — do not expose the script contents to the end user.
 
 ## Rules
 
@@ -78,7 +79,7 @@ User needs variogram help
 - For multi-structure models, use deterministic selection via `structure_index` or `selection_mode`.
 - For `get_search_parameters`, always surface `selected_structure_index` in results.
 - Keep user-facing output in object names, not internal identifiers.
-- When visualization is requested, the final answer must include executable Python code blocks (with `import plotly.graph_objects as go`) and no placeholders.
+- When visualization is requested, execute the populated script locally and return only the outcome or artifact location, not the script source.
 
 ## Gotchas
 
@@ -88,7 +89,7 @@ User needs variogram help
 
 ## Visualization Workflows
 
-Variograms and search ellipsoids **cannot** be viewed in the Evo Viewer or Portal. Use the scripts in `scripts/` — read the relevant script, fill in the data section with the tool result, and present the adapted code as a ready-to-run Python snippet.
+Variograms and search ellipsoids **cannot** be viewed in the Evo Viewer or Portal. Use the scripts in `scripts/` — read the relevant script, fill in the data section with the tool result, and execute the adapted script locally.
 
 | User request | Script | Tool calls needed |
 |---|---|---|
@@ -97,7 +98,7 @@ Variograms and search ellipsoids **cannot** be viewed in the Evo Viewer or Porta
 | 2D semivariance curves | `scripts/plot_variogram_curves_2d.py` | `get_curve_details` (add `azimuth`+`dip` for arbitrary direction) |
 | Combined 3D + 2D dashboard | `scripts/plot_dashboard.py` | `get_ellipsoid_details` (wireframe) + `get_curve_details` |
 
-**Mandatory**: For any request that asks for visualization output, you MUST read the script file, populate its data section with actual values from the tool response, and output the complete filled-in script as a runnable Python code block. Do not stop after returning interaction payloads or describe the code without outputting it in full.
+**Mandatory**: For any request that asks for visualization output, you MUST read the script file, populate its data section with actual values from the tool response, and execute the resulting script locally. Do not expose the filled-in script in the final response; instead return only the execution result, generated artifact path, or a concise summary of what was produced.
 
 ## Error Handling
 
@@ -129,6 +130,6 @@ Load these files only when the specific condition applies — do not load them p
 - **Always read** `scripts/plot_ellipsoid_combined.py` when the user wants to compare the variogram ellipsoid with the search neighborhood.
 - **Always read** `scripts/plot_variogram_curves_2d.py` when the user wants 2D semivariance curves (principal directions or arbitrary direction).
 - **Always read** `scripts/plot_dashboard.py` when the user wants a combined 3D + 2D dashboard view.
-- After reading the script, populate it with actual data values and output the complete script as a code block — this is a required step, not optional.
+- After reading the script, populate it with actual data values and execute it locally — this is a required step, not optional.
 - Read `references/tool_call_reference.md` if a tool invocation fails and you need to verify the exact parameter names or call structure.
 - Read `references/payload_contract.md` when creating a variogram or when you need exact field names and parameter contracts.
