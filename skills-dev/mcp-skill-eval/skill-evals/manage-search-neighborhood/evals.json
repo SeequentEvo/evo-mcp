@@ -27,7 +27,7 @@
     },
     {
       "id": 4,
-      "prompt": "Design a search neighborhood specifying only major=400 and max_samples=10, without providing semi_major or minor ranges.",
+      "prompt": "Design a search neighborhood specifying only major=400 and max_samples=10.",
       "expected_output": "The request fails with a validation error indicating that all three ellipsoid ranges (major, semi_major, minor) must be provided.",
       "category": "error-handling-incomplete-ranges"
     },
@@ -39,7 +39,7 @@
     },
     {
       "id": 6,
-      "prompt": "Design a search neighborhood without specifying any ellipsoid ranges and without providing a variogram source.",
+      "prompt": "Design a search neighborhood with max_samples=50.",
       "expected_output": "The request fails with a validation error indicating that either explicit ranges or a variogram source must be provided.",
       "category": "error-handling-no-source"
     },

@@ -31,16 +31,50 @@
     "object_type": "point_set",
     "name": "EOM Import Point Set",
     "description": "Workspace-only point set fixture for import eval",
-    "coordinate_reference_system": "EPSG:32650",
     "data": {
       "coordinates": {
-        "x": [1000.0, 1010.0, 1020.0, 1030.0, 1040.0, 1050.0],
-        "y": [2000.0, 2010.0, 2020.0, 2030.0, 2040.0, 2050.0],
-        "z": [300.0, 310.0, 320.0, 330.0, 340.0, 350.0]
+        "x": [
+          1000.0,
+          1010.0,
+          1020.0,
+          1030.0,
+          1040.0,
+          1050.0
+        ],
+        "y": [
+          2000.0,
+          2010.0,
+          2020.0,
+          2030.0,
+          2040.0,
+          2050.0
+        ],
+        "z": [
+          300.0,
+          310.0,
+          320.0,
+          330.0,
+          340.0,
+          350.0
+        ]
       },
       "attributes": {
-        "GRADE": [0.45, 0.52, 0.38, 0.61, 0.47, 0.58],
-        "DOMAIN": [1, 1, 2, 2, 3, 3]
+        "GRADE": [
+          0.45,
+          0.52,
+          0.38,
+          0.61,
+          0.47,
+          0.58
+        ],
+        "DOMAIN": [
+          1,
+          1,
+          2,
+          2,
+          3,
+          3
+        ]
       }
     }
   },
@@ -49,12 +83,23 @@
     "object_type": "regular_block_model",
     "name": "EOM Import Block Model",
     "description": "Workspace-only block model fixture for import eval",
-    "coordinate_reference_system": "EPSG:32650",
-    "origin": {"x": 1100.0, "y": 2100.0, "z": 320.0},
-    "n_blocks": {"nx": 4, "ny": 3, "nz": 2},
-    "block_size": {"dx": 12.5, "dy": 12.5, "dz": 12.5}
+    "coordinate_reference_system": 32650,
+    "origin": {
+      "x": 1100.0,
+      "y": 2100.0,
+      "z": 320.0
+    },
+    "n_blocks": {
+      "nx": 4,
+      "ny": 3,
+      "nz": 2
+    },
+    "block_size": {
+      "dx": 12.5,
+      "dy": 12.5,
+      "dz": 12.5
+    }
   },
-
   "publish_new_variogram_staged": {
     "seed_mode": "staged",
     "object_type": "variogram",
@@ -87,15 +132,38 @@
     "object_type": "point_set",
     "name": "EOM Stage Point Set New",
     "description": "Staged-only point set fixture for publish-new eval",
-    "coordinate_reference_system": "EPSG:32650",
     "data": {
       "coordinates": {
-        "x": [1200.0, 1210.0, 1220.0, 1230.0, 1240.0],
-        "y": [2200.0, 2210.0, 2220.0, 2230.0, 2240.0],
-        "z": [360.0, 362.0, 364.0, 366.0, 368.0]
+        "x": [
+          1200.0,
+          1210.0,
+          1220.0,
+          1230.0,
+          1240.0
+        ],
+        "y": [
+          2200.0,
+          2210.0,
+          2220.0,
+          2230.0,
+          2240.0
+        ],
+        "z": [
+          360.0,
+          362.0,
+          364.0,
+          366.0,
+          368.0
+        ]
       },
       "attributes": {
-        "GRADE": [0.33, 0.41, 0.49, 0.57, 0.63]
+        "GRADE": [
+          0.33,
+          0.41,
+          0.49,
+          0.57,
+          0.63
+        ]
       }
     }
   },
@@ -104,12 +172,23 @@
     "object_type": "regular_block_model",
     "name": "EOM Stage Block Model New",
     "description": "Staged-only block model fixture for publish-new eval",
-    "coordinate_reference_system": "EPSG:32650",
-    "origin": {"x": 1250.0, "y": 2250.0, "z": 350.0},
-    "n_blocks": {"nx": 3, "ny": 3, "nz": 2},
-    "block_size": {"dx": 15.0, "dy": 15.0, "dz": 15.0}
+    "coordinate_reference_system": 32650,
+    "origin": {
+      "x": 1250.0,
+      "y": 2250.0,
+      "z": 350.0
+    },
+    "n_blocks": {
+      "nx": 3,
+      "ny": 3,
+      "nz": 2
+    },
+    "block_size": {
+      "dx": 15.0,
+      "dy": 15.0,
+      "dz": 15.0
+    }
   },
-
   "publish_version_variogram_both": {
     "seed_mode": "both",
     "object_type": "variogram",
@@ -142,15 +221,38 @@
     "object_type": "point_set",
     "name": "EOM Both Point Set",
     "description": "Workspace+staged point set fixture for publish-new-version eval",
-    "coordinate_reference_system": "EPSG:32650",
     "data": {
       "coordinates": {
-        "x": [1300.0, 1310.0, 1320.0, 1330.0, 1340.0],
-        "y": [2300.0, 2310.0, 2320.0, 2330.0, 2340.0],
-        "z": [380.0, 382.0, 384.0, 386.0, 388.0]
+        "x": [
+          1300.0,
+          1310.0,
+          1320.0,
+          1330.0,
+          1340.0
+        ],
+        "y": [
+          2300.0,
+          2310.0,
+          2320.0,
+          2330.0,
+          2340.0
+        ],
+        "z": [
+          380.0,
+          382.0,
+          384.0,
+          386.0,
+          388.0
+        ]
       },
       "attributes": {
-        "GRADE": [0.42, 0.44, 0.46, 0.48, 0.5]
+        "GRADE": [
+          0.42,
+          0.44,
+          0.46,
+          0.48,
+          0.5
+        ]
       }
     }
   },
@@ -159,9 +261,21 @@
     "object_type": "regular_block_model",
     "name": "EOM Both Block Model",
     "description": "Workspace+staged block model fixture for publish-new-version eval",
-    "coordinate_reference_system": "EPSG:32650",
-    "origin": {"x": 1350.0, "y": 2350.0, "z": 390.0},
-    "n_blocks": {"nx": 5, "ny": 2, "nz": 2},
-    "block_size": {"dx": 20.0, "dy": 20.0, "dz": 20.0}
+    "coordinate_reference_system": 32650,
+    "origin": {
+      "x": 1350.0,
+      "y": 2350.0,
+      "z": 390.0
+    },
+    "n_blocks": {
+      "nx": 5,
+      "ny": 2,
+      "nz": 2
+    },
+    "block_size": {
+      "dx": 20.0,
+      "dy": 20.0,
+      "dz": 20.0
+    }
   }
 }

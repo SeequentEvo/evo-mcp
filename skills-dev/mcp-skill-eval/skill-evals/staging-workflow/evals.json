@@ -9,19 +9,19 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Bring my EOM Import Variogram from the workspace into the session so I can use it locally.",
+      "prompt": "Download my EOM Import Variogram so I can use it locally.",
       "expected_output": "Import succeeds and summary confirms the variogram properties including sill, nugget, and structure count.",
       "category": "import-variogram"
     },
     {
       "id": 2,
-      "prompt": "Import the EOM Import Point Set from my workspace. I want to check it has the GRADE and DOMAIN attributes.",
+      "prompt": "Import my EOM Import Point Set so I can check it has the GRADE and DOMAIN attributes.",
       "expected_output": "Import succeeds and summary confirms the point set with its attributes (GRADE, DOMAIN), point count, and coordinate reference system.",
       "category": "import-point-set"
     },
     {
       "id": 3,
-      "prompt": "Import the EOM Import Block Model from my workspace so I can inspect its grid dimensions.",
+      "prompt": "Import my EOM Import Block Model so I can inspect its grid dimensions.",
       "expected_output": "Import succeeds and summary confirms the block model grid dimensions and block size.",
       "category": "import-block-model"
     },
@@ -33,13 +33,13 @@
     },
     {
       "id": 5,
-      "prompt": "Save my local point set EOM Stage Point Set New to the workspace as a new object.",
+      "prompt": "Publish my local point set EOM Stage Point Set New to the workspace as a new object.",
       "expected_output": "Publish succeeds for the staged-only point set. A new workspace object is created with a valid object ID and version ID.",
       "category": "publish-new-point-set"
     },
     {
       "id": 6,
-      "prompt": "Upload my local block model EOM Stage Block Model New to the workspace as a new object.",
+      "prompt": "Publish my local block model EOM Stage Block Model New to the workspace as a new object.",
       "expected_output": "Publish succeeds for the staged-only regular block model. A new workspace object is created with a valid object ID and version ID.",
       "category": "publish-new-block-model"
     },
@@ -57,19 +57,13 @@
     },
     {
       "id": 9,
-      "prompt": "Import EOM Both Block Model from the workspace, then publish it back as a new version.",
-      "expected_output": "Import succeeds for EOM Both Block Model. Publish as new version succeeds — the object ID stays the same but the version ID changes.",
-      "category": "publish-new-version-block-model"
-    },
-    {
-      "id": 10,
-      "prompt": "What objects do I currently have staged in my session?",
+      "prompt": "What objects do I currently have locally?",
       "expected_output": "A list of currently staged objects is returned in plain language, including their names and types.",
       "category": "list-staged-objects"
     },
     {
-      "id": 11,
-      "prompt": "Import EOM Import Variogram from the workspace, then remove it from the session.",
+      "id": 10,
+      "prompt": "Import EOM Import Variogram from the workspace, then delete the local copy.",
       "expected_output": "Import succeeds. After discarding, the variogram is no longer present in the session.",
       "category": "import-then-discard"
     }

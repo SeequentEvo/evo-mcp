@@ -15,8 +15,8 @@
     },
     {
       "id": 2,
-      "prompt": "Design a block model with anisotropic padding: x 0–100, y 0–80, z −50 to 50, block sizes 10/10/5, padding x=20, y=5, z=10. Report the requested and resulting bounding boxes.",
-      "expected_output": "Requested bounding box reflects padding. Resulting grid bounding box covers padded extents.",
+      "prompt": "Design a block model with anisotropic padding: x 0–100, y 0–80, z −50 to 50, block sizes 10/10/5, using padding_x=20, padding_y=5, padding_z=10. Report requested_bounding_box and derived_grid.resulting_bounding_box from the create response.",
+      "expected_output": "Create succeeds and the response explicitly includes requested_bounding_box (reflecting padded extents) plus derived_grid.resulting_bounding_box (covering padded extents with grid alignment).",
       "category": "explicit-extents-with-padding"
     },
     {

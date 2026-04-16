@@ -31,15 +31,39 @@
     "object_type": "point_set",
     "name": "EOD Test Point Set",
     "description": "Five-point grade sample set for eval use",
-    "coordinate_reference_system": "EPSG:32650",
+    "coordinate_reference_system": 32650,
     "data": {
       "coordinates": {
-        "x": [1000.0, 1010.0, 1020.0, 1030.0, 1040.0],
-        "y": [2000.0, 2010.0, 2020.0, 2030.0, 2040.0],
-        "z": [300.0, 310.0, 320.0, 330.0, 340.0]
+        "x": [
+          1000.0,
+          1010.0,
+          1020.0,
+          1030.0,
+          1040.0
+        ],
+        "y": [
+          2000.0,
+          2010.0,
+          2020.0,
+          2030.0,
+          2040.0
+        ],
+        "z": [
+          300.0,
+          310.0,
+          320.0,
+          330.0,
+          340.0
+        ]
       },
       "attributes": {
-        "GRADE": [0.45, 0.52, 0.38, 0.61, 0.47]
+        "GRADE": [
+          0.45,
+          0.52,
+          0.38,
+          0.61,
+          0.47
+        ]
       }
     }
   },
@@ -48,25 +72,61 @@
     "object_type": "regular_block_model",
     "name": "EOD Test Block Model",
     "description": "5x4x3 block model at 10m resolution for eval use",
-    "coordinate_reference_system": "EPSG:32650",
-    "origin": {"x": 1000.0, "y": 2000.0, "z": 300.0},
-    "n_blocks": {"nx": 5, "ny": 4, "nz": 3},
-    "block_size": {"dx": 10.0, "dy": 10.0, "dz": 10.0}
+    "coordinate_reference_system": 32650,
+    "origin": {
+      "x": 1000.0,
+      "y": 2000.0,
+      "z": 300.0
+    },
+    "n_blocks": {
+      "nx": 5,
+      "ny": 4,
+      "nz": 3
+    },
+    "block_size": {
+      "dx": 10.0,
+      "dy": 10.0,
+      "dz": 10.0
+    }
   },
   "assay_grades": {
     "seed_mode": "workspace",
     "object_type": "point_set",
     "name": "EOD Assay Grades",
     "description": "Assay grade sample points for fuzzy-search eval",
-    "coordinate_reference_system": "EPSG:32650",
+    "coordinate_reference_system": 32650,
     "data": {
       "coordinates": {
-        "x": [444800.0, 444820.0, 444840.0, 444860.0, 444880.0],
-        "y": [493000.0, 493020.0, 493040.0, 493060.0, 493080.0],
-        "z": [2400.0, 2410.0, 2420.0, 2430.0, 2440.0]
+        "x": [
+          444800.0,
+          444820.0,
+          444840.0,
+          444860.0,
+          444880.0
+        ],
+        "y": [
+          493000.0,
+          493020.0,
+          493040.0,
+          493060.0,
+          493080.0
+        ],
+        "z": [
+          2400.0,
+          2410.0,
+          2420.0,
+          2430.0,
+          2440.0
+        ]
       },
       "attributes": {
-        "CU_pct": [0.45, 0.52, 0.38, 0.61, 0.47]
+        "CU_pct": [
+          0.45,
+          0.52,
+          0.38,
+          0.61,
+          0.47
+        ]
       }
     }
   }
