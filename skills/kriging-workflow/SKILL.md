@@ -37,7 +37,7 @@ For all object fetch, inspect, update, and publish behavior, follow the `staging
 ### Phase 1 — Gather Inputs
 
 #### Step 1: Confirm workspace *(orchestrator)*
-Ask the user which workspace contains their data. Capture the `workspace_id`.
+Call `list_workspaces` and present the results to the user by name. Ask them to confirm which workspace contains their data. Capture the `workspace_id`.
 
 #### Step 2: Resolve or create objects *(orchestrator + skills)*
 Identify the source point set, variogram, and target block model. Each object may follow either path — a mixed combination is valid (e.g., variogram from Evo, block model created locally):
@@ -77,18 +77,30 @@ Before running kriging, ensure all required objects have valid workspace object 
 
 ### Phase 2 — Execute
 
-#### Step 7: Build and run kriging — *skill: `evo-kriging-execute`*
-Delegate to this skill once all inputs are assembled: `workspace_id`, `point_set_object_id`, `point_set_attribute`, `variogram_object_id`, `target_object_id`, `target_attribute`, and `search`.
+#### Step 7: Confirm final parameters *(orchestrator)*
+Before running kriging, present a plain-language summary of all assembled inputs and ask the user to confirm:
+
+- Source point set name and attribute
+- Variogram name
+- Target block model name and result attribute name
+- Search neighborhood (ranges, rotation, sample limits)
+- Kriging method (ordinary or simple with mean)
+- Domain filter, if applicable
+
+Do not proceed to execution until the user explicitly confirms.
+
+#### Step 8: Build and run kriging — *skill: `evo-kriging-execute`*
+Delegate to this skill once the user has confirmed all parameters: `workspace_id`, `point_set_object_id`, `point_set_attribute`, `variogram_object_id`, `target_object_id`, `target_attribute`, and `search`.
 **Assembles:** structured kriging results with inspection links
 
 ---
 
 ### Phase 3 — Report and Visualize
 
-#### Step 8: Report results — *skill: `kriging-reporting`*
+#### Step 9: Report results — *skill: `kriging-reporting`*
 Delegate to this skill once kriging completes.
 
-#### Step 9 (optional): Visualize — *skill: `evo-object-visualisation`*
+#### Step 10 (optional): Visualize — *skill: `evo-object-visualisation`*
 Delegate to this skill if the user wants to view the results in the Evo Viewer.
 
 
@@ -105,6 +117,7 @@ Delegate to this skill if the user wants to view the results in the Evo Viewer.
 - Unchanged imported objects usually do not need re-publish before execution.
 - Do not proceed past CRS validation on `mismatch` unless the user explicitly accepts risk.
 - Attribute-name confirmation is a required gate before execution, not an optional UX step.
+- Final parameter confirmation is mandatory — never delegate to `evo-kriging-execute` without explicit user approval.
 
 ## Skill Composition Map
 
@@ -122,9 +135,10 @@ User: "Run kriging on my gold data"
 +-- 4. manage-search-neighborhood -> neighborhood payload       [skill]
 +-- 5. Confirm attribute names                                  [orchestrator]
 +-- 6. staging-workflow          -> publish new/modified only   [skill]
-+-- 7. evo-kriging-execute            -> execute                    [skill]
-+-- 8. kriging-reporting          -> summarize                  [skill]
-+-- 9. evo-object-visualisation   -> view (optional)            [skill]
++-- 7. Confirm final parameters  -> user approval gate          [orchestrator]
++-- 8. evo-kriging-execute       -> execute                     [skill]
++-- 9. kriging-reporting         -> summarize                   [skill]
++-- 10. evo-object-visualisation -> view (optional)             [skill]
 ```
 
 Each skill is self-contained. The orchestrator passes object names between steps — leaf skills resolve names to their internal representations independently.

@@ -18,7 +18,7 @@ Use this skill when:
 - source, target, and variogram are already published Evo objects
 - all required IDs and attributes are already resolved
 - search neighborhood payload is provided as manual run input
-- any method/region filter/discretisation settings are provided as manual run inputs
+- any method/domain filter/discretisation settings are provided as manual run inputs
 - CRS validation has already passed (or has been explicitly accepted)
 - the user wants to run kriging now
 
@@ -57,7 +57,7 @@ Use the documented tool path directly. Assume tool contracts are stable for this
 - Always use `kriging_build_parameters` to build payloads. Do not hand-construct `KrigingParameters` JSON.
 - This skill does not publish objects and does not resolve names to IDs.
 - Source, target, and variogram must already exist as published Evo objects before execution.
-- Search neighborhood, method, region filter, and block discretisation are manual run inputs (not published Evo objects).
+- Search neighborhood, method, domain filter, and block discretisation are manual run inputs (not published Evo objects).
 - Pass scenario fields under `params`; pass `workspace_id` separately to both tools.
 - Build one scenario per call, then batch them in `scenarios` for `kriging_run`.
 - Pass payloads through unchanged from `kriging_build_parameters` to `kriging_run`.

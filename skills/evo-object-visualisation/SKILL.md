@@ -1,6 +1,6 @@
 ---
 name: evo-object-visualisation
-description: Use this skill when the user wants to view Evo objects in the Viewer or generate portal links — even if they just say "show me" or "open in Evo." Requires explicit object IDs. Note: variograms are not currently supported.
+description: Use this skill when the user wants to view Evo objects in the Viewer or generate portal links — even if they just say "show me" or "open in Evo." Requires explicit object IDs. Note — variograms are not currently supported.
 ---
 
 # Object Visualisation

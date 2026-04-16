@@ -61,12 +61,15 @@ User needs block model help
 1. Choose action path: design from extents or inspect a block model.
 2. For design from extents: call `staging_create_object(object_type="regular_block_model", params={...})` with explicit extents and block sizes.
 3. For payload inspection: call `staging_invoke_interaction(object_name="...", interaction_name="get_definition_details")`.
+4. For padded designs, always report both `requested_bounding_box` and `derived_grid.resulting_bounding_box` from the create response.
 
 ## Rules
 
 - Regular block models can be designed locally; subblocked block models are import-only.
 - Keep payloads strict and canonical.
 - Keep derivation results explicit: origin, n_blocks, block_size, total_blocks, and resulting bounding box.
+- Use exact padding parameter names: `padding_x`, `padding_y`, `padding_z`.
+- For padding workflows, include both requested padded extents and derived grid extents in the user-facing response.
 - Both tools are local operations — no Evo API calls.
 - Block sizes (`dx`, `dy`, `dz`) must be greater than zero.
 - Extents must have `max > min` on all axes.

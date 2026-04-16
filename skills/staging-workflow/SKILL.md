@@ -37,7 +37,7 @@ Do not use this skill when:
 | `staging_spatial_validation` | Validate CRS compatibility between two staged objects |
 | `staging_publish_object` | Publish a staged object to Evo |
 | `staging_list` | List all objects currently in the session |
-| `staging_discard_object` | Remove an object from the session |
+| `staging_discard_object` | Discard/remove/delete an object from the session |
 
 ## Workflow
 
@@ -48,7 +48,9 @@ Do not use this skill when:
 5. Publish when requested.
 6. Return a short outcome-focused response.
 
-When the user asks what's in the session, use `staging_list` and summarise the results in plain language.
+When the user asks what's in the session, use `staging_list` and present the results as a plain-language table.
+
+Use "Imported from Evo" for objects that have an Evo object ID, and "Local only" for objects that exist only in the session. Do not expose internal envelope fields.
 When the user asks to remove or discard an object, use `staging_discard_object` with its name.
 
 ## Rules
