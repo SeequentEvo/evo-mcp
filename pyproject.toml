@@ -5,7 +5,7 @@ description = "An MCP server implementation using Evo SDK"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
-    "fastmcp>=3.0.2",
+    "fastmcp>=3.2.0",
     "google-adk==1.22.1",
     "evo-files>=0.2.4",
     "evo-compute>=0.0.2",
@@ -14,6 +14,7 @@ dependencies = [
     "evo-schemas>=2025.9.2",
     "evo-widgets>=0.2.0",
     "aiohttp>=3.13.2",
+    "aiohttp>=3.13.4",
     "pyarrow>=14.0.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
@@ -25,5 +26,16 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pre-commit>=4",
+    "ruff==0.15.4",
     "reuse",
 ]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+extend-select = ["I", "RUF022"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["evo_mcp"]

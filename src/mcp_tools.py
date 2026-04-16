@@ -31,38 +31,36 @@ The environment variables can be set in a .env file or
 passed directly to the MCP server as input parameters.
 """
 
-import os
 import logging
+import os
 from pathlib import Path
+
 from fastmcp import FastMCP
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from fastmcp.utilities.logging import configure_logging
 
+from evo_mcp.session import object_registry
+from evo_mcp.staging import runtime as staging_runtime
+from evo_mcp.staging.service import staging_service
 from evo_mcp.tools import (
     register_admin_tools,
     register_compute_tools,
-    # register_data_tools,
-    register_general_tools,
-    register_filesystem_tools,
-    register_object_builder_tools,
-    register_file_tools,
-    register_object_staging_tools,
-    register_instance_users_admin_tools,
     register_dev_tools,
-    register_visualisation_tools,
+    register_file_tools,
+    register_filesystem_tools,
+    register_general_tools,
+    register_instance_users_admin_tools,
+    register_object_builder_tools,
+    register_object_staging_tools,
     register_skills_sync_tools,
+    register_visualisation_tools,
 )
-from evo_mcp.staging import runtime as staging_runtime
-from evo_mcp.staging.service import staging_service
-from evo_mcp.session import object_registry
 
 staging_runtime.configure(object_registry, staging_service)
 
 
 logger = logging.getLogger(__name__)
-OBJECTS_REFERENCE_UNAVAILABLE = (
-    "Objects reference information is currently unavailable."
-)
+OBJECTS_REFERENCE_UNAVAILABLE = "Objects reference information is currently unavailable."
 
 # Get transport mode from environment variable
 TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio").lower()
@@ -95,9 +93,7 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
 DEV_MODE = os.getenv("MCP_DEV_MODE", "").lower() in ("1", "true", "yes")
 
 # Initialize FastMCP server with agent type in name for clarity
-server_name = (
-    "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
-)
+server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
 mcp = FastMCP(server_name)
 
 # Resolve skills folder path relative to this file's location

@@ -21,7 +21,8 @@ import logging
 from pathlib import Path
 from uuid import UUID
 
-from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.context import ensure_initialized, evo_context
+from evo_mcp.tools.filesystem_tools import _get_data_directory
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +31,7 @@ def register_file_tools(mcp):
     """Register file-related tools with the FastMCP server."""
 
     @mcp.tool()
-    async def upload_file(
-        workspace_id: str, local_file_path: str, target_path: str = ""
-    ) -> dict:
+    async def upload_file(workspace_id: str, local_file_path: str, target_path: str = "") -> dict:
         """Upload a local file to a workspace.
 
         Args:
@@ -47,10 +46,7 @@ def register_file_tools(mcp):
 
         local_path = Path(local_file_path)
         if not local_path.exists():
-            return {
-                "error": f"Local file not found: {local_file_path}",
-                "status": "file_not_found",
-            }
+            return {"error": f"Local file not found: {local_file_path}", "status": "file_not_found"}
 
         # Build target path: folder + filename
         if not target_path:
@@ -70,9 +66,7 @@ def register_file_tools(mcp):
             upload_ctx = await file_client.prepare_upload_by_path(full_target_path)
 
             # Upload the file
-            await upload_ctx.upload_from_path(
-                str(local_path), evo_context.connector.transport
-            )
+            await upload_ctx.upload_from_path(str(local_path), evo_context.connector.transport)
 
             return {
                 "status": "uploaded",
@@ -125,9 +119,7 @@ def register_file_tools(mcp):
         }
 
     @mcp.tool()
-    async def download_file(
-        workspace_id: str, file_path: str, local_filename: str = "", version: str = ""
-    ) -> dict:
+    async def download_file(workspace_id: str, file_path: str, local_filename: str = "", version: str = "") -> dict:
         """Download a file from a workspace to the local data directory.
 
         Args:
@@ -167,34 +159,22 @@ def register_file_tools(mcp):
             # Prepare download context
             if version:
                 # Download specific version by file ID
-                download_ctx = await file_client.prepare_download_by_path(
-                    file_path, version_id=version
-                )
+                download_ctx = await file_client.prepare_download_by_path(file_path, version_id=version)
             else:
                 download_ctx = await file_client.prepare_download_by_path(file_path)
 
             # Download the file to local path
-            await download_ctx.download_to_path(
-                str(local_file_path), evo_context.connector.transport
-            )
+            await download_ctx.download_to_path(str(local_file_path), evo_context.connector.transport)
 
             return {
                 "file_path": file_path,
                 "local_file": str(local_file_path),
-                "version_id": download_ctx.version_id
-                if hasattr(download_ctx, "version_id")
-                else version,
-                "size_bytes": local_file_path.stat().st_size
-                if local_file_path.exists()
-                else None,
+                "version_id": download_ctx.version_id if hasattr(download_ctx, "version_id") else version,
+                "size_bytes": local_file_path.stat().st_size if local_file_path.exists() else None,
                 "status": "downloaded",
             }
         except Exception as e:
-            return {
-                "error": str(e),
-                "file_path": file_path,
-                "status": "download_failed",
-            }
+            return {"error": str(e), "file_path": file_path, "status": "download_failed"}
 
     @mcp.tool()
     async def list_files(workspace_id: str, path_filter: str = "") -> dict:

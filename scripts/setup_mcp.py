@@ -68,9 +68,7 @@ def print_color(text: str, color: str = Colors.RESET):
     print(f"{color}{text}{Colors.RESET}")
 
 
-def is_confirmed(
-    prompt: str = "Is this correct? [Y/n]: ", default_yes: bool = True
-) -> bool:
+def is_confirmed(prompt: str = "Is this correct? [Y/n]: ", default_yes: bool = True) -> bool:
     """Prompt for yes/no confirmation with configurable default."""
     choice = input(prompt).strip().lower()
     if not choice:
@@ -278,9 +276,7 @@ def configure_env_settings(project_dir: Path) -> dict[str, str]:
             DEFAULT_REDIRECT_URL,
         )
 
-    new_values["MCP_TOOL_FILTER"] = prompt_tool_filter(
-        current_values.get("MCP_TOOL_FILTER", "all")
-    )
+    new_values["MCP_TOOL_FILTER"] = prompt_tool_filter(current_values.get("MCP_TOOL_FILTER", "all"))
 
     return new_values
 
@@ -325,9 +321,7 @@ def resolve_command_path(command: str, project_dir: Path) -> str:
     return command
 
 
-def start_http_server(
-    python_exe: str, mcp_script: str, project_dir: Path
-) -> int | None:
+def start_http_server(python_exe: str, mcp_script: str, project_dir: Path) -> int | None:
     """Start Evo MCP HTTP server in the foreground and return exit code."""
     python_command = resolve_command_path(python_exe, project_dir)
     script_command = resolve_command_path(mcp_script, project_dir)
@@ -371,7 +365,7 @@ def get_client_choice() -> ClientChoice:
     choice_list = ", ".join(sorted(choice_keys, key=int))
 
     choice = prompt_choice(
-        f"Enter your choice (default: 1): ",
+        "Enter your choice (default: 1): ",
         choice_keys,
         "1",
         f"Invalid choice. Please enter one of: {choice_list}.",
@@ -413,14 +407,10 @@ def get_protocol_choice(
         print("HTTP Server Configuration:")
 
         current_host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
-        env_values["MCP_HTTP_HOST"] = prompt_with_confirmation(
-            "host", current_host, DEFAULT_HTTP_HOST
-        )
+        env_values["MCP_HTTP_HOST"] = prompt_with_confirmation("host", current_host, DEFAULT_HTTP_HOST)
         print()
         current_port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
-        env_values["MCP_HTTP_PORT"] = prompt_with_confirmation(
-            "port", current_port, DEFAULT_HTTP_PORT
-        )
+        env_values["MCP_HTTP_PORT"] = prompt_with_confirmation("port", current_port, DEFAULT_HTTP_PORT)
 
     return protocol, env_values
 
@@ -540,9 +530,7 @@ def get_python_executable() -> str:
 
 def is_virtual_environment_active() -> bool:
     """Return True when setup is running inside a Python virtual environment."""
-    return sys.prefix != getattr(sys, "base_prefix", sys.prefix) or bool(
-        os.environ.get("VIRTUAL_ENV")
-    )
+    return sys.prefix != getattr(sys, "base_prefix", sys.prefix) or bool(os.environ.get("VIRTUAL_ENV"))
 
 
 def resolve_python_executable(python_command: str) -> str | None:
@@ -582,19 +570,13 @@ def choose_python_executable(default_python: str) -> str:
         if is_confirmed("Use this Python interpreter? [Y/n]: "):
             return default_python
     else:
-        print_color(
-            "Warning: setup is running outside a virtual environment.", Colors.RED
-        )
-        print(
-            "If Evo MCP dependencies are in a virtual environment, use that interpreter path."
-        )
+        print_color("Warning: setup is running outside a virtual environment.", Colors.RED)
+        print("If Evo MCP dependencies are in a virtual environment, use that interpreter path.")
         if is_confirmed("Use this interpreter anyway? [y/N]: ", default_yes=False):
             return default_python
 
     while True:
-        candidate = input(
-            f"Enter Python executable path (default: {default_python}): "
-        ).strip()
+        candidate = input(f"Enter Python executable path (default: {default_python}): ").strip()
         candidate = candidate or default_python
         resolved = resolve_python_executable(candidate)
         if resolved:
@@ -649,9 +631,7 @@ def setup_mcp_config(
 
     config_dir = get_config_dir(client)
     if not config_dir:
-        print_color(
-            f"✗ Could not find {client.display_name} installation directory", Colors.RED
-        )
+        print_color(f"✗ Could not find {client.display_name} installation directory", Colors.RED)
         sys.exit(1)
     config_file = config_dir / "mcp.json"
     print_color(f"Using user configuration for {client.display_name}", Colors.GREEN)
@@ -739,9 +719,7 @@ def setup_mcp_config(
             )
             server_exit_code = start_http_server(python_exe, mcp_script, project_dir)
             if server_exit_code not in [0, 130, None]:
-                print_color(
-                    f"✗ HTTP server exited with code {server_exit_code}", Colors.RED
-                )
+                print_color(f"✗ HTTP server exited with code {server_exit_code}", Colors.RED)
     except (IOError, OSError) as e:
         print_color(f"✗ Failed to update configuration file: {e}", Colors.RED)
         sys.exit(1)

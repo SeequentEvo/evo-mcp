@@ -38,9 +38,9 @@ To ensure your pull request is merged as quickly as possible, please consider th
 * Ensure your code has been automatically linted.
 * Verify that all tests pass, and write new tests with appropriate code coverage for new code.
 * Verify that all sample code and example notebooks can be run successfully.
-* Any new non-trivial files need SDPX license and copyright headers added:
+* Any new non-trivial files need SPDX license and copyright headers added:
 
-    reuse annotate --copyright="Bentley Systems, Incorporated" --license=Apache-2.0 $(git ls-files src/) $(git ls-files scripts/)
+  reuse annotate --copyright="Bentley Systems, Incorporated" --license=Apache-2.0 $(find src scripts -type f -name '*.py')
 
 ### Contributor License Agreement (CLA)
 
