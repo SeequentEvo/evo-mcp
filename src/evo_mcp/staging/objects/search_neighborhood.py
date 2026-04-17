@@ -17,8 +17,6 @@ Interactions:
   - validate: Check parameter consistency and range validity.
 """
 
-from __future__ import annotations
-
 from typing import Any, Literal
 
 from evo.compute.tasks.common import SearchNeighborhood as ComputeSearchNeighborhood
@@ -123,8 +121,6 @@ async def _validate(payload: SearchNeighborhoodData, params: dict[str, Any]) -> 
     }
 
 
-
-
 # ── Create interaction handler ─────────────────────────────────────────────────
 
 
@@ -141,7 +137,9 @@ class SearchNeighborhoodCreateParams(BaseModel):
     pitch: float | None = Field(None, description="Pitch in degrees (optional override).")
     variogram_name: str | None = Field(None, description="Name of a staged variogram to derive ranges from.")
     variogram_object_id: str | None = Field(None, description="UUID of a variogram object in Evo.")
-    workspace_id: str | None = Field(None, description="Workspace UUID (required when variogram_object_id is provided).")
+    workspace_id: str | None = Field(
+        None, description="Workspace UUID (required when variogram_object_id is provided)."
+    )
     structure_index: int | None = Field(None, ge=0, description="Variogram structure index to use.")
     selection_mode: Literal["first", "largest_major"] = Field("first", description="Structure selection strategy.")
     scale_factor: float = Field(1.0, gt=0, description="Scale factor applied to variogram ranges.")
@@ -200,7 +198,9 @@ async def _create(params: SearchNeighborhoodCreateParams) -> dict[str, Any]:
         if not structures:
             raise ValueError("No variogram structures available to select from.")
         sel_idx, sel_struct, sel_by = _select_structure(
-            structures, params.structure_index, params.selection_mode,
+            structures,
+            params.structure_index,
+            params.selection_mode,
         )
 
         ranges_d = sel_struct.get("anisotropy", {}).get("ellipsoid_ranges", {})
@@ -217,11 +217,16 @@ async def _create(params: SearchNeighborhoodCreateParams) -> dict[str, Any]:
             pitch=float(rot_d.get("pitch", 0.0)),
         )
         derivation_mode = "variogram-scaled"
-        derivation_details.update({
-            "variogram_object_id": None, "variogram_name": params.variogram_name,
-            "selected_structure_index": sel_idx, "selected_by": sel_by,
-            "selection_mode": params.selection_mode, "scale_factor": resolved_sf,
-        })
+        derivation_details.update(
+            {
+                "variogram_object_id": None,
+                "variogram_name": params.variogram_name,
+                "selected_structure_index": sel_idx,
+                "selected_by": sel_by,
+                "selection_mode": params.selection_mode,
+                "scale_factor": resolved_sf,
+            }
+        )
     else:
         if params.variogram_object_id is None:
             raise ValueError("Provide either explicit ranges, a variogram_name, or a variogram_object_id.")
@@ -288,18 +293,22 @@ class SearchNeighborhoodObjectType(StagedObjectType):
 
     def __init__(self) -> None:
         super().__init__()
-        self._register_interaction(Interaction(
-            name="get_summary",
-            display_name="Get Summary",
-            description="Return the full neighborhood configuration (ellipsoid, samples, derivation).",
-            handler=_summarize,
-        ))
-        self._register_interaction(Interaction(
-            name="get_validation_report",
-            display_name="Get Validation Report",
-            description="Check parameter consistency: sample limits, range ordering, positive ranges.",
-            handler=_validate,
-        ))
+        self._register_interaction(
+            Interaction(
+                name="get_summary",
+                display_name="Get Summary",
+                description="Return the full neighborhood configuration (ellipsoid, samples, derivation).",
+                handler=_summarize,
+            )
+        )
+        self._register_interaction(
+            Interaction(
+                name="get_validation_report",
+                display_name="Get Validation Report",
+                description="Check parameter consistency: sample limits, range ordering, positive ranges.",
+                handler=_validate,
+            )
+        )
 
 
 # Auto-register at import time.

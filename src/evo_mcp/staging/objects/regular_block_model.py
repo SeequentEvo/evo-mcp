@@ -10,8 +10,6 @@ Interactions:
   - get_definition_details: Inspect grid geometry, origin, block size, and bounding box.
 """
 
-from __future__ import annotations
-
 import math
 from typing import Any
 
@@ -51,15 +49,12 @@ def _resolve_regular_block_model_crs(
 
 
 def _details_from_regular(parsed: RegularBlockModelData) -> dict[str, Any]:
-    bbox = BoundingBox.from_origin_and_size(
-        parsed.origin, parsed.n_blocks, parsed.block_size
-    )
+    bbox = BoundingBox.from_origin_and_size(parsed.origin, parsed.n_blocks, parsed.block_size)
     return {
         "status": "success",
         "name": parsed.name,
         "description": parsed.description,
-        "coordinate_reference_system": parsed.coordinate_reference_system
-        or "unspecified",
+        "coordinate_reference_system": parsed.coordinate_reference_system or "unspecified",
         "size_unit_id": parsed.size_unit_id,
         "origin": {"x": parsed.origin.x, "y": parsed.origin.y, "z": parsed.origin.z},
         "n_blocks": {
@@ -80,9 +75,7 @@ def _details_from_regular(parsed: RegularBlockModelData) -> dict[str, Any]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _get_definition_details(
-    payload: Any, params: dict[str, Any]
-) -> dict[str, Any]:
+async def _get_definition_details(payload: Any, params: dict[str, Any]) -> dict[str, Any]:
     return _details_from_regular(payload)
 
 
@@ -93,9 +86,7 @@ class RegularBlockModelCreateParams(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     object_name: str = Field(..., description="Name for the block model.")
-    object_path: str = Field(
-        "", description="Path for the new object (e.g. '/models/grid.json')."
-    )
+    object_path: str = Field("", description="Path for the new object (e.g. '/models/grid.json').")
     block_size_x: float = Field(..., gt=0, description="Block size in X direction.")
     block_size_y: float = Field(..., gt=0, description="Block size in Y direction.")
     block_size_z: float = Field(..., gt=0, description="Block size in Z direction.")
@@ -105,15 +96,9 @@ class RegularBlockModelCreateParams(BaseModel):
     y_max: float = Field(..., description="Maximum Y extent.")
     z_min: float = Field(..., description="Minimum Z extent.")
     z_max: float = Field(..., description="Maximum Z extent.")
-    padding_x: float = Field(
-        0.0, ge=0, description="Extra padding added to X extents on each side."
-    )
-    padding_y: float = Field(
-        0.0, ge=0, description="Extra padding added to Y extents on each side."
-    )
-    padding_z: float = Field(
-        0.0, ge=0, description="Extra padding added to Z extents on each side."
-    )
+    padding_x: float = Field(0.0, ge=0, description="Extra padding added to X extents on each side.")
+    padding_y: float = Field(0.0, ge=0, description="Extra padding added to Y extents on each side.")
+    padding_z: float = Field(0.0, ge=0, description="Extra padding added to Z extents on each side.")
     description: str = Field("", description="Object description.")
     coordinate_reference_system: str | int = Field(
         "unspecified",
@@ -129,14 +114,8 @@ class RegularBlockModelCreateParams(BaseModel):
         padded_y_min = self.y_min - self.padding_y
         padded_z_max = self.z_max + self.padding_z
         padded_z_min = self.z_min - self.padding_z
-        if (
-            padded_x_max <= padded_x_min
-            or padded_y_max <= padded_y_min
-            or padded_z_max <= padded_z_min
-        ):
-            raise ValueError(
-                "Extents must have max values greater than min values on all axes (after padding)."
-            )
+        if padded_x_max <= padded_x_min or padded_y_max <= padded_y_min or padded_z_max <= padded_z_min:
+            raise ValueError("Extents must have max values greater than min values on all axes (after padding).")
         return self
 
 
@@ -171,12 +150,8 @@ async def _create(params: RegularBlockModelCreateParams) -> dict[str, Any]:
         z_max=params.z_max + params.padding_z,
     )
 
-    block_size = Size3d(
-        dx=params.block_size_x, dy=params.block_size_y, dz=params.block_size_z
-    )
-    origin, n_blocks, resulting_bbox = _derive_regular_grid_definition(
-        bounding_box, block_size
-    )
+    block_size = Size3d(dx=params.block_size_x, dy=params.block_size_y, dz=params.block_size_z)
+    origin, n_blocks, resulting_bbox = _derive_regular_grid_definition(bounding_box, block_size)
 
     resolved_crs = _resolve_regular_block_model_crs(
         params.coordinate_reference_system,
@@ -245,17 +220,13 @@ class RegularBlockModelObjectType(StagedObjectType):
     create_params_model = RegularBlockModelCreateParams
 
     def _validate(self, payload: RegularBlockModelData) -> None:
-        _validate_grid_geometry(
-            payload.block_size, payload.n_blocks, "RegularBlockModelData"
-        )
+        _validate_grid_geometry(payload.block_size, payload.n_blocks, "RegularBlockModelData")
 
     def summarize(self, payload: RegularBlockModelData) -> dict[str, Any]:
         n = payload.n_blocks
         b = payload.block_size
         total = n.nx * n.ny * n.nz
-        attr_count = (
-            len(payload.cell_data.columns) if payload.cell_data is not None else 0
-        )
+        attr_count = len(payload.cell_data.columns) if payload.cell_data is not None else 0
         return {
             "block_model_kind": "regular",
             "total_blocks": total,
@@ -273,19 +244,13 @@ class RegularBlockModelObjectType(StagedObjectType):
         try:
             name = data["name"]
         except KeyError as exc:
-            raise StageValidationError(
-                "RegularBlockModelData dict is missing required key 'name'."
-            ) from exc
+            raise StageValidationError("RegularBlockModelData dict is missing required key 'name'.") from exc
         try:
             origin = Point3Schema.model_validate(data.get("origin", {})).to_sdk()
             n_blocks = Size3iSchema.model_validate(data.get("n_blocks", {})).to_sdk()
-            block_size = Size3dSchema.model_validate(
-                data.get("block_size", {})
-            ).to_sdk()
+            block_size = Size3dSchema.model_validate(data.get("block_size", {})).to_sdk()
         except Exception as exc:
-            raise StageValidationError(
-                f"Regular block model geometry validation failed: {exc}"
-            ) from exc
+            raise StageValidationError(f"Regular block model geometry validation failed: {exc}") from exc
 
         resolved_crs = _resolve_regular_block_model_crs(
             data.get("coordinate_reference_system"),

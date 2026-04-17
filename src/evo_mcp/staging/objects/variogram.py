@@ -12,8 +12,6 @@ Interactions:
   - get_curve_details: Return principal-direction curves for 2D plotting.
 """
 
-from __future__ import annotations
-
 import math
 from typing import Any, Literal
 
@@ -56,7 +54,7 @@ from evo_mcp.staging.runtime import get_registry, get_staging_service
 # ── Variogram-specific helpers ────────────────────────────────────────────────
 
 
-_ALPHA_REQUIRED= {"spheroidal", "generalisedcauchy"}
+_ALPHA_REQUIRED = {"spheroidal", "generalisedcauchy"}
 _VALID_ALPHA = {3, 5, 7, 9}
 
 
@@ -93,13 +91,9 @@ class VariogramStructureInput(BaseModel):
             if self.alpha is None:
                 raise ValueError(f"alpha is required for {vtype} structures.")
             if self.alpha not in _VALID_ALPHA:
-                raise ValueError(
-                    f"alpha must be one of {sorted(_VALID_ALPHA)} for {vtype} structures."
-                )
+                raise ValueError(f"alpha must be one of {sorted(_VALID_ALPHA)} for {vtype} structures.")
         elif self.alpha is not None:
-            raise ValueError(
-                f"alpha is only valid for spheroidal/generalisedcauchy structures, not {vtype}."
-            )
+            raise ValueError(f"alpha is only valid for spheroidal/generalisedcauchy structures, not {vtype}.")
         return self
 
     def to_sdk(self) -> Any:
@@ -112,17 +106,13 @@ class VariogramStructureInput(BaseModel):
             ),
             rotation=self.anisotropy.rotation.to_sdk(),
         )
-        return _variogram_structure_from_inputs(
-            self.variogram_type.lower(), self.contribution, ellipsoid, self.alpha
-        )
+        return _variogram_structure_from_inputs(self.variogram_type.lower(), self.contribution, ellipsoid, self.alpha)
 
 
 def variogram_structure_from_dict(structure: dict[str, Any]) -> Any:
     """Deserialize a variogram structure dict into the appropriate typed SDK class."""
     if not isinstance(structure, dict):
-        raise StageValidationError(
-            f"Variogram structure must be a dict, got {type(structure).__name__}."
-        )
+        raise StageValidationError(f"Variogram structure must be a dict, got {type(structure).__name__}.")
     try:
         return VariogramStructureInput.model_validate(structure).to_sdk()
     except Exception as exc:
@@ -142,19 +132,12 @@ def _select_structure(
         raise ValueError("Variogram must contain at least one structure.")
     if structure_index is not None:
         if structure_index < 0 or structure_index >= len(structures):
-            raise ValueError(
-                f"structure_index {structure_index} is out of range for {len(structures)} structure(s)."
-            )
+            raise ValueError(f"structure_index {structure_index} is out of range for {len(structures)} structure(s).")
         return structure_index, structures[structure_index], "structure_index"
     if selection_mode == "largest_major":
         idx = max(
             range(len(structures)),
-            key=lambda i: float(
-                structures[i]
-                .get("anisotropy", {})
-                .get("ellipsoid_ranges", {})
-                .get("major", 0.0)
-            ),
+            key=lambda i: float(structures[i].get("anisotropy", {}).get("ellipsoid_ranges", {}).get("major", 0.0)),
         )
         return idx, structures[idx], "largest_major"
     return 0, structures[0], "first"
@@ -178,18 +161,10 @@ class VariogramCreateParams(BaseModel):
         description="List of variogram structure objects.",
     )
     nugget: float = Field(0.0, ge=0.0, description="Nugget variance.")
-    is_rotation_fixed: bool = Field(
-        True, description="Whether rotation is fixed across all structures."
-    )
-    modelling_space: Literal["data", "normalscore"] = Field(
-        "data", description="Modelling space."
-    )
-    data_variance: float | None = Field(
-        None, description="Data variance (defaults to sill if omitted)."
-    )
-    attribute: str | None = Field(
-        None, description="Attribute name the variogram describes."
-    )
+    is_rotation_fixed: bool = Field(True, description="Whether rotation is fixed across all structures.")
+    modelling_space: Literal["data", "normalscore"] = Field("data", description="Modelling space.")
+    data_variance: float | None = Field(None, description="Data variance (defaults to sill if omitted).")
+    attribute: str | None = Field(None, description="Attribute name the variogram describes.")
     domain: str | None = Field(None, description="Domain name.")
     description: str | None = Field(None, description="Object description.")
     tags: dict[str, Any] | None = Field(None, description="Tags dict.")
@@ -211,29 +186,21 @@ class StructureSelectionParams(BaseModel):
 
 
 class GetSearchParamsParams(StructureSelectionParams):
-    scale_factor: float = Field(
-        2.0, gt=0, description="Multiplier applied to all ellipsoid ranges."
-    )
+    scale_factor: float = Field(2.0, gt=0, description="Multiplier applied to all ellipsoid ranges.")
 
 
 class GetEllipsoidDetailsParams(StructureSelectionParams):
     center_x: float = Field(0.0, description="Ellipsoid center X coordinate.")
     center_y: float = Field(0.0, description="Ellipsoid center Y coordinate.")
     center_z: float = Field(0.0, description="Ellipsoid center Z coordinate.")
-    include_surface_points: bool = Field(
-        True, description="Include surface mesh points for 3D plotting."
-    )
-    include_wireframe_points: bool = Field(
-        True, description="Include wireframe points for 3D plotting."
-    )
+    include_surface_points: bool = Field(True, description="Include surface mesh points for 3D plotting.")
+    include_wireframe_points: bool = Field(True, description="Include wireframe points for 3D plotting.")
 
 
 class GetCurveDetailsParams(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    n_points: int = Field(
-        200, ge=10, description="Number of sample points along the distance axis."
-    )
+    n_points: int = Field(200, ge=10, description="Number of sample points along the distance axis.")
     max_distance: float | None = Field(
         None,
         gt=0,
@@ -251,9 +218,7 @@ class GetCurveDetailsParams(BaseModel):
     @model_validator(mode="after")
     def azimuth_dip_together(self) -> "GetCurveDetailsParams":
         if (self.azimuth is None) != (self.dip is None):
-            raise ValueError(
-                "Provide both azimuth and dip together for arbitrary-direction curves."
-            )
+            raise ValueError("Provide both azimuth and dip together for arbitrary-direction curves.")
         return self
 
 
@@ -294,9 +259,7 @@ def _principal_direction_curves(
             max_ranges[d] = max(max_ranges[d], float(ranges.get(d, 0.0)))
     resolved = max_distance
     if resolved is None:
-        resolved = (
-            max(max_ranges.values()) * 1.2 if max(max_ranges.values()) > 0 else 100.0
-        )
+        resolved = max(max_ranges.values()) * 1.2 if max(max_ranges.values()) > 0 else 100.0
     h = np.linspace(0.0, resolved, n_points)
     curves: dict[str, Any] = {}
     for direction in ["major", "semi_major", "minor"]:
@@ -306,11 +269,7 @@ def _principal_direction_curves(
                 s.get("variogram_type", "unknown"),
                 h,
                 float(s.get("contribution", 0.0)),
-                float(
-                    s.get("anisotropy", {})
-                    .get("ellipsoid_ranges", {})
-                    .get(direction, 1.0)
-                ),
+                float(s.get("anisotropy", {}).get("ellipsoid_ranges", {}).get(direction, 1.0)),
                 s.get("alpha"),
             )
         curves[direction] = {
@@ -341,9 +300,7 @@ async def _summarize(payload: VariogramData, params: dict[str, Any]) -> dict[str
     }
 
 
-async def _get_structure_details(
-    payload: VariogramData, params: StructureSelectionParams
-) -> dict[str, Any]:
+async def _get_structure_details(payload: VariogramData, params: StructureSelectionParams) -> dict[str, Any]:
     structures = payload.get_structures_as_dicts()
     idx, selected, selected_by = _select_structure(
         structures,
@@ -360,9 +317,7 @@ async def _get_structure_details(
     }
 
 
-async def _get_search_params(
-    payload: VariogramData, params: GetSearchParamsParams
-) -> dict[str, Any]:
+async def _get_search_params(payload: VariogramData, params: GetSearchParamsParams) -> dict[str, Any]:
     structures = payload.get_structures_as_dicts()
     idx, selected, selected_by = _select_structure(
         structures,
@@ -387,9 +342,7 @@ async def _get_search_params(
     }
 
 
-async def _get_ellipsoid_details(
-    payload: VariogramData, params: GetEllipsoidDetailsParams
-) -> dict[str, Any]:
+async def _get_ellipsoid_details(payload: VariogramData, params: GetEllipsoidDetailsParams) -> dict[str, Any]:
     structures = payload.get_structures_as_dicts()
     idx, selected, selected_by = _select_structure(
         structures,
@@ -416,9 +369,7 @@ async def _get_ellipsoid_details(
     if not params.include_surface_points and not params.include_wireframe_points:
         return result
     if not details["is_valid_for_ellipsoid"]:
-        raise ValueError(
-            "Cannot generate ellipsoid points: selected structure has non-positive ranges."
-        )
+        raise ValueError("Cannot generate ellipsoid points: selected structure has non-positive ranges.")
     ranges = details["ranges"]
     rotation = details["rotation"]
     ellipsoid = ComputeEllipsoid(
@@ -451,12 +402,8 @@ async def _get_ellipsoid_details(
     return result
 
 
-async def _get_curve_details(
-    payload: VariogramData, params: GetCurveDetailsParams
-) -> dict[str, Any]:
-    curves, resolved_max = _principal_direction_curves(
-        payload, params.n_points, params.max_distance
-    )
+async def _get_curve_details(payload: VariogramData, params: GetCurveDetailsParams) -> dict[str, Any]:
+    curves, resolved_max = _principal_direction_curves(payload, params.n_points, params.max_distance)
 
     arbitrary_curve: dict[str, Any] | None = None
     if params.azimuth is not None and params.dip is not None:
@@ -528,9 +475,6 @@ async def _get_curve_details(
     }
 
 
-
-
-
 # ── Create interaction helpers ─────────────────────────────────────────────────
 
 
@@ -552,13 +496,9 @@ def _variogram_structure_from_inputs(
     if structure_type_lower == "linear":
         return LinearStructure(contribution=contribution, anisotropy=ellipsoid)
     if structure_type_lower == "spheroidal":
-        return SpheroidalStructure(
-            contribution=contribution, anisotropy=ellipsoid, alpha=alpha
-        )
+        return SpheroidalStructure(contribution=contribution, anisotropy=ellipsoid, alpha=alpha)
     if structure_type_lower == "generalisedcauchy":
-        return GeneralisedCauchyStructure(
-            contribution=contribution, anisotropy=ellipsoid, alpha=alpha
-        )
+        return GeneralisedCauchyStructure(contribution=contribution, anisotropy=ellipsoid, alpha=alpha)
     raise ValueError(
         "Unsupported structure_type. Use spherical, exponential, gaussian, cubic, linear, spheroidal, or generalisedcauchy."
     )
@@ -579,12 +519,8 @@ async def _create(params: VariogramCreateParams) -> dict[str, Any]:
     """Create a new variogram from canonical modelling parameters."""
     parsed_structures = _build_variogram_structures(params.structures)
     total_contribution = sum(s.contribution for s in parsed_structures)
-    if not math.isclose(
-        params.sill, params.nugget + total_contribution, rel_tol=1e-6, abs_tol=1e-6
-    ):
-        raise ValueError(
-            "sill must equal nugget + the sum of all structure contributions."
-        )
+    if not math.isclose(params.sill, params.nugget + total_contribution, rel_tol=1e-6, abs_tol=1e-6):
+        raise ValueError("sill must equal nugget + the sum of all structure contributions.")
 
     variogram_data = VariogramData(
         name=params.object_name,
@@ -595,9 +531,7 @@ async def _create(params: VariogramCreateParams) -> dict[str, Any]:
         nugget=params.nugget,
         is_rotation_fixed=params.is_rotation_fixed,
         modelling_space=params.modelling_space,
-        data_variance=params.data_variance
-        if params.data_variance is not None
-        else params.sill,
+        data_variance=params.data_variance if params.data_variance is not None else params.sill,
         structures=parsed_structures,
         attribute=params.attribute,
         domain=params.domain,
@@ -684,9 +618,7 @@ class VariogramObjectType(StagedObjectType):
         try:
             name = data["name"]
         except KeyError as exc:
-            raise StageValidationError(
-                "VariogramData dict is missing required key 'name'."
-            ) from exc
+            raise StageValidationError("VariogramData dict is missing required key 'name'.") from exc
         return VariogramData(
             name=name,
             description=data.get("description"),
@@ -696,11 +628,7 @@ class VariogramObjectType(StagedObjectType):
             nugget=float(data.get("nugget", 0.0)),
             is_rotation_fixed=bool(data.get("is_rotation_fixed", False)),
             structures=structures,
-            data_variance=(
-                float(data["data_variance"])
-                if data.get("data_variance") is not None
-                else None
-            ),
+            data_variance=(float(data["data_variance"]) if data.get("data_variance") is not None else None),
             modelling_space=data.get("modelling_space"),
             domain=data.get("domain"),
             attribute=data.get("attribute"),

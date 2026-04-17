@@ -10,8 +10,6 @@ Interactions:
   - attribute_details: Inspect attribute columns with statistics.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, Literal, Union
 
@@ -49,9 +47,7 @@ class PointSetCreateParams(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     object_name: str = Field(..., description="Name for the new point set.")
-    csv_file: str = Field(
-        ..., description="Path to the CSV file containing point data."
-    )
+    csv_file: str = Field(..., description="Path to the CSV file containing point data.")
     x_column: str = Field(..., description="Column name for X coordinates.")
     y_column: str = Field(..., description="Column name for Y coordinates.")
     z_column: str = Field(..., description="Column name for Z coordinates.")
@@ -144,20 +140,14 @@ async def _create(params: PointSetCreateParams) -> dict[str, Any]:
     if missing_required:
         raise ValueError(f"Missing required coordinate columns: {missing_required}")
 
-    selected_attribute_columns = params.attribute_columns or [
-        c for c in df.columns if c not in required_columns
-    ]
+    selected_attribute_columns = params.attribute_columns or [c for c in df.columns if c not in required_columns]
     missing_attributes = [c for c in selected_attribute_columns if c not in df.columns]
     if missing_attributes:
-        raise ValueError(
-            f"Specified attribute columns were not found in CSV: {missing_attributes}"
-        )
+        raise ValueError(f"Specified attribute columns were not found in CSV: {missing_attributes}")
 
     selected_columns = required_columns + selected_attribute_columns
     working_df = df[selected_columns].copy()
-    working_df = working_df.rename(
-        columns={params.x_column: "x", params.y_column: "y", params.z_column: "z"}
-    )
+    working_df = working_df.rename(columns={params.x_column: "x", params.y_column: "y", params.z_column: "z"})
 
     for coord_col in ["x", "y", "z"]:
         working_df[coord_col] = pd.to_numeric(working_df[coord_col], errors="coerce")
@@ -239,9 +229,7 @@ class PointSetObjectType(StagedObjectType):
             raise StageValidationError("PointSetData locations must be non-empty.")
         for col in ("x", "y", "z"):
             if col not in df.columns:
-                raise StageValidationError(
-                    f"PointSetData locations must contain column '{col}'."
-                )
+                raise StageValidationError(f"PointSetData locations must contain column '{col}'.")
 
     def summarize(self, payload: PointSetData) -> dict[str, Any]:
         df = payload.locations
@@ -259,29 +247,19 @@ class PointSetObjectType(StagedObjectType):
         try:
             df = pd.DataFrame(
                 {
-                    "x": pd.to_numeric(pd.Series(coords["x"]), errors="raise").astype(
-                        "float64"
-                    ),
-                    "y": pd.to_numeric(pd.Series(coords["y"]), errors="raise").astype(
-                        "float64"
-                    ),
-                    "z": pd.to_numeric(pd.Series(coords["z"]), errors="raise").astype(
-                        "float64"
-                    ),
+                    "x": pd.to_numeric(pd.Series(coords["x"]), errors="raise").astype("float64"),
+                    "y": pd.to_numeric(pd.Series(coords["y"]), errors="raise").astype("float64"),
+                    "z": pd.to_numeric(pd.Series(coords["z"]), errors="raise").astype("float64"),
                 }
             )
         except KeyError as exc:
-            raise StageValidationError(
-                f"PointSetData dict is missing required coordinate key: {exc}"
-            ) from exc
+            raise StageValidationError(f"PointSetData dict is missing required coordinate key: {exc}") from exc
         for attr_name, attr_values in (raw.get("attributes") or {}).items():
             df[attr_name] = pd.Series(attr_values)
         try:
             name = data["name"]
         except KeyError as exc:
-            raise StageValidationError(
-                "PointSetData dict is missing required key 'name'."
-            ) from exc
+            raise StageValidationError("PointSetData dict is missing required key 'name'.") from exc
 
         try:
             resolved_crs = _resolve_point_set_crs(

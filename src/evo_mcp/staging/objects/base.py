@@ -17,8 +17,6 @@ lookups by Evo SDK class and data class, replacing the former
 ``DescriptorRegistry``.
 """
 
-from __future__ import annotations
-
 import abc
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, ClassVar
@@ -124,9 +122,7 @@ class StagedObjectType(abc.ABC):
         Called by the staging service before storing every payload.
         """
         if self.data_class is not None and not isinstance(payload, self.data_class):
-            raise StageValidationError(
-                f"Expected {self.data_class.__name__}, got {type(payload).__name__}."
-            )
+            raise StageValidationError(f"Expected {self.data_class.__name__}, got {type(payload).__name__}.")
         self._validate(payload)
 
     @abc.abstractmethod
@@ -148,9 +144,7 @@ class StagedObjectType(abc.ABC):
 
         Override in object types that support fixture seeding via ``dev_tools``.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support deserialization from dict."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support deserialization from dict.")
 
     @abc.abstractmethod
     async def create(self, params: Any) -> dict[str, Any]:
@@ -175,15 +169,11 @@ class StagedObjectType(abc.ABC):
 
     async def publish_create(self, context: Any, data: Any, path: str) -> Any:
         """SDK call for ``mode='create'``."""
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support publish_create."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support publish_create.")
 
     async def publish_replace(self, context: Any, url: str, data: Any) -> Any:
         """SDK call for ``mode='new_version'``."""
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support publish_replace."
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support publish_replace.")
 
     def import_guard(self, evo_obj: Any) -> bool:
         """Predicate for disambiguation when multiple types share ``evo_class``.
@@ -207,10 +197,7 @@ class StagedObjectType(abc.ABC):
         interaction = self._interactions.get(name)
         if interaction is None:
             available = ", ".join(sorted(self._interactions.keys()))
-            raise ValueError(
-                f"Unknown interaction '{name}' on {self.display_name}. "
-                f"Available: {available}"
-            )
+            raise ValueError(f"Unknown interaction '{name}' on {self.display_name}. Available: {available}")
         return interaction
 
     async def invoke(
@@ -247,10 +234,7 @@ class StagedObjectTypeRegistry:
         result = self._types.get(object_type)
         if result is None:
             available = ", ".join(sorted(self._types.keys()))
-            raise ValueError(
-                f"No staged object type registered for '{object_type}'. "
-                f"Available: {available}"
-            )
+            raise ValueError(f"No staged object type registered for '{object_type}'. Available: {available}")
         return result
 
     def get_by_evo_class(self, evo_obj: Any) -> StagedObjectType:
@@ -260,23 +244,14 @@ class StagedObjectTypeRegistry:
         are equal the first match wins. Override ``import_guard`` on higher-
         priority types for fine-grained disambiguation.
         """
-        candidates = [
-            t
-            for t in self._types.values()
-            if t.evo_class is not None and isinstance(evo_obj, t.evo_class)
-        ]
+        candidates = [t for t in self._types.values() if t.evo_class is not None and isinstance(evo_obj, t.evo_class)]
         if not candidates:
-            raise ValueError(
-                f"No type registered for Evo class '{type(evo_obj).__name__}'."
-            )
+            raise ValueError(f"No type registered for Evo class '{type(evo_obj).__name__}'.")
         candidates.sort(key=lambda t: t.priority, reverse=True)
         for t in candidates:
             if t.import_guard(evo_obj):
                 return t
-        raise ValueError(
-            f"No type matched for Evo class '{type(evo_obj).__name__}' "
-            f"after import_guard checks."
-        )
+        raise ValueError(f"No type matched for Evo class '{type(evo_obj).__name__}' after import_guard checks.")
 
     def get_by_data_class(self, data: Any) -> StagedObjectType:
         """Find the type whose ``data_class`` matches a staged payload."""

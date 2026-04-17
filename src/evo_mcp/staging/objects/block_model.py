@@ -10,8 +10,6 @@ Interactions:
   - get_definition_details: Inspect grid geometry, origin, block size, and attributes.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 from evo.common.typed import BoundingBox
@@ -38,8 +36,7 @@ def _details_from_block_model_data(parsed: BlockModelData) -> dict[str, Any]:
         "model_type": g.model_type,
         "name": parsed.name,
         "description": parsed.description,
-        "coordinate_reference_system": parsed.coordinate_reference_system
-        or "unspecified",
+        "coordinate_reference_system": parsed.coordinate_reference_system or "unspecified",
         "origin": {"x": g.origin.x, "y": g.origin.y, "z": g.origin.z},
         "n_blocks": {"nx": g.n_blocks.nx, "ny": g.n_blocks.ny, "nz": g.n_blocks.nz},
         "block_size": {
@@ -56,18 +53,14 @@ def _details_from_block_model_data(parsed: BlockModelData) -> dict[str, Any]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _get_definition_details(
-    payload: Any, params: dict[str, Any]
-) -> dict[str, Any]:
+async def _get_definition_details(payload: Any, params: dict[str, Any]) -> dict[str, Any]:
     return _details_from_block_model_data(payload)
 
 
 # ── Import / publish handlers ─────────────────────────────────────────────────
 
 
-async def _import_block_model(
-    obj: Any, context: Any
-) -> tuple[Any, dict[str, Any], str]:
+async def _import_block_model(obj: Any, context: Any) -> tuple[Any, dict[str, Any], str]:
     data = BlockModelData(
         name=obj.name,
         description=getattr(obj, "description", None),
@@ -80,11 +73,9 @@ async def _import_block_model(
     extras: dict[str, Any] = {"schema_id": schema_label(obj)}
     is_regular = getattr(obj.geometry, "model_type", None) == "regular"
     message = (
-        "Regular block model imported. Can be published as a new version "
-        "with publish_object(mode='new_version')."
+        "Regular block model imported. Can be published as a new version with publish_object(mode='new_version')."
         if is_regular
-        else "Block model imported as reference (read-only; only regular "
-        "block models can be published)."
+        else "Block model imported as reference (read-only; only regular block models can be published)."
     )
     return data, extras, message
 
