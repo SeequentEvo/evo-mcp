@@ -16,7 +16,7 @@ Usage (agent instructions):
 """
 
 import plotly.graph_objects as go
-from evo.compute.tasks import Ellipsoid, EllipsoidRanges, Rotation
+from evo.objects.typed import Ellipsoid, EllipsoidRanges, Rotation
 
 # ── Paste result["result"] from get_ellipsoid_details here ─────────────────
 var_ellipsoid_data = {
@@ -36,7 +36,7 @@ search_params = {
 
 # Build search ellipsoid surface points from the scaled ranges
 search_ellipsoid = Ellipsoid(
-    ellipsoid_ranges=EllipsoidRanges(
+    ranges=EllipsoidRanges(
         major=search_params["scaled_ranges"]["major"],
         semi_major=search_params["scaled_ranges"]["semi_major"],
         minor=search_params["scaled_ranges"]["minor"],

@@ -16,15 +16,6 @@ import math
 from typing import Any, Literal
 
 import numpy as np
-from evo.compute.tasks import (
-    Ellipsoid as ComputeEllipsoid,
-)
-from evo.compute.tasks import (
-    EllipsoidRanges as ComputeEllipsoidRanges,
-)
-from evo.compute.tasks import (
-    Rotation as ComputeRotation,
-)
 from evo.objects.typed import (
     CubicStructure,
     Ellipsoid,
@@ -372,13 +363,13 @@ async def _get_ellipsoid_details(payload: VariogramData, params: GetEllipsoidDet
         raise ValueError("Cannot generate ellipsoid points: selected structure has non-positive ranges.")
     ranges = details["ranges"]
     rotation = details["rotation"]
-    ellipsoid = ComputeEllipsoid(
-        ranges=ComputeEllipsoidRanges(
+    ellipsoid = Ellipsoid(
+        ranges=EllipsoidRanges(
             major=ranges["major"],
             semi_major=ranges["semi_major"],
             minor=ranges["minor"],
         ),
-        rotation=ComputeRotation(
+        rotation=Rotation(
             dip_azimuth=rotation["dip_azimuth"],
             dip=rotation["dip"],
             pitch=rotation["pitch"],
