@@ -98,7 +98,7 @@ class BlockModelObjectType(StagedObjectType):
     object_type = "block_model"
     display_name = "Block Model"
     evo_class = BlockModel
-    data_classes = (BlockModelData,)
+    data_class = BlockModelData
     supported_publish_modes = frozenset({"new_version"})
     fixture_path_segment = "blockmodels"
     role_label = "Block model"

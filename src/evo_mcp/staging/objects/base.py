@@ -90,7 +90,7 @@ class StagedObjectType(abc.ABC):
     Class-level attributes for SDK integration:
 
     - ``evo_class`` — the SDK wrapper class (``Variogram``, ``PointSet``, ``BlockModel``).
-    - ``data_classes`` — typed data classes accepted as staged payloads.
+    - ``data_class`` — the single typed data class accepted as a staged payload.
     - ``supported_publish_modes`` — subset of ``{"create", "new_version"}``.
     - ``fixture_path_segment`` — sub-folder under ``/fixtures/`` for dev seeding.
     - ``role_label`` / ``role_article`` — for error messages.
@@ -103,7 +103,7 @@ class StagedObjectType(abc.ABC):
 
     # SDK integration
     evo_class: type | None = None
-    data_classes: tuple[type, ...] = ()
+    data_class: type | None = None
     supported_publish_modes: frozenset[str] = frozenset()
     fixture_path_segment: str = ""
     role_label: str = ""
@@ -118,15 +118,14 @@ class StagedObjectType(abc.ABC):
         self._interactions: dict[str, Interaction] = {}
 
     def validate(self, payload: Any) -> None:
-        """Validate a payload: type-check against ``data_classes``, then domain rules.
+        """Validate a payload: type-check against ``data_class``, then domain rules.
 
         Raises ``StageValidationError`` if the payload is invalid.
         Called by the staging service before storing every payload.
         """
-        if self.data_classes and not isinstance(payload, self.data_classes):
-            expected = " or ".join(cls.__name__ for cls in self.data_classes)
+        if self.data_class is not None and not isinstance(payload, self.data_class):
             raise StageValidationError(
-                f"Expected {expected}, got {type(payload).__name__}."
+                f"Expected {self.data_class.__name__}, got {type(payload).__name__}."
             )
         self._validate(payload)
 
@@ -280,9 +279,9 @@ class StagedObjectTypeRegistry:
         )
 
     def get_by_data_class(self, data: Any) -> StagedObjectType:
-        """Find the type whose ``data_classes`` match a staged payload."""
+        """Find the type whose ``data_class`` matches a staged payload."""
         for obj_type in self._types.values():
-            if obj_type.data_classes and isinstance(data, obj_type.data_classes):
+            if obj_type.data_class is not None and isinstance(data, obj_type.data_class):
                 return obj_type
         raise ValueError(f"No type registered for data class '{type(data).__name__}'.")
 

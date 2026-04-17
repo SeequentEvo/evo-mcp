@@ -650,7 +650,7 @@ class VariogramObjectType(StagedObjectType):
     object_type = "variogram"
     display_name = "Variogram"
     evo_class = Variogram
-    data_classes = (VariogramData,)
+    data_class = VariogramData
     supported_publish_modes = frozenset({"create", "new_version"})
     fixture_path_segment = "variograms"
     role_label = "Variogram"

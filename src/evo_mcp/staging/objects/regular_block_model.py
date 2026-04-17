@@ -237,7 +237,7 @@ class RegularBlockModelObjectType(StagedObjectType):
     # BlockModelData (handled by BlockModelObjectType). Locally designed ones
     # are matched via get_by_data_class using RegularBlockModelData.
     evo_class = None
-    data_classes = (RegularBlockModelData,)
+    data_class = RegularBlockModelData
     supported_publish_modes = frozenset({"create"})
     fixture_path_segment = "blockmodels"
     role_label = "Block model"

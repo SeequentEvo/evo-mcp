@@ -226,7 +226,7 @@ class PointSetObjectType(StagedObjectType):
     object_type = "point_set"
     display_name = "Point Set"
     evo_class = PointSet
-    data_classes = (PointSetData,)
+    data_class = PointSetData
     supported_publish_modes = frozenset({"create", "new_version"})
     fixture_path_segment = "pointsets"
     role_label = "PointSet"
