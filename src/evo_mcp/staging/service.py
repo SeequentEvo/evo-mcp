@@ -196,9 +196,7 @@ class StagingService:
         if envelope is None:
             raise StageNotFoundError(stage_id)
         self._check_expiry(envelope)
-        self._envelopes[stage_id] = replace(
-            envelope, status="discarded", updated_at=now_iso()
-        )
+        self._envelopes[stage_id] = replace(envelope, status="discarded", updated_at=now_iso())
         self._payloads.pop(stage_id, None)
 
     def publish_stage(self, stage_id: str) -> tuple[StagedEnvelope, Any]:
@@ -222,10 +220,7 @@ class StagingService:
         results = []
         now_dt = datetime.now(timezone.utc)
         for envelope in list(self._envelopes.values()):
-            if (
-                envelope.status == "active"
-                and _parse_iso(envelope.expires_at) <= now_dt
-            ):
+            if envelope.status == "active" and _parse_iso(envelope.expires_at) <= now_dt:
                 envelope = replace(envelope, status="expired", updated_at=now_iso())
                 self._envelopes[envelope.stage_id] = envelope
             if object_type is not None and envelope.object_type != object_type:
@@ -245,10 +240,7 @@ class StagingService:
         for stage_id, envelope in self._envelopes.items():
             if envelope.status in ("discarded", "published"):
                 to_remove.append(stage_id)
-            elif (
-                envelope.status == "active"
-                and _parse_iso(envelope.expires_at) <= now_dt
-            ):
+            elif envelope.status == "active" and _parse_iso(envelope.expires_at) <= now_dt:
                 to_remove.append(stage_id)
         if not dry_run:
             for stage_id in to_remove:
@@ -272,8 +264,7 @@ class StagingService:
         estimated = self._estimate_payload_bytes(payload)
         if estimated > _DEFAULT_MAX_PAYLOAD_BYTES:
             raise StageValidationError(
-                f"Payload size (~{estimated:,} bytes) exceeds maximum of "
-                f"{_DEFAULT_MAX_PAYLOAD_BYTES:,} bytes."
+                f"Payload size (~{estimated:,} bytes) exceeds maximum of {_DEFAULT_MAX_PAYLOAD_BYTES:,} bytes."
             )
 
     def _check_expiry(self, envelope: StagedEnvelope) -> StagedEnvelope:
@@ -292,8 +283,7 @@ class StagingService:
         self._check_payload_size(payload)
         if self._active_count() >= self._max_active:
             raise StageCapacityError(
-                f"Active stage limit ({self._max_active}) reached. "
-                "Discard or publish existing stages first."
+                f"Active stage limit ({self._max_active}) reached. Discard or publish existing stages first."
             )
         self._envelopes[envelope.stage_id] = envelope
         self._payloads[envelope.stage_id] = payload

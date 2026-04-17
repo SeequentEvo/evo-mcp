@@ -34,19 +34,12 @@ def register_visualisation_tools(mcp) -> None:
         unique_requested_ids = list(dict.fromkeys(object_ids))
         try:
             resolved_objects = await asyncio.gather(
-                *(
-                    object_from_uuid(context, object_id)
-                    for object_id in unique_requested_ids
-                )
+                *(object_from_uuid(context, object_id) for object_id in unique_requested_ids)
             )
         except Exception as exc:
-            raise ValueError(
-                f"Could not resolve one or more object IDs for viewer-link generation: {exc}"
-            ) from exc
+            raise ValueError(f"Could not resolve one or more object IDs for viewer-link generation: {exc}") from exc
 
-        unique_ids = list(
-            dict.fromkeys(str(obj.metadata.id) for obj in resolved_objects)
-        )
+        unique_ids = list(dict.fromkeys(str(obj.metadata.id) for obj in resolved_objects))
         viewer_url = get_viewer_url(
             org_id=str(environment.org_id),
             workspace_id=str(environment.workspace_id),

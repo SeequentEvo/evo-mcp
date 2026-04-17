@@ -155,16 +155,13 @@ def register_object_staging_tools(mcp) -> None:
 
         if staged_type.create_params_model is None:
             raise ValueError(
-                f"Object type '{object_type}' does not support local creation. "
-                f"Use staging_import_object instead."
+                f"Object type '{object_type}' does not support local creation. Use staging_import_object instead."
             )
 
         try:
             validated_params = staged_type.create_params_model.model_validate(params)
         except Exception as exc:
-            raise ValueError(
-                f"Invalid parameters for '{object_type}' create: {exc}"
-            ) from exc
+            raise ValueError(f"Invalid parameters for '{object_type}' create: {exc}") from exc
 
         result = await staged_type.create(validated_params)
         return {
@@ -242,9 +239,7 @@ def register_object_staging_tools(mcp) -> None:
         try:
             obj = await object_from_uuid(context, object_id, version=version_id)
         except Exception as exc:
-            raise ValueError(
-                f"Could not resolve object '{object_id}' for import."
-            ) from exc
+            raise ValueError(f"Could not resolve object '{object_id}' for import.") from exc
 
         try:
             descriptor = staged_object_type_registry.get_by_evo_class(obj)
@@ -258,9 +253,7 @@ def register_object_staging_tools(mcp) -> None:
 
         source_ref: dict[str, Any] = {
             "object_id": str(obj.metadata.id),
-            "version_id": str(obj.metadata.version_id)
-            if obj.metadata.version_id
-            else None,
+            "version_id": str(obj.metadata.version_id) if obj.metadata.version_id else None,
             "path": getattr(obj.metadata, "path", None),
         }
 
@@ -337,16 +330,12 @@ def register_object_staging_tools(mcp) -> None:
             try:
                 published = await descriptor.publish_create(context, data, object_path)
             except Exception as exc:
-                raise ValueError(
-                    f"Failed to publish {descriptor.display_name} as a new object: {exc}"
-                ) from exc
+                raise ValueError(f"Failed to publish {descriptor.display_name} as a new object: {exc}") from exc
         else:
             try:
                 existing = await object_from_uuid(context, object_id)
             except Exception as exc:
-                raise ValueError(
-                    f"Could not resolve '{object_id}' for new-version publish."
-                ) from exc
+                raise ValueError(f"Could not resolve '{object_id}' for new-version publish.") from exc
             require_object_role(
                 existing,
                 descriptor.evo_class,
@@ -354,13 +343,9 @@ def register_object_staging_tools(mcp) -> None:
                 descriptor.role_article,
             )
             try:
-                published = await descriptor.publish_replace(
-                    context, str(existing.metadata.url), data
-                )
+                published = await descriptor.publish_replace(context, str(existing.metadata.url), data)
             except Exception as exc:
-                raise ValueError(
-                    f"Failed to publish {descriptor.display_name} as a new version: {exc}"
-                ) from exc
+                raise ValueError(f"Failed to publish {descriptor.display_name} as a new version: {exc}") from exc
 
         staging_service.publish_stage(entry.stage_id)
         environment = await get_workspace_environment(workspace_id)
@@ -396,13 +381,9 @@ def register_object_staging_tools(mcp) -> None:
             target_name: Name of the target staged object.
         """
         try:
-            source_entry, source_payload = object_registry.get_payload(
-                name=source_name, object_type="point_set"
-            )
+            source_entry, source_payload = object_registry.get_payload(name=source_name, object_type="point_set")
         except (ResolutionError, Exception) as exc:
-            raise ValueError(
-                f"Could not resolve source '{source_name}' as a point set."
-            ) from exc
+            raise ValueError(f"Could not resolve source '{source_name}' as a point set.") from exc
 
         try:
             target_entry, target_payload = object_registry.get_payload(
@@ -410,13 +391,9 @@ def register_object_staging_tools(mcp) -> None:
             )
         except (ResolutionError, Exception):
             try:
-                target_entry, target_payload = object_registry.get_payload(
-                    name=target_name, object_type="block_model"
-                )
+                target_entry, target_payload = object_registry.get_payload(name=target_name, object_type="block_model")
             except (ResolutionError, Exception) as exc:
-                raise ValueError(
-                    f"Could not resolve target '{target_name}' as a block model."
-                ) from exc
+                raise ValueError(f"Could not resolve target '{target_name}' as a block model.") from exc
 
         source_crs = extract_crs(source_payload)
         target_crs = extract_crs(target_payload)
@@ -443,8 +420,6 @@ def register_object_staging_tools(mcp) -> None:
                 "coordinate_reference_system": format_crs(target_crs),
             },
             "unit_context": {
-                "guidance": (
-                    "Search-neighborhood ranges should use the same coordinate units as the resolved CRS."
-                )
+                "guidance": ("Search-neighborhood ranges should use the same coordinate units as the resolved CRS.")
             },
         }

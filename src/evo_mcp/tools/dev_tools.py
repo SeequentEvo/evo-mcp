@@ -104,9 +104,7 @@ async def _publish_one(
     typed_payload = descriptor.from_dict(raw)
 
     if "create" not in descriptor.supported_publish_modes:
-        raise ValueError(
-            f"{descriptor.display_name} fixtures are import-only and cannot be published."
-        )
+        raise ValueError(f"{descriptor.display_name} fixtures are import-only and cannot be published.")
 
     object_path = f"{path_prefix}/{descriptor.fixture_path_segment}/{name}.json"
     published_obj = await descriptor.publish_create(context, typed_payload, object_path)
@@ -125,9 +123,7 @@ async def _publish_one(
                 description=typed_payload.description,
                 coordinate_reference_system=typed_payload.coordinate_reference_system,
                 block_model_uuid=published_obj.block_model_uuid,
-                block_model_version_uuid=getattr(
-                    published_obj, "block_model_version_uuid", None
-                ),
+                block_model_version_uuid=getattr(published_obj, "block_model_version_uuid", None),
                 geometry=published_obj.geometry,
                 attributes=list(published_obj.attributes),
             )
@@ -301,9 +297,7 @@ def register_dev_tools(mcp) -> None:
             for name in names_to_seed:
                 raw = all_fixtures.get(name)
                 if raw is None:
-                    file_errors[name] = (
-                        f"'{name}' not found. Available: {list(all_fixtures.keys())}"
-                    )
+                    file_errors[name] = f"'{name}' not found. Available: {list(all_fixtures.keys())}"
                     total_errors += 1
                     continue
 
@@ -311,15 +305,11 @@ def register_dev_tools(mcp) -> None:
                 if seed_mode is None:
                     file_errors[name] = f"Fixture '{name}' has no 'seed_mode' field."
                     total_errors += 1
-                    logger.warning(
-                        "Fixture '%s' in '%s' missing seed_mode.", name, fixture_file
-                    )
+                    logger.warning("Fixture '%s' in '%s' missing seed_mode.", name, fixture_file)
                     continue
 
                 if seed_mode not in _VALID_SEED_MODES:
-                    file_errors[name] = (
-                        f"Invalid seed_mode '{seed_mode}' on fixture '{name}'."
-                    )
+                    file_errors[name] = f"Invalid seed_mode '{seed_mode}' on fixture '{name}'."
                     total_errors += 1
                     continue
 
@@ -341,9 +331,7 @@ def register_dev_tools(mcp) -> None:
                 except Exception as exc:
                     file_errors[name] = str(exc)
                     total_errors += 1
-                    logger.error(
-                        "Failed to seed '%s' from '%s': %s", name, fixture_file, exc
-                    )
+                    logger.error("Failed to seed '%s' from '%s': %s", name, fixture_file, exc)
 
             results[fixture_file] = {
                 "staged": file_staged,
@@ -351,17 +339,11 @@ def register_dev_tools(mcp) -> None:
                 "errors": file_errors,
             }
 
-        msg_parts = [
-            f"Seeded {total_staged + total_published} fixture(s) from"
-            f" {len(loaded)} file(s)."
-        ]
+        msg_parts = [f"Seeded {total_staged + total_published} fixture(s) from {len(loaded)} file(s)."]
         if total_staged:
             msg_parts.append(f"{total_staged} staged.")
         if total_published:
-            msg_parts.append(
-                f"{total_published} published to workspace"
-                f" '{workspace_name}' ({workspace_id})."
-            )
+            msg_parts.append(f"{total_published} published to workspace '{workspace_name}' ({workspace_id}).")
         if total_errors:
             msg_parts.append(f"{total_errors} error(s).")
         if load_errors:

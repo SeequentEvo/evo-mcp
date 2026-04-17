@@ -160,9 +160,7 @@ def register_compute_tools(mcp) -> None:
         target_reference = str(scenario.target.object)
         target_object_id = target_reference.rstrip("/").split("/")[-1].split("?")[0]
         links = build_links_from_metadata(environment, target_object_id)
-        requested_attribute = getattr(
-            scenario.target.attribute, "name", result.attribute_name
-        )
+        requested_attribute = getattr(scenario.target.attribute, "name", result.attribute_name)
         return {
             "status": "success",
             "message": result.message,
@@ -210,14 +208,9 @@ def register_compute_tools(mcp) -> None:
         environment = await get_workspace_environment(workspace_id)
         context = StaticContext.from_environment(environment, evo_context.connector)
 
-        results = await run_compute(
-            context, scenarios, preview=True, fb=MCPFeedback(ctx)
-        )
+        results = await run_compute(context, scenarios, preview=True, fb=MCPFeedback(ctx))
         return {
             "status": "success",
             "scenarios_completed": len(results),
-            "results": [
-                _format_single_result(r, scenario, environment)
-                for r, scenario in zip(results, scenarios)
-            ],
+            "results": [_format_single_result(r, scenario, environment) for r, scenario in zip(results, scenarios)],
         }

@@ -42,9 +42,7 @@ class ObjectResolver:
             ResolutionError: If the reference is ambiguous or not found.
         """
         if name is None and object_type is None:
-            raise ResolutionError(
-                "Provide an object name or type to resolve a reference."
-            )
+            raise ResolutionError("Provide an object name or type to resolve a reference.")
 
         candidates = list(entries.values())
 
@@ -53,9 +51,7 @@ class ObjectResolver:
 
         # 1. Exact name + type
         if object_type is not None:
-            exact = [
-                e for e in candidates if e.name == name and e.object_type == object_type
-            ]
+            exact = [e for e in candidates if e.name == name and e.object_type == object_type]
             if len(exact) == 1:
                 return exact[0]
             if len(exact) > 1:

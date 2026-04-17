@@ -168,9 +168,7 @@ def resolve_crs(
 
     if isinstance(coordinate_reference_system, str):
         return (
-            int(coordinate_reference_system)
-            if coordinate_reference_system.isdigit()
-            else coordinate_reference_system
+            int(coordinate_reference_system) if coordinate_reference_system.isdigit() else coordinate_reference_system
         )
 
     return coordinate_reference_system

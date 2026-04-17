@@ -85,10 +85,7 @@ def register_skills_sync_tools(mcp, skills_folder: Path):
                 "failed": [],
             }
 
-        available_skills = [
-            d for d in skills_folder.iterdir()
-            if d.is_dir() and (d / "SKILL.md").exists()
-        ]
+        available_skills = [d for d in skills_folder.iterdir() if d.is_dir() and (d / "SKILL.md").exists()]
 
         # Filter to requested skills if specified
         if skills:
@@ -151,7 +148,5 @@ def register_skills_sync_tools(mcp, skills_folder: Path):
             "synced": synced,
             "skipped": skipped,
             "failed": failed,
-            "summary": (
-                f"{len(synced)} synced, {len(skipped)} skipped, {len(failed)} failed."
-            ),
+            "summary": (f"{len(synced)} synced, {len(skipped)} skipped, {len(failed)} failed."),
         }

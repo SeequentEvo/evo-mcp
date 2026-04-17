@@ -101,8 +101,6 @@ def _validate_grid_geometry(block_size: Any, n_blocks: Any, label: str = "") -> 
 
     prefix = f"{label} " if label else ""
     if block_size.dx <= 0 or block_size.dy <= 0 or block_size.dz <= 0:
-        raise StageValidationError(
-            f"{prefix}Block sizes must all be greater than zero."
-        )
+        raise StageValidationError(f"{prefix}Block sizes must all be greater than zero.")
     if n_blocks.nx < 1 or n_blocks.ny < 1 or n_blocks.nz < 1:
         raise StageValidationError(f"{prefix}n_blocks must all be >= 1.")
