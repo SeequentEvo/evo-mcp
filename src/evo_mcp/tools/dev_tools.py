@@ -5,7 +5,7 @@
 """Dev-only MCP tools for internal staging inspection and fixture management.
 
 All tools in this module are gated behind MCP_DEV_MODE=true and are NOT
-exposed in production. Staging is an internal implementation detail.
+exposed in production.
 
 Tools:
   - staging_get_info, staging_clone, staging_gc
@@ -36,11 +36,7 @@ _VALID_SEED_MODES = ("staged", "workspace", "both")
 
 
 def _resolve_fixture_path(fpath: str) -> Path:
-    """Resolve fixture file paths from either CWD or repo root.
-
-    This keeps relative paths like ``skills-dev/.../fixtures.json`` working even
-    when the MCP process is launched from a parent directory.
-    """
+    """Resolve fixture file paths from either CWD or repo root."""
     candidate = Path(fpath).expanduser()
     if candidate.is_absolute():
         return candidate
@@ -219,9 +215,6 @@ def register_dev_tools(mcp) -> None:
 
         Args:
             fixture_files: One or more paths to ``fixtures.json`` files.
-                Pass a single-element list for a per-skill run, or multiple
-                paths to seed several skills in one call.
-                Example: ``["skills/evo-kriging-execute/evals/fixtures.json"]``
             fixture_names: Optional allow-list of fixture keys. When provided,
                 only fixtures whose key appears in this list are seeded across
                 all provided files.
