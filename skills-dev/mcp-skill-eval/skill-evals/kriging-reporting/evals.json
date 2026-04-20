@@ -1,0 +1,36 @@
+{
+  "skill_name": "kriging-reporting",
+  "setup": {
+    "steps": [
+      {"step": 0, "tool": "staging_reset", "args": {}},
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/kriging-reporting/fixtures.json"]}},
+      {"step": 2, "tool": "kriging_run", "args": {}, "note": "Run a kriging scenario using the published objects to produce estimated attributes on the block model"}
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Show me the results of the kriging run — which attributes were created and where can I inspect them?",
+      "expected_output": "A summary of the completed kriging run is returned listing the newly created estimated attributes on the target block model, along with portal or viewer links for inspection",
+      "category": "single-run-results"
+    },
+    {
+      "id": 2,
+      "prompt": "Summarize all three kriging scenarios and tell me which ones completed successfully",
+      "expected_output": "A comparative summary of three kriging scenarios is provided, showing each scenario's status and highlighting which completed successfully with their key output metrics",
+      "category": "multi-scenario-summary"
+    },
+    {
+      "id": 3,
+      "prompt": "What should I do after kriging completes?",
+      "expected_output": "Guidance on recommended next steps after kriging, such as validating estimation results, reviewing block model statistics, or visualising the estimated block model alongside the source data",
+      "category": "post-kriging-next-steps"
+    },
+    {
+      "id": 4,
+      "prompt": "I ran ordinary and simple kriging side by side — can you show me a comparison chart of the two sets of estimates?",
+      "expected_output": "A plotly box plot or equivalent comparison visualisation is generated showing the distribution of estimated values from each scenario side by side, allowing the user to visually compare ordinary vs simple kriging results.",
+      "category": "scenario-comparison-visualization"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "skill_name": "validate-crs",
+  "setup": {
+    "steps": [
+      {"step": 0, "tool": "staging_reset", "args": {}},
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/validate-crs/fixtures.json"]}}
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Check if my VCU Test Point Set and VCU Test Block Model are in the same coordinate system",
+      "expected_output": "Both objects' coordinate reference systems are compared and a clear compatible verdict is returned, confirming they share EPSG:32650",
+      "category": "compatible-crs-check"
+    },
+    {
+      "id": 2,
+      "prompt": "Are my VCU NAD27 Samples compatible with my VCU UTM Zone 50 Block Model?",
+      "expected_output": "The CRS mismatch between EPSG:4267 and EPSG:32750 is detected and reported, with a clear incompatible verdict and guidance on resolving the discrepancy",
+      "category": "crs-mismatch-detection"
+    },
+    {
+      "id": 3,
+      "prompt": "My VCU Unspecified CRS Samples don't have a coordinate system defined — can I still use them with my VCU Test Block Model?",
+      "expected_output": "The missing CRS on the source data is flagged as unknown. The result indicates the compatibility cannot be determined and guidance is given on the risk of proceeding without a defined CRS",
+      "category": "unknown-crs-handling"
+    },
+    {
+      "id": 4,
+      "prompt": "Validate the spatial compatibility between my VCU Test Point Set and VCU Test Block Model before I proceed",
+      "expected_output": "A spatial compatibility check is performed comparing coordinate reference systems of both objects, returning a pass result with the shared CRS confirmed",
+      "category": "workflow-gate-validation"
+    },
+    {
+      "id": 5,
+      "prompt": "Neither my VCU Unspecified CRS Samples nor my VCU Unspecified CRS Block Model have a CRS defined — can I still run estimation?",
+      "expected_output": "Both objects are flagged as missing CRS. The result indicates compatibility cannot be determined and warns that proceeding without defined coordinate systems carries risk of spatial errors",
+      "category": "both-objects-missing-crs"
+    }
+  ]
+}

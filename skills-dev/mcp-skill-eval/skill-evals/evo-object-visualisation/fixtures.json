@@ -1,0 +1,92 @@
+{
+  "eov_standard_point_set": {
+    "seed_mode": "workspace",
+    "object_type": "point_set",
+    "name": "EOV Test Point Set",
+    "description": "Five-point grade sample set for visualisation eval use",
+    "coordinate_reference_system": 32650,
+    "data": {
+      "coordinates": {
+        "x": [
+          1000.0,
+          1010.0,
+          1020.0,
+          1030.0,
+          1040.0
+        ],
+        "y": [
+          2000.0,
+          2010.0,
+          2020.0,
+          2030.0,
+          2040.0
+        ],
+        "z": [
+          300.0,
+          310.0,
+          320.0,
+          330.0,
+          340.0
+        ]
+      },
+      "attributes": {
+        "GRADE": [
+          0.45,
+          0.52,
+          0.38,
+          0.61,
+          0.47
+        ]
+      }
+    }
+  },
+  "eov_regular_block_model": {
+    "seed_mode": "workspace",
+    "object_type": "regular_block_model",
+    "name": "EOV Test Block Model",
+    "description": "5x4x3 block model at 10m resolution for visualisation eval use",
+    "coordinate_reference_system": 32650,
+    "origin": {
+      "x": 1000.0,
+      "y": 2000.0,
+      "z": 300.0
+    },
+    "n_blocks": {
+      "nx": 5,
+      "ny": 4,
+      "nz": 3
+    },
+    "block_size": {
+      "dx": 10.0,
+      "dy": 10.0,
+      "dz": 10.0
+    }
+  },
+  "test_variogram": {
+    "seed_mode": "staged",
+    "object_type": "variogram",
+    "name": "EOV Test Variogram",
+    "description": "Single-structure spherical variogram for visualisation routing eval",
+    "sill": 1.1,
+    "is_rotation_fixed": false,
+    "structures": [
+      {
+        "variogram_type": "spherical",
+        "contribution": 1.0,
+        "anisotropy": {
+          "ellipsoid_ranges": {
+            "major": 200.0,
+            "semi_major": 150.0,
+            "minor": 100.0
+          },
+          "rotation": {
+            "dip_azimuth": 0.0,
+            "dip": 0.0,
+            "pitch": 0.0
+          }
+        }
+      }
+    ],
+    "nugget": 0.1
+  }
+}
