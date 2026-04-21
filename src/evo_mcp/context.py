@@ -3,291 +3,138 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Configuration and Context Management for Evo SDK.
+Context entrypoint for Evo MCP tools.
 
-This module handles connection initialization, OAuth authentication,
-and client management for the Evo platform.
+Re-exports the context classes from ``evo_mcp.contexts`` and provides the
+public ``get_evo_context()`` function that every tool calls.
+
+See ``evo_mcp/contexts/`` for the class implementations:
+  - base.py       — EvoContextBase (ABC)
+  - managed.py    — ManagedAuthContext  (CLIENT_DELEGATED_AUTH=false)
+  - delegated.py  — DelegatedAuthContext (CLIENT_DELEGATED_AUTH=true)
 """
 
-import json
+import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Optional
-from uuid import UUID
 
-import jwt
+from cachetools import TTLCache
 from dotenv import load_dotenv
-from evo.aio import AioTransport
-from evo.common import APIConnector
-from evo.discovery import DiscoveryAPIClient
-from evo.files import FileAPIClient
-from evo.oauth import (
-    AccessTokenAuthorizer,
-    AuthorizationCodeAuthorizer,
-    ClientCredentialsAuthorizer,
-    EvoScopes,
-    OAuthConnector,
-)
-from evo.objects import ObjectAPIClient
-from evo.workspaces import WorkspaceAPIClient
+
+from evo_mcp.contexts import DelegatedAuthContext, EvoContextBase, ManagedAuthContext
+from evo_mcp.contexts.helpers import get_client_session_id
 
 # Load environment variables from .env file
-# Look for .env in the project root (parent of src directory)
 env_path = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# Set up local logger for this module
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") == "1" else logging.INFO)
 
 
-class EvoContext:
-    """Maintains Evo SDK connection state and clients."""
+class _CleanupTTLCache(TTLCache):
+    """TTLCache that calls ``cleanup()`` on evicted values.
 
-    def __init__(self):
-        self.transport: Optional[AioTransport] = None
-        self.connector: Optional[APIConnector] = None
-        self.workspace_client: Optional[WorkspaceAPIClient] = None
-        self.discovery_client: Optional[DiscoveryAPIClient] = None
-        self._initialized: bool = False
-        self.org_id: Optional[UUID] = None
-        self.hub_url: Optional[str] = None
-        repo_root = Path(__file__).parent.parent.parent
-        self.cache_path = repo_root / ".cache"
-        if not self.cache_path.exists():
-            self.cache_path.mkdir()
+    When a ``DelegatedAuthContext`` is evicted (TTL expiry or maxsize), its
+    temporary directory is cleaned up promptly instead of waiting for GC.
+    The matching ``session_locks`` entry is also removed.
+    """
 
-        self._cached_variables = [
-            "org_id",
-            "hub_url",
-        ]
+    def __init__(self, *args, locks: dict, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._locks = locks
 
-    def load_variables_from_cache(self):
-        try:
-            with open(self.cache_path / "variables.json", encoding="utf-8") as f:
-                variables = json.load(f)
-        except FileNotFoundError:
-            return
-
-        for var in self._cached_variables:
-            if hasattr(self, var):
-                if var == "org_id":
-                    # TODO: put persistent variables in a pydantic model or
-                    # something to avoid this special casing here and in
-                    # save_....
-                    variables[var] = UUID(variables[var])
-                setattr(self, var, variables[var])
-
-    def save_variables_to_cache(self):
-        variables = {}
-
-        for var in self._cached_variables:
-            if getattr(self, var):
-                variables[var] = getattr(self, var)
-                if isinstance(variables[var], UUID):
-                    variables[var] = str(variables[var])
-
-        with open(self.cache_path / "variables.json", "w", encoding="utf-8") as f:
-            json.dump(variables, f)
-
-    def get_access_token_from_cache(self) -> Optional[str]:
-        """Retrieve access token from cache if valid, else return None."""
-        # Token cache file location - use repo directory for easier debugging
-        token_cache_path = self.cache_path / "evo_token_cache.json"
-        # Try to load cached token first
-
-        logger.debug(f"Checking for cached token at {token_cache_path}")
-        if token_cache_path.exists():
+    def _cleanup_value(self, key: str, value: object) -> None:
+        cleanup = getattr(value, "cleanup", None)
+        if callable(cleanup):
             try:
-                with open(token_cache_path, "r") as f:
-                    token_data = json.load(f)
+                cleanup()
+            except Exception:
+                logger.exception("Failed to clean up context for session %s", key)
+        self._locks.pop(key, None)
 
-                logger.debug("Found cached token, verifying its validity...")
-                access_token = token_data.get("access_token")
-                if not access_token:
-                    raise ValueError("Access token not found in cache")
+    def __delitem__(self, key):
+        value = self[key]
+        super().__delitem__(key)
+        self._cleanup_value(key, value)
 
-                # Verify token is not expired
-                jwt.decode(access_token, options={"verify_signature": False, "verify_exp": True})
+    def pop(self, key, *args):
+        if key in self:
+            value = self[key]
+            result = super().pop(key)
+            self._cleanup_value(key, value)
+            return result
+        return super().pop(key, *args)
 
-                logger.debug("Cached token appears to be valid and not expired.")
-                return access_token
+    def popitem(self):
+        key, value = super().popitem()
+        self._cleanup_value(key, value)
+        return key, value
 
-            except Exception as e:
-                # Token expired or invalid, need to re-authenticate
-                logger.info(f"Cached token invalid or expired: {type(e).__name__} - {str(e)}")
-        else:
-            logger.info(f"No cached token found at {token_cache_path}")
-        return None
+    def clear(self):
+        items = list(self.items())
+        super().clear()
+        for key, value in items:
+            self._cleanup_value(key, value)
 
-    def save_access_token_to_cache(self, access_token: str) -> None:
-        """Save access token to cache file."""
-        token_cache_path = self.cache_path / "evo_token_cache.json"
-        with open(token_cache_path, "w") as f:
-            json.dump({"access_token": access_token}, f)
-        logger.info(f"Access token saved to cache at {token_cache_path}")
 
-    def get_transport(self) -> AioTransport:
-        if self.transport is not None:
-            return self.transport
-        from evo_mcp import __dist_name__, __version__
+delegated_mode: bool = False
+managed_context: ManagedAuthContext | None = None
 
-        self.transport = AioTransport(user_agent=f"{__dist_name__}/{__version__}")
-        return self.transport
+SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "3600"))
+MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "1000"))
+session_locks: dict[str, asyncio.Lock] = {}
+delegated_contexts: TTLCache[str, DelegatedAuthContext] = _CleanupTTLCache(
+    maxsize=MAX_SESSIONS,
+    ttl=SESSION_TTL_SECONDS,
+    locks=session_locks,
+)
 
-    async def get_access_token_via_client_credentials(self) -> str:
-        logger.debug("Obtaining a new service token")
-        client_id = os.getenv("EVO_CLIENT_ID")
-        client_secret = os.getenv("EVO_CLIENT_SECRET")
-        issuer_url = os.getenv("ISSUER_URL")
-        if not client_id or not client_secret:
-            raise ValueError(
-                "EVO_CLIENT_ID and EVO_CLIENT_SECRET environment variables are required with client credentials authentication method"
-            )
+# TODO: Move this to an environment manager module
+MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio").lower()
+CLIENT_DELEGATED_AUTH_ENV = os.getenv("CLIENT_DELEGATED_AUTH", "false").lower() in ("true", "1")
+AUTH_METHOD = os.getenv("AUTH_METHOD", "native_app").lower()
 
-        transport = self.get_transport()
-        oauth_connector = OAuthConnector(
-            transport=transport, client_id=client_id, client_secret=client_secret, base_uri=issuer_url
+if CLIENT_DELEGATED_AUTH_ENV and MCP_TRANSPORT == "http":
+    if AUTH_METHOD == "client_credentials":
+        raise ValueError(
+            "CLIENT_DELEGATED_AUTH=true is not supported with AUTH_METHOD=client_credentials. "
+            "Delegated auth requires AUTH_METHOD=native_app (interactive browser login)."
         )
-        authorizer = ClientCredentialsAuthorizer(oauth_connector, scopes=EvoScopes.all_evo)
-
-        headers = await authorizer.get_default_headers()
-        auth_header = headers.get("Authorization", "")
-
-        if auth_header.startswith("Bearer "):
-            return auth_header[7:]  # Remove 'Bearer ' prefix
-        else:
-            logger.error("ERROR: Could not extract access token from headers")
-            raise ValueError("Failed to obtain access token from OAuth login")
-
-    async def get_access_token_via_user_login(self) -> str:
-        # Set up OAuth authentication (following SDK example pattern)
-        redirect_url = os.getenv("EVO_REDIRECT_URL")
-        client_id = os.getenv("EVO_CLIENT_ID")
-        issuer_url = os.getenv("ISSUER_URL")
-        if not client_id:
-            raise ValueError("EVO_CLIENT_ID environment variable is required")
-
-        logger.info("Starting OAuth login flow...")
-        transport = self.get_transport()
-        oauth_connector = OAuthConnector(transport=transport, client_id=client_id, base_uri=issuer_url)
-        auth_code_authorizer = AuthorizationCodeAuthorizer(
-            oauth_connector=oauth_connector, redirect_url=redirect_url, scopes=EvoScopes.all_evo
-        )
-
-        # Perform OAuth login (this gets the access token)
-        await auth_code_authorizer.login()
-        logger.info("OAuth login completed")
-
-        # Extract access token from the Authorization header
-        headers = await auth_code_authorizer.get_default_headers()
-        auth_header = headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            return auth_header[7:]  # Remove 'Bearer ' prefix
-        else:
-            logger.error("ERROR: Could not extract access token from headers")
-            raise ValueError("Failed to obtain access token from OAuth login")
-
-    async def get_authorizer(self) -> AccessTokenAuthorizer:
-        """Create an OAuth authorizer based on environment variables."""
-        access_token = self.get_access_token_from_cache()
-
-        # If no valid cached token, do full OAuth login
-        if access_token is None:
-            auth_method = os.environ.get("AUTH_METHOD")
-            if auth_method == "client_credentials":
-                access_token = await self.get_access_token_via_client_credentials()
-            else:
-                access_token = await self.get_access_token_via_user_login()
-            self.save_access_token_to_cache(access_token)
-
-        authorizer = AccessTokenAuthorizer(access_token=access_token)
-
-        return authorizer
-
-    async def initialize(self):
-        """Initialize connection to Evo platform with OAuth authentication."""
-        if self._initialized and self.get_access_token_from_cache() is not None:
-            return
-
-        # Get configuration from environment variables
-        discovery_url = os.getenv("EVO_DISCOVERY_URL")
-
-        self.load_variables_from_cache()
-
-        transport = self.get_transport()
-        authorizer = await self.get_authorizer()
-
-        # Use Discovery API to get organization and hub details
-        discovery_connector = APIConnector(discovery_url, transport, authorizer)
-        self.discovery_client = DiscoveryAPIClient(discovery_connector)
-
-        if not self.org_id or not self.hub_url:
-            # Get default organization
-            organizations = await self.discovery_client.list_organizations()
-
-            if not organizations:
-                raise ValueError(
-                    "The authenticated user does not have access to any Evo instances. They may need to contact their administrator to be added to an Evo instance or to resolve any licensing issues."
-                )
-
-            org = organizations[0]
-            self.org_id = org.id
-
-            if not org.hubs:
-                raise ValueError(
-                    f"Organization {self.org_id} has no hubs configured. "
-                    f"This may indicate a licensing or permission issue."
-                )
-
-            # There is only one hub for an organization
-            self.hub_url = org.hubs[0].url
-
-        # Create connector for the hub
-        self.connector = APIConnector(self.hub_url, transport, authorizer)
-
-        # Create workspace client
-        self.workspace_client = WorkspaceAPIClient(self.connector, self.org_id)
-        self._initialized = True
-
-        self.save_variables_to_cache()
-
-    async def get_object_client(self, workspace_id: UUID) -> ObjectAPIClient:
-        """Get or create an object client for a workspace."""
-        workspace = await self.workspace_client.get_workspace(workspace_id)
-        environment = workspace.get_environment()
-        return ObjectAPIClient(environment, self.connector)
-
-    async def get_file_client(self, workspace_id: UUID) -> FileAPIClient:
-        """Get or create a file client for a workspace."""
-        workspace = await self.workspace_client.get_workspace(workspace_id)
-        environment = workspace.get_environment()
-        return FileAPIClient(environment, self.connector)
-
-    async def switch_instance(self, org_id: UUID, hub_url: str):
-        """Switch to a different instance and recreate clients.
-
-        Args:
-            org_id: The organization/instance UUID to switch to
-            hub_url: The hub URL for the new instance
-        """
-        self.org_id = org_id
-        self.hub_url = hub_url
-
-        # Recreate connector for the new hub URL
-        # Reuse existing transport and authorizer from the current connector
-        self.connector = APIConnector(self.hub_url, self.connector._transport, self.connector._authorizer)
-
-        # Recreate workspace client with new connector and org_id
-        self.workspace_client = WorkspaceAPIClient(self.connector, self.org_id)
-
-        self.save_variables_to_cache()
+    delegated_mode = True
+    logger.info("Using client-delegated authentication mode")
+else:
+    delegated_mode = False
+    logger.info("Using managed authentication mode")
 
 
-evo_context = EvoContext()
+async def get_evo_context() -> EvoContextBase:
+    """Return an initialized context for the current request.
 
+    In managed mode, returns the single shared ManagedAuthContext.
+    In delegated mode, looks up (or creates) a DelegatedAuthContext
+    keyed by the MCP session ID.  On every request the context is
+    re-initialized with the current access token, rebuilding API clients
+    cleanly while preserving instance selection via seeds.
+    """
+    if not delegated_mode:
+        global managed_context
+        if managed_context is None:
+            managed_context = ManagedAuthContext()
+        await managed_context.initialize()
+        return managed_context
 
-async def ensure_initialized():
-    """Ensure Evo context is initialized before any tool is called."""
-    await evo_context.initialize()
+    session_id = get_client_session_id()
+
+    # Per-session lock prevents duplicate context creation when
+    # concurrent requests arrive for the same new session.
+    lock = session_locks.setdefault(session_id, asyncio.Lock())
+    async with lock:
+        context = delegated_contexts.get(session_id)
+        if context is None:
+            context = DelegatedAuthContext(client_session_id=session_id)
+        await context.initialize()
+        # Re-insert resets TTL timer
+        delegated_contexts[session_id] = context
+        return context

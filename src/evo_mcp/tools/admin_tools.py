@@ -9,7 +9,7 @@ MCP tools for workspace management operations.
 from datetime import datetime
 from uuid import UUID
 
-from evo_mcp.context import ensure_initialized, evo_context
+from evo_mcp.context import get_evo_context
 from evo_mcp.utils.evo_data_utils import copy_object_data, extract_data_references
 
 
@@ -25,7 +25,7 @@ def register_admin_tools(mcp):
             description: Workspace description
             labels: Workspace labels (optional list)
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
 
         workspace = await evo_context.workspace_client.create_workspace(
             name=name, description=description, labels=labels or []
@@ -45,7 +45,7 @@ def register_admin_tools(mcp):
         Args:
             workspace_id: Workspace UUID
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         file_client = await evo_context.get_file_client(UUID(workspace_id))
 
@@ -94,7 +94,7 @@ def register_admin_tools(mcp):
         Returns:
             Snapshot metadata and object version information
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         object_client = await evo_context.get_object_client(UUID(workspace_id))
         workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
 
@@ -162,7 +162,7 @@ def register_admin_tools(mcp):
             object_id: Object UUID to copy
             version: Specific version ID (optional)
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
         source_client = await evo_context.get_object_client(UUID(source_workspace_id))
         target_client = await evo_context.get_object_client(UUID(target_workspace_id))
 
@@ -205,7 +205,7 @@ def register_admin_tools(mcp):
             schema_filter: Filter by object types (optional list)
             name_filter: Filter by object names (optional list)
         """
-        await ensure_initialized()
+        evo_context = await get_evo_context()
 
         # Create target workspace
         target_workspace = await evo_context.workspace_client.create_workspace(

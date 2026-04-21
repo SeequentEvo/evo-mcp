@@ -12,7 +12,7 @@ including workspace management, object operations, and data transfer capabilitie
 import importlib.metadata
 from pathlib import Path
 
-from .context import EvoContext, ensure_initialized
+from .context import get_evo_context
 
 try:
     import tomllib
@@ -44,4 +44,4 @@ except (KeyError, IndexError, importlib.metadata.PackageNotFoundError):
         # If tomllib is not available or file is not found, use hardcoded defaults.
         pass
 
-__all__ = ["EvoContext", "__dist_name__", "__version__", "ensure_initialized"]
+__all__ = ["__dist_name__", "__version__", "get_evo_context"]
