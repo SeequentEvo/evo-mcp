@@ -60,14 +60,19 @@ The server comes packaged with many tools written by Seequent, but it is fully e
 ```mermaid
 flowchart LR
     Clients["🖥️ MCP Clients<br/>VS Code · Cursor<br/>Claude Desktop · ADK"]
-    Clients -- stdio / streamable HTTP --> Server
+    Clients -- "stdio / streamable HTTP" --> Server
     Server -- HTTPS --> APIs
 
-    subgraph Server[Evo MCP Server]
-        Tools[Tool Modules<br/>General · Admin<br/>Data · Filesystem]
+    subgraph Server["Evo MCP Server (FastMCP)"]
+        Tools["Tool Modules<br/>General · Admin<br/>Data · Filesystem"]
         Filter[MCP_TOOL_FILTER]
-        Context[EvoContext<br/>OAuth · Tokens]
+        Context[EvoContext<br/>per-session or shared]
+        Proxy["OIDCProxy<br/>(delegated auth only)"]
         Tools --> Filter --> Context
+    end
+
+    subgraph IMS["Bentley IMS"]
+        OIDC[OAuth 2.0 / OIDC]
     end
 
     subgraph APIs[Evo APIs]
@@ -75,7 +80,12 @@ flowchart LR
         Workspace[Workspace]
         Object[Object]
     end
+
+    Proxy -- "Authorization Code + PKCE" --> OIDC
+    Context -. "server-managed auth<br/>(native_app / client_credentials)" .-> OIDC
 ```
+
+> See [docs/authentication.md](docs/authentication.md) for detailed sequence diagrams and session lifecycle.
 
 ### Key components
 
