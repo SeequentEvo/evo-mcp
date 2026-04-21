@@ -82,8 +82,8 @@ flowchart LR
         Object[Object]
     end
 
-    Proxy -- "Authorization Code + PKCE" --> OIDC
-    Context -. "server-managed auth<br/>(native_app / client_credentials)" .-> OIDC
+    Proxy -- "Proxied OAuth<br/>(delegated)" --> OIDC
+    Context -. "Direct OAuth<br/>(managed)" .-> OIDC
 ```
 
 > See [docs/authentication.md](docs/authentication.md) for detailed sequence diagrams and session lifecycle.

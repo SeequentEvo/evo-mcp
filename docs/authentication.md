@@ -18,45 +18,31 @@ The Evo MCP server supports two authentication modes depending on the deployment
 ## Components
 
 ```mermaid
-graph TB
-    subgraph Clients["AI Clients"]
-        VSCode["VS Code<br/>(Copilot)"]
-        Cursor[Cursor]
-        Claude["Claude Desktop"]
-        ADK["Google ADK /<br/>custom agents"]
-    end
+graph LR
+    Clients["🖥️ AI Clients<br/><sub>VS Code · Cursor · Claude Desktop · ADK</sub>"]
 
     subgraph MCP["Evo MCP Server"]
+        direction TB
         FastMCP["FastMCP Runtime"]
-        Proxy["OIDCProxy<br/><i>Authorization server</i>"]
-        Middleware["AuthMetadata<br/>PatchMiddleware"]
+        Proxy["OIDCProxy"]
         Tools["Tool Modules"]
-        MCtx["ManagedAuthContext<br/><i>single shared context</i>"]
-        DCtx["DelegatedAuthContext<br/><i>per-session context</i>"]
+        Context["EvoContext<br/><sub>managed or per-session</sub>"]
 
+        FastMCP --> Tools --> Context
         FastMCP --> Proxy
-        FastMCP --> Middleware
-        FastMCP --> Tools
-        Tools --> MCtx
-        Tools --> DCtx
+        Proxy -. "upstream token" .-> Context
     end
 
-    subgraph IMS["Bentley IMS (PingFederate)"]
-        AuthZ["OAuth 2.0 / OIDC<br/>Authorization Server"]
+    subgraph IMS["Bentley IMS"]
+        AuthZ["OAuth 2.0 / OIDC"]
     end
 
-    subgraph Evo["Evo Platform"]
-        Discovery["Discovery API"]
-        WS["Workspace API"]
-        Obj["Object API"]
-    end
+    Evo["Evo APIs<br/><sub>Discovery · Workspace · Object</sub>"]
 
-    VSCode & Cursor & Claude & ADK -- "stdio / streamable HTTP" --> FastMCP
-
-    Proxy -- "Authorization Code + PKCE<br/>(delegated mode)" --> AuthZ
-    MCtx -. "native_app / client_credentials<br/>(managed mode)" .-> AuthZ
-
-    MCtx & DCtx -- "Bearer token" --> Discovery & WS & Obj
+    Clients -- "stdio / streamable HTTP" --> FastMCP
+    Proxy -- "Proxied OAuth<br/>(delegated)" --> AuthZ
+    Context -. "Direct OAuth<br/>(managed)" .-> AuthZ
+    Context -- "Bearer token" --> Evo
 ```
 
 ## Server-managed authentication

@@ -57,7 +57,7 @@ HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
 
 # Whether to enable OAuth authentication for HTTP transport.
 # When enabled, the server acts as an OIDC proxy: MCP clients authenticate
-# via an OAuth browser flow (Dynamic Client Registration + PKCE), and the
+# via an OAuth browser flow (Dynamic Client Registration + Authorization Code), and the
 # server validates each request's token before forwarding it to Evo APIs.
 # This enables client-delegated auth — each connected client authenticates
 # independently and sees only the instances/workspaces their account has access to.
