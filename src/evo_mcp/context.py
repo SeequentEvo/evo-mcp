@@ -10,14 +10,12 @@ and client management for the Evo platform.
 """
 
 import json
-import logging
 import os
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
 import jwt
-from dotenv import load_dotenv
 from evo.aio import AioTransport
 from evo.common import APIConnector
 from evo.discovery import DiscoveryAPIClient
@@ -31,15 +29,35 @@ from evo.oauth import (
 )
 from evo.objects import ObjectAPIClient
 from evo.workspaces import WorkspaceAPIClient
+from fastmcp.utilities.logging import get_logger
 
-# Load environment variables from .env file
-# Look for .env in the project root (parent of src directory)
-env_path = Path(__file__).parent.parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
+from evo_mcp.env import load_repo_env
+
+# Load environment variables from .env in the repository root.
+load_repo_env()
 
 # Set up local logger for this module
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") == "1" else logging.INFO)
+logger = get_logger(__name__)
+_raw_log_level = os.environ.get("MCP_LOG_LEVEL")
+if _raw_log_level:
+    _context_log_level = _raw_log_level.upper()
+elif os.environ.get("DEBUG") == "1":
+    # Backward compatibility for older env files.
+    _context_log_level = "DEBUG"
+else:
+    _context_log_level = "INFO"
+
+_valid_log_levels = {
+    "CRITICAL",
+    "ERROR",
+    "WARNING",
+    "INFO",
+    "DEBUG",
+    "NOTSET",
+}
+if _context_log_level not in _valid_log_levels:
+    _context_log_level = "INFO"
+logger.setLevel(_context_log_level)
 
 
 class EvoContext:
@@ -97,7 +115,7 @@ class EvoContext:
         token_cache_path = self.cache_path / "evo_token_cache.json"
         # Try to load cached token first
 
-        logger.debug(f"Checking for cached token at {token_cache_path}")
+        logger.debug("Checking for cached token", extra={"token_cache_path": str(token_cache_path)})
         if token_cache_path.exists():
             try:
                 with open(token_cache_path, "r") as f:
@@ -116,9 +134,12 @@ class EvoContext:
 
             except Exception as e:
                 # Token expired or invalid, need to re-authenticate
-                logger.info(f"Cached token invalid or expired: {type(e).__name__} - {str(e)}")
+                logger.debug(
+                    "Cached token invalid or expired",
+                    extra={"error_type": type(e).__name__, "error": str(e)},
+                )
         else:
-            logger.info(f"No cached token found at {token_cache_path}")
+            logger.debug("No cached token found", extra={"token_cache_path": str(token_cache_path)})
         return None
 
     def save_access_token_to_cache(self, access_token: str) -> None:
@@ -126,7 +147,7 @@ class EvoContext:
         token_cache_path = self.cache_path / "evo_token_cache.json"
         with open(token_cache_path, "w") as f:
             json.dump({"access_token": access_token}, f)
-        logger.info(f"Access token saved to cache at {token_cache_path}")
+        logger.info("Access token saved to cache", extra={"token_cache_path": str(token_cache_path)})
 
     def get_transport(self) -> AioTransport:
         if self.transport is not None:
@@ -186,7 +207,7 @@ class EvoContext:
         if auth_header.startswith("Bearer "):
             return auth_header[7:]  # Remove 'Bearer ' prefix
         else:
-            logger.error("ERROR: Could not extract access token from headers")
+            logger.error("Could not extract access token from authorization headers")
             raise ValueError("Failed to obtain access token from OAuth login")
 
     async def get_authorizer(self) -> AccessTokenAuthorizer:
