@@ -69,6 +69,7 @@ flowchart LR
         Context[EvoContext<br/>per-session or shared]
         Proxy["OIDCProxy<br/>(delegated auth only)"]
         Tools --> Filter --> Context
+        Proxy -. "upstream token" .-> Context
     end
 
     subgraph IMS["Bentley IMS"]
