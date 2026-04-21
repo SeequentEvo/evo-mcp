@@ -13,8 +13,6 @@ from .filesystem_tools import register_filesystem_tools
 from .object_build_tools import register_object_builder_tools
 from .file_tools import register_file_tools
 from .instance_users_admin_tools import register_instance_users_admin_tools
-from .duplicate_tools import register_duplicate_tools
-from .object_compare_tools import register_object_compare_tools
 
 __all__ = [
     'register_admin_tools',
@@ -24,6 +22,4 @@ __all__ = [
     'register_object_builder_tools',
     'register_file_tools',
     'register_instance_users_admin_tools',
-    'register_duplicate_tools',
-    'register_object_compare_tools',
 ]

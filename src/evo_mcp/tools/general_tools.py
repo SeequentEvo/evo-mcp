@@ -7,80 +7,13 @@ MCP tools for general operations (health checks, object CRUD, etc).
 """
 
 import logging
-from typing import Any
 from uuid import UUID
 
 from fastmcp import Context
-from evo.objects.endpoints.models import MetadataUpdateBody
 
 from evo_mcp.context import evo_context, ensure_initialized
 
 logger = logging.getLogger(__name__)
-
-HIDDEN_INSTANCE_NAMES = {"BHP Exploration"}
-
-
-def _instance_display_name(instance: object) -> str:
-    if isinstance(instance, dict):
-        return str(instance.get("display_name") or instance.get("name") or "")
-    return str(getattr(instance, "display_name", getattr(instance, "name", "")) or "")
-
-
-def _visible_instances(instances: list[object]) -> list[object]:
-    return [
-        instance
-        for instance in instances
-        if _instance_display_name(instance) not in HIDDEN_INSTANCE_NAMES
-    ]
-
-
-def _stage_name(stage: Any) -> str:
-    if isinstance(stage, dict):
-        return str(stage.get("name") or "")
-    return str(getattr(stage, "name", "") or "")
-
-
-def _stage_id(stage: Any) -> str:
-    if isinstance(stage, dict):
-        return str(stage.get("id") or stage.get("stage_id") or "")
-    return str(getattr(stage, "id", getattr(stage, "stage_id", "")) or "")
-
-
-def _serialize_stage(stage: Any) -> dict[str, str] | None:
-    if not stage:
-        return None
-    return {
-        "id": _stage_id(stage),
-        "name": _stage_name(stage),
-    }
-
-
-def _available_stage_names(stages: list[Any]) -> str:
-    names = sorted({_stage_name(stage) for stage in stages if _stage_name(stage)})
-    return ", ".join(names) if names else "none"
-
-
-def _resolve_target_stage(stages: list[Any], *, stage_id: str = "", stage_name: str = "") -> Any:
-    if bool(stage_id) == bool(stage_name):
-        raise ValueError("Provide exactly one of stage_id or stage_name.")
-
-    if stage_id:
-        matching_stage = next((stage for stage in stages if _stage_id(stage) == stage_id), None)
-        if matching_stage is None:
-            raise ValueError(
-                f"Unknown stage_id '{stage_id}'. Available stages: {_available_stage_names(stages)}"
-            )
-        return matching_stage
-
-    normalized_name = stage_name.strip().casefold()
-    matches = [stage for stage in stages if _stage_name(stage).strip().casefold() == normalized_name]
-    if not matches:
-        raise ValueError(
-            f"Unknown stage_name '{stage_name}'. Available stages: {_available_stage_names(stages)}"
-        )
-    if len(matches) > 1:
-        raise ValueError(f"Stage name '{stage_name}' matched multiple stages; use stage_id instead.")
-    return matches[0]
 
 
 def register_general_tools(mcp):
@@ -281,108 +214,6 @@ def register_general_tools(mcp):
             "stage": obj.metadata.stage,
         }
 
-    @mcp.tool()
-    async def list_object_stages(workspace_id: str) -> dict:
-        """List the available object stages for the selected Evo instance.
-
-        Args:
-            workspace_id: Workspace UUID used to resolve the current instance
-        """
-        await ensure_initialized()
-
-        object_client = await evo_context.get_object_client(UUID(workspace_id))
-        stages = await object_client.list_stages()
-        serialized_stages = sorted(
-            [_serialize_stage(stage) for stage in stages if _serialize_stage(stage) is not None],
-            key=lambda stage: stage["name"].casefold(),
-        )
-
-        return {
-            "workspace_id": workspace_id,
-            "total_stages": len(serialized_stages),
-            "stages": serialized_stages,
-        }
-
-    @mcp.tool()
-    async def set_object_stage(
-        workspace_id: str,
-        object_id: str = "",
-        object_path: str = "",
-        stage_id: str = "",
-        stage_name: str = "",
-        version: str = "",
-        clear_stage: bool = False,
-    ) -> dict:
-        """Set or clear the stage metadata for an Evo object version.
-
-        Args:
-            workspace_id: Workspace UUID
-            object_id: Object UUID (provide either this or object_path)
-            object_path: Object path (provide either this or object_id)
-            stage_id: Target stage UUID (provide either this or stage_name)
-            stage_name: Target stage name (provide either this or stage_id)
-            version: Specific version ID to update (optional, defaults to latest)
-            clear_stage: Clear the stage metadata instead of setting it
-        """
-        await ensure_initialized()
-
-        if bool(object_id) == bool(object_path):
-            raise ValueError("Provide exactly one of object_id or object_path.")
-
-        if clear_stage:
-            if stage_id or stage_name:
-                raise ValueError("Do not provide stage_id or stage_name when clear_stage=True.")
-        else:
-            if not stage_id and not stage_name:
-                raise ValueError("Provide stage_id or stage_name, or set clear_stage=True.")
-            if stage_id and stage_name:
-                raise ValueError("Provide only one of stage_id or stage_name.")
-
-        object_client = await evo_context.get_object_client(UUID(workspace_id))
-
-        if object_id:
-            downloaded = await object_client.download_object_by_id(UUID(object_id), version=version or None)
-        else:
-            downloaded = await object_client.download_object_by_path(object_path, version=version or None)
-
-        resolved_object_id = UUID(str(downloaded.metadata.id))
-        resolved_version_id = int(version or downloaded.metadata.version_id)
-        previous_stage = _serialize_stage(downloaded.metadata.stage)
-
-        if clear_stage:
-            await object_client._metadata_api.update_metadata(
-                object_id=str(resolved_object_id),
-                org_id=str(object_client._environment.org_id),
-                workspace_id=str(object_client._environment.workspace_id),
-                metadata_update_body=MetadataUpdateBody(stage_id=None),
-                version_id=resolved_version_id,
-            )
-            return {
-                "status": "stage_cleared",
-                "workspace_id": workspace_id,
-                "object_id": str(resolved_object_id),
-                "path": downloaded.metadata.path,
-                "version_id": resolved_version_id,
-                "previous_stage": previous_stage,
-                "stage": None,
-            }
-
-        stages = await object_client.list_stages()
-        target_stage = _resolve_target_stage(stages, stage_id=stage_id, stage_name=stage_name)
-        target_stage_id = UUID(_stage_id(target_stage))
-
-        await object_client.set_stage(resolved_object_id, resolved_version_id, target_stage_id)
-
-        return {
-            "status": "stage_updated",
-            "workspace_id": workspace_id,
-            "object_id": str(resolved_object_id),
-            "path": downloaded.metadata.path,
-            "version_id": resolved_version_id,
-            "previous_stage": previous_stage,
-            "stage": _serialize_stage(target_stage),
-        }
-
 
     @mcp.tool()
     async def list_my_instances(
@@ -394,7 +225,7 @@ def register_general_tools(mcp):
         if evo_context.org_id:
             await ctx.info(f"Selected instance ID {evo_context.org_id}")
         instances = await evo_context.discovery_client.list_organizations()
-        return _visible_instances(instances)
+        return instances
 
     @mcp.tool()
     async def select_instance(
@@ -414,9 +245,7 @@ def register_general_tools(mcp):
         """
         await ensure_initialized()
 
-        instances = _visible_instances(
-            await evo_context.discovery_client.list_organizations()
-        )
+        instances = await evo_context.discovery_client.list_organizations()
         for instance in instances:
             if instance.id == instance_id or instance.display_name == instance_name:
                 await evo_context.switch_instance(instance.id, instance.hubs[0].url)

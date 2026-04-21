@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from evo_mcp.tools.object_compare_tools import _inspect_parquet_bytes, _resolve_object_side, register_object_compare_tools
+from evo_mcp.tools.admin_tools import _inspect_parquet_bytes, _resolve_object_side, register_admin_tools
 
 
 class _FakeMCP:
@@ -98,12 +98,12 @@ class CompareEvoObjectsDetailedTests(unittest.IsolatedAsyncioTestCase):
             }
 
         with (
-            patch("evo_mcp.tools.object_compare_tools._resolve_instance", AsyncMock(return_value={"id": "instance-1", "name": "Instance One", "hub_url": "https://hub.example.invalid"})),
-            patch("evo_mcp.tools.object_compare_tools._resolve_workspace", AsyncMock(return_value=fake_workspace)),
-            patch("evo_mcp.tools.object_compare_tools.APIConnector", return_value=object()),
-            patch("evo_mcp.tools.object_compare_tools.ObjectAPIClient", return_value=fake_object_client),
-            patch("evo_mcp.tools.object_compare_tools._inspect_data_link", side_effect=fake_inspect_data_link),
-            patch("evo_mcp.tools.object_compare_tools.evo_context", fake_evo_context),
+            patch("evo_mcp.tools.admin_tools._resolve_instance", AsyncMock(return_value={"id": "instance-1", "name": "Instance One", "hub_url": "https://hub.example.invalid"})),
+            patch("evo_mcp.tools.admin_tools._resolve_workspace", AsyncMock(return_value=fake_workspace)),
+            patch("evo_mcp.tools.admin_tools.APIConnector", return_value=object()),
+            patch("evo_mcp.tools.admin_tools.ObjectAPIClient", return_value=fake_object_client),
+            patch("evo_mcp.tools.admin_tools._inspect_data_link", side_effect=fake_inspect_data_link),
+            patch("evo_mcp.tools.admin_tools.evo_context", fake_evo_context),
         ):
             result = await _resolve_object_side(
                 side_name="left",
@@ -130,7 +130,7 @@ class CompareEvoObjectsDetailedTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_builds_json_and_parquet_summary_report(self) -> None:
         fake_mcp = _FakeMCP()
-        register_object_compare_tools(fake_mcp)
+        register_admin_tools(fake_mcp)
         compare_tool = fake_mcp.tools["compare_evo_objects_detailed"]
 
         async def fake_resolve_object_side(**kwargs):
@@ -219,7 +219,7 @@ class CompareEvoObjectsDetailedTests(unittest.IsolatedAsyncioTestCase):
                 ],
             }
 
-        with patch("evo_mcp.tools.object_compare_tools._resolve_object_side", side_effect=fake_resolve_object_side):
+        with patch("evo_mcp.tools.admin_tools._resolve_object_side", side_effect=fake_resolve_object_side):
             result = await compare_tool(
                 left_workspace_id="workspace-1",
                 left_object_id="object-1",

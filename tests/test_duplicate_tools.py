@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import UUID
 
-from evo_mcp.tools import duplicate_tools
+import evo_mcp.tools.admin_tools as admin_tools
 
 
 def _user(name: str) -> SimpleNamespace:
@@ -187,11 +187,11 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(duplicate_tools, "ensure_initialized", AsyncMock()),
-            patch.object(duplicate_tools, "evo_context", fake_context),
-            patch.object(duplicate_tools, "ObjectAPIClient", _FakeObjectAPIClient),
+            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
+            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
         ):
-            result = await duplicate_tools._run_duplicate_analysis(
+            result = await admin_tools._run_duplicate_analysis(
                 workspace_ids=[str(workspace.id)],
                 workspace_names=None,
                 max_concurrent=4,
@@ -199,10 +199,10 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(3, result["summary"]["total_objects_scanned"])
         self.assertEqual(1, result["summary"]["duplicate_object_pairs"])
-        self.assertIn((str(workspace.id), 0, duplicate_tools.DEFAULT_OBJECT_PAGE_SIZE), _FakeObjectAPIClient.LIST_CALLS)
-        self.assertIn((str(workspace.id), 0, duplicate_tools.DEFAULT_OBJECT_PAGE_SIZE // 2), _FakeObjectAPIClient.LIST_CALLS)
+        self.assertIn((str(workspace.id), 0, admin_tools.DEFAULT_OBJECT_PAGE_SIZE), _FakeObjectAPIClient.LIST_CALLS)
+        self.assertIn((str(workspace.id), 0, admin_tools.DEFAULT_OBJECT_PAGE_SIZE // 2), _FakeObjectAPIClient.LIST_CALLS)
         self.assertEqual(
-            [duplicate_tools.OBJECT_FETCH_TIMEOUT_SECONDS] * 3,
+            [admin_tools.OBJECT_FETCH_TIMEOUT_SECONDS] * 3,
             _FakeObjectAPIClient.OBJECT_TIMEOUTS,
         )
         pair = result["duplicate_pairs"][0]
@@ -229,9 +229,9 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
             return _ZeroProgressPage(offset=offset, limit=100, total=10)
 
         with self.assertRaisesRegex(RuntimeError, "No pagination progress while listing objects"):
-            await duplicate_tools._list_all_pages(
+            await admin_tools._list_all_pages(
                 fetch_page,
-                page_size=duplicate_tools.DEFAULT_OBJECT_PAGE_SIZE,
+                page_size=admin_tools.DEFAULT_OBJECT_PAGE_SIZE,
                 resource_name="objects",
             )
 
@@ -243,14 +243,14 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
             calls.append((offset, limit))
             return _FakePage(items=[workspace][offset : offset + limit], offset=offset, limit=limit, total=1)
 
-        result = await duplicate_tools._list_all_pages(
+        result = await admin_tools._list_all_pages(
             fetch_page,
-            page_size=duplicate_tools.DEFAULT_WORKSPACE_PAGE_SIZE,
+            page_size=admin_tools.DEFAULT_WORKSPACE_PAGE_SIZE,
             resource_name="workspaces",
         )
 
         self.assertEqual([workspace], result)
-        self.assertEqual([(0, duplicate_tools.DEFAULT_WORKSPACE_PAGE_SIZE)], calls)
+        self.assertEqual([(0, admin_tools.DEFAULT_WORKSPACE_PAGE_SIZE)], calls)
 
 
 if __name__ == "__main__":
