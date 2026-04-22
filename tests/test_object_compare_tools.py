@@ -5,13 +5,14 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from evo_mcp.tools.admin_tools import _inspect_parquet_bytes, _resolve_object_side, register_admin_tools
+from evo_mcp.tools.admin_tools import _download_blob_bytes, _inspect_parquet_bytes, _resolve_object_side, register_admin_tools
 
 
 class _FakeMCP:
@@ -59,6 +60,8 @@ class InspectParquetBytesTests(unittest.TestCase):
 
 class CompareEvoObjectsDetailedTests(unittest.IsolatedAsyncioTestCase):
     async def test_resolve_object_side_uses_downloaded_object_payload_and_urls(self) -> None:
+        created_at = datetime(2026, 4, 23, 10, 30, tzinfo=timezone.utc)
+        modified_at = datetime(2026, 4, 23, 11, 45, tzinfo=timezone.utc)
         fake_workspace = SimpleNamespace(
             id="workspace-1",
             display_name="Workspace One",
@@ -71,8 +74,8 @@ class CompareEvoObjectsDetailedTests(unittest.IsolatedAsyncioTestCase):
                 path="/Object One.json",
                 version_id="v1",
                 schema_id=SimpleNamespace(sub_classification="pointsets"),
-                created_at=None,
-                modified_at=None,
+                created_at=created_at,
+                modified_at=modified_at,
             ),
             as_dict=lambda: {
                 "schema": "/objects/pointsets/1.0.0/pointsets.schema.json",
@@ -118,6 +121,8 @@ class CompareEvoObjectsDetailedTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual("object-1", result["object"]["id"])
         self.assertEqual("/objects/pointsets/1.0.0/pointsets.schema.json", result["object"]["schema"])
+        self.assertEqual(created_at.isoformat(), result["object"]["created_at"])
+        self.assertEqual(modified_at.isoformat(), result["object"]["modified_at"])
         self.assertEqual(
             [
                 {"index": 1, "name": "blob-a", "id": "blob-a", "download_url": "https://example.invalid/a"},
@@ -131,6 +136,57 @@ class CompareEvoObjectsDetailedTests(unittest.IsolatedAsyncioTestCase):
                 {"blob_name": "blob-b", "download_url": "https://example.invalid/b", "num_rows": 3},
             ],
             result["parquet_files"],
+        )
+
+    async def test_download_blob_bytes_disables_redirects_on_authenticated_retry(self) -> None:
+        class _FakeResponse:
+            def __init__(self, status: int, body: bytes = b"") -> None:
+                self.status = status
+                self._body = body
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb) -> bool:
+                return False
+
+            def raise_for_status(self) -> None:
+                return None
+
+            async def read(self) -> bytes:
+                return self._body
+
+        class _FakeSession:
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, dict[str, object]]] = []
+                self._responses = [_FakeResponse(401), _FakeResponse(200, b"ok")]
+
+            def get(self, url: str, **kwargs):
+                self.calls.append((url, kwargs))
+                return self._responses.pop(0)
+
+        session = _FakeSession()
+
+        with patch(
+            "evo_mcp.tools.admin_tools._get_authorization_headers",
+            AsyncMock(return_value={"Authorization": "Bearer token"}),
+        ):
+            result = await _download_blob_bytes(
+                "https://hub.example.invalid/blob",
+                connector=SimpleNamespace(),
+                hub_url="https://hub.example.invalid",
+                session=session,
+            )
+
+        self.assertEqual(b"ok", result)
+        self.assertEqual(2, len(session.calls))
+        self.assertEqual({}, session.calls[0][1])
+        self.assertEqual(
+            {
+                "headers": {"Authorization": "Bearer token"},
+                "allow_redirects": False,
+            },
+            session.calls[1][1],
         )
 
     async def test_builds_json_and_parquet_summary_report(self) -> None:

@@ -645,7 +645,7 @@ async def _download_blob_bytes(
 
         auth_headers = await _get_authorization_headers(connector)
         if auth_headers:
-            async with s.get(download_url, headers=auth_headers) as retry_response:
+            async with s.get(download_url, headers=auth_headers, allow_redirects=False) as retry_response:
                 retry_response.raise_for_status()
                 return await retry_response.read()
 
@@ -905,8 +905,8 @@ async def _resolve_object_side(
             "schema_id": _normalize_schema_id(metadata.schema_id),
             "schema": schema_path,
             "schema_version": _schema_version_from_path(schema_path),
-            "created_at": metadata.created_at,
-            "modified_at": metadata.modified_at,
+            "created_at": metadata.created_at.isoformat() if metadata.created_at else None,
+            "modified_at": metadata.modified_at.isoformat() if metadata.modified_at else None,
         },
         "json_payload": object_payload,
         "crs_candidates": _collect_crs_candidates(object_payload),
