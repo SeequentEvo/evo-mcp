@@ -26,6 +26,7 @@ from evo.common import APIConnector
 from evo.common.data import Environment
 from evo.objects import ObjectAPIClient
 from evo.workspaces import WorkspaceAPIClient
+from fastmcp import Context
 
 from evo_mcp.context import ensure_initialized, evo_context
 from evo_mcp.utils.downloaded_object_utils import downloaded_object_data_links
@@ -35,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_WORKSPACE_PAGE_SIZE = 100
 DEFAULT_OBJECT_PAGE_SIZE = 100
+DEFAULT_MAX_WORKSPACES = 10
 MIN_PAGE_SIZE = 1
 LIST_REQUEST_TIMEOUT_SECONDS = 60
 OBJECT_FETCH_TIMEOUT_SECONDS = 60
@@ -206,10 +208,64 @@ async def _scan_object(
     return record
 
 
+async def _preview_workspaces() -> list[dict[str, Any]]:
+    """Return a lightweight list of workspaces with object counts (no downloads)."""
+    await ensure_initialized()
+
+    ws_list = await _list_all_pages(
+        evo_context.workspace_client.list_workspaces,
+        page_size=DEFAULT_WORKSPACE_PAGE_SIZE,
+        resource_name="workspaces",
+    )
+
+    hub_url = evo_context.hub_url
+    org_id = evo_context.org_id
+    results: list[dict[str, Any]] = []
+
+    for workspace in ws_list:
+        ws_name = workspace.display_name or str(workspace.id)
+        ws_env = Environment(hub_url=hub_url, org_id=org_id, workspace_id=workspace.id)
+        object_client = ObjectAPIClient(ws_env, evo_context.connector)
+        try:
+            objects = await _list_all_pages(
+                object_client.list_objects,
+                page_size=DEFAULT_OBJECT_PAGE_SIZE,
+                resource_name=f"objects in workspace {ws_name}",
+            )
+            object_count = len(objects)
+        except Exception as exc:
+            logger.warning("Failed to list objects in workspace %s: %s", ws_name, exc)
+            object_count = -1
+        results.append({
+            "workspace_id": str(workspace.id),
+            "workspace_name": ws_name,
+            "object_count": object_count,
+        })
+
+    return results
+
+
+async def _report_progress(
+    ctx: Context | None,
+    progress: float,
+    total: float | None = None,
+    message: str | None = None,
+) -> None:
+    if ctx is None:
+        return
+    try:
+        await ctx.report_progress(progress, total, message)
+    except Exception:
+        pass
+
+
 async def _run_duplicate_analysis(
     workspace_ids: list[str] | None,
     workspace_names: list[str] | None,
     max_concurrent: int,
+    max_workspaces: int = DEFAULT_MAX_WORKSPACES,
+    scan_all_workspaces: bool = False,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     await ensure_initialized()
 
@@ -229,6 +285,25 @@ async def _run_duplicate_analysis(
         ws_list = [ws for ws in ws_list if (ws.display_name or "").lower() in requested]
         if not ws_list:
             return {"error": "None of the provided workspace names matched available workspaces."}
+    elif not scan_all_workspaces and len(ws_list) > max_workspaces:
+        return {
+            "error": (
+                f"This instance has {len(ws_list)} workspaces which exceeds the "
+                f"max_workspaces limit of {max_workspaces}. Scanning all of them "
+                f"would be very slow. Either specify workspace_ids or "
+                f"workspace_names to narrow the scan, increase max_workspaces, "
+                f"or set scan_all_workspaces=True to override this safety limit."
+            ),
+            "available_workspaces": [
+                {
+                    "workspace_id": str(ws.id),
+                    "workspace_name": ws.display_name or str(ws.id),
+                }
+                for ws in ws_list
+            ],
+            "total_workspaces": len(ws_list),
+            "max_workspaces": max_workspaces,
+        }
 
     org_id = evo_context.org_id
     hub_url = evo_context.hub_url
@@ -242,6 +317,10 @@ async def _run_duplicate_analysis(
     total_errors = 0
     objects_with_blobs = 0
     objects_without_blobs = 0
+    processed_workspaces = 0
+    total_workspace_count = len(ws_list)
+
+    await _report_progress(ctx, 0, total_workspace_count, f"Scanning {total_workspace_count} workspace(s)...")
 
     for workspace in ws_list:
         ws_name = workspace.display_name or str(workspace.id)
@@ -278,6 +357,15 @@ async def _run_duplicate_analysis(
         total_errors += ws_error_count
         workspace_stats.append(
             {"name": ws_name, "id": str(workspace.id), "objects": ws_object_count, "errors": ws_error_count}
+        )
+
+        processed_workspaces += 1
+        await _report_progress(
+            ctx,
+            processed_workspaces,
+            total_workspace_count,
+            f"Scanned workspace {ws_name} ({ws_object_count} objects) — "
+            f"{processed_workspaces}/{total_workspace_count} workspaces done",
         )
 
         for record in scanned:
@@ -1018,9 +1106,12 @@ def register_admin_tools(mcp):
 
     @mcp.tool()
     async def find_duplicate_objects(
+        ctx: Context,
         workspace_ids: list[str] | None = None,
         workspace_names: list[str] | None = None,
         max_concurrent_fetches: int = 20,
+        max_workspaces: int = 10,
+        scan_all_workspaces: bool = False,
     ) -> dict:
         """Find duplicate objects across Evo workspaces by comparing blob hashes.
 
@@ -1030,12 +1121,22 @@ def register_admin_tools(mcp):
 
         You can scope the analysis to specific workspaces or run it across the
         entire instance. Provide either workspace_ids or workspace_names (not both).
-        If neither is provided, ALL workspaces in the current instance are scanned.
+
+        When neither workspace_ids nor workspace_names is provided, the tool will
+        scan up to `max_workspaces` workspaces. If the instance has more workspaces
+        than the limit, the tool returns the full workspace list so you can select
+        specific workspaces to scan. Set `scan_all_workspaces=True` to override
+        this safety limit and scan every workspace (may be very slow).
+
+        Use `preview_duplicate_scan` first to see workspace names and object counts
+        before committing to a full scan.
 
         Args:
             workspace_ids: List of workspace UUIDs to scan (optional).
             workspace_names: List of workspace display names to scan (optional).
             max_concurrent_fetches: Max parallel object fetches (default 20).
+            max_workspaces: Max workspaces to scan without explicit opt-in (default 10).
+            scan_all_workspaces: Set True to scan all workspaces regardless of count.
 
         Returns:
             A dict with:
@@ -1054,7 +1155,30 @@ def register_admin_tools(mcp):
             workspace_ids=workspace_ids,
             workspace_names=workspace_names,
             max_concurrent=max_concurrent_fetches,
+            max_workspaces=max_workspaces,
+            scan_all_workspaces=scan_all_workspaces,
+            ctx=ctx,
         )
+
+    @mcp.tool()
+    async def preview_duplicate_scan() -> dict:
+        """Preview workspaces and object counts before running a duplicate scan.
+
+        Lists all workspaces in the current instance with the number of objects
+        in each. Use this to decide which workspaces to include in a
+        `find_duplicate_objects` call. No objects are downloaded.
+
+        Returns:
+            A dict with:
+              - total_workspaces: number of workspaces in the instance
+              - workspaces: list of {workspace_id, workspace_name, object_count}
+                (object_count is -1 if listing failed for that workspace)
+        """
+        workspaces = await _preview_workspaces()
+        return {
+            "total_workspaces": len(workspaces),
+            "workspaces": workspaces,
+        }
 
     @mcp.tool()
     async def compare_evo_objects_detailed(

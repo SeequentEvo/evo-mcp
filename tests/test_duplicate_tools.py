@@ -251,6 +251,198 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([workspace], result)
         self.assertEqual([(0, admin_tools.DEFAULT_WORKSPACE_PAGE_SIZE)], calls)
 
+    async def test_run_duplicate_analysis_refuses_unfiltered_scan_when_over_max_workspaces(self) -> None:
+        workspaces = [
+            SimpleNamespace(
+                id=UUID(f"00000000-0000-0000-0000-00000000000{i}"),
+                display_name=f"Workspace {i}",
+            )
+            for i in range(1, 6)
+        ]
+
+        fake_context = SimpleNamespace(
+            workspace_client=_FakeWorkspaceClient(workspaces, max_limit=100),
+            org_id=UUID("00000000-0000-0000-0000-0000000000aa"),
+            hub_url="https://hub.example.invalid",
+            connector=None,
+        )
+
+        with (
+            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
+            patch.object(admin_tools, "evo_context", fake_context),
+        ):
+            result = await admin_tools._run_duplicate_analysis(
+                workspace_ids=None,
+                workspace_names=None,
+                max_concurrent=4,
+                max_workspaces=3,
+                scan_all_workspaces=False,
+            )
+
+        self.assertIn("error", result)
+        self.assertIn("5 workspaces", result["error"])
+        self.assertIn("max_workspaces limit of 3", result["error"])
+        self.assertEqual(5, result["total_workspaces"])
+        self.assertEqual(5, len(result["available_workspaces"]))
+        self.assertEqual("Workspace 1", result["available_workspaces"][0]["workspace_name"])
+
+    async def test_run_duplicate_analysis_allows_unfiltered_scan_with_scan_all_flag(self) -> None:
+        workspace = SimpleNamespace(
+            id=UUID("00000000-0000-0000-0000-000000000001"),
+            display_name="Workspace One",
+        )
+        object_1 = _metadata(
+            object_id="00000000-0000-0000-0000-000000000101",
+            name="Object One",
+            path="/Object One.json",
+            version_id="v1",
+        )
+
+        _FakeObjectAPIClient.DATA = {
+            str(workspace.id): {
+                "objects": [object_1],
+                "responses": {
+                    str(object_1.id): _FakeDownloadedObject(
+                        schema="/objects/pointsets/1.0.0/pointsets.schema.json",
+                        blob_names=["blob-a"],
+                    ),
+                },
+            }
+        }
+        _FakeObjectAPIClient.LIST_CALLS = []
+        _FakeObjectAPIClient.OBJECT_TIMEOUTS = []
+
+        fake_context = SimpleNamespace(
+            workspace_client=_FakeWorkspaceClient([workspace], max_limit=100),
+            org_id=UUID("00000000-0000-0000-0000-0000000000aa"),
+            hub_url="https://hub.example.invalid",
+            connector=None,
+        )
+
+        with (
+            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
+            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
+        ):
+            result = await admin_tools._run_duplicate_analysis(
+                workspace_ids=None,
+                workspace_names=None,
+                max_concurrent=4,
+                max_workspaces=0,
+                scan_all_workspaces=True,
+            )
+
+        self.assertNotIn("error", result)
+        self.assertEqual(1, result["summary"]["total_objects_scanned"])
+
+    async def test_run_duplicate_analysis_skips_cap_when_workspaces_filtered_by_id(self) -> None:
+        workspace = SimpleNamespace(
+            id=UUID("00000000-0000-0000-0000-000000000001"),
+            display_name="Workspace One",
+        )
+        object_1 = _metadata(
+            object_id="00000000-0000-0000-0000-000000000101",
+            name="Object One",
+            path="/Object One.json",
+            version_id="v1",
+        )
+
+        _FakeObjectAPIClient.DATA = {
+            str(workspace.id): {
+                "objects": [object_1],
+                "responses": {
+                    str(object_1.id): _FakeDownloadedObject(
+                        schema="/objects/pointsets/1.0.0/pointsets.schema.json",
+                        blob_names=["blob-a"],
+                    ),
+                },
+            }
+        }
+        _FakeObjectAPIClient.LIST_CALLS = []
+        _FakeObjectAPIClient.OBJECT_TIMEOUTS = []
+
+        many_workspaces = [
+            SimpleNamespace(
+                id=UUID(f"00000000-0000-0000-0000-00000000000{i}"),
+                display_name=f"Workspace {i}",
+            )
+            for i in range(1, 8)
+        ]
+
+        fake_context = SimpleNamespace(
+            workspace_client=_FakeWorkspaceClient(many_workspaces, max_limit=100),
+            org_id=UUID("00000000-0000-0000-0000-0000000000aa"),
+            hub_url="https://hub.example.invalid",
+            connector=None,
+        )
+
+        with (
+            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
+            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
+        ):
+            result = await admin_tools._run_duplicate_analysis(
+                workspace_ids=[str(workspace.id)],
+                workspace_names=None,
+                max_concurrent=4,
+                max_workspaces=2,
+                scan_all_workspaces=False,
+            )
+
+        self.assertNotIn("error", result)
+        self.assertEqual(1, result["summary"]["workspaces_scanned"])
+
+    async def test_preview_workspaces(self) -> None:
+        workspaces = [
+            SimpleNamespace(
+                id=UUID("00000000-0000-0000-0000-000000000001"),
+                display_name="Workspace One",
+            ),
+            SimpleNamespace(
+                id=UUID("00000000-0000-0000-0000-000000000002"),
+                display_name="Workspace Two",
+            ),
+        ]
+
+        object_1 = _metadata(
+            object_id="00000000-0000-0000-0000-000000000101",
+            name="Object One",
+            path="/Object One.json",
+            version_id="v1",
+        )
+
+        _FakeObjectAPIClient.DATA = {
+            str(workspaces[0].id): {
+                "objects": [object_1],
+                "responses": {},
+            },
+            str(workspaces[1].id): {
+                "objects": [],
+                "responses": {},
+            },
+        }
+        _FakeObjectAPIClient.LIST_CALLS = []
+
+        fake_context = SimpleNamespace(
+            workspace_client=_FakeWorkspaceClient(workspaces, max_limit=100),
+            org_id=UUID("00000000-0000-0000-0000-0000000000aa"),
+            hub_url="https://hub.example.invalid",
+            connector=None,
+        )
+
+        with (
+            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
+            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
+        ):
+            result = await admin_tools._preview_workspaces()
+
+        self.assertEqual(2, len(result))
+        self.assertEqual("Workspace One", result[0]["workspace_name"])
+        self.assertEqual(1, result[0]["object_count"])
+        self.assertEqual("Workspace Two", result[1]["workspace_name"])
+        self.assertEqual(0, result[1]["object_count"])
+
 
 if __name__ == "__main__":
     unittest.main()
