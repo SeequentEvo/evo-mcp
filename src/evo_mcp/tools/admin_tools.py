@@ -17,6 +17,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from itertools import combinations
 from typing import Any, Awaitable, Callable
+from urllib.parse import urlparse
 from uuid import UUID
 
 import aiohttp
@@ -350,18 +351,23 @@ async def _run_duplicate_analysis(
             )
             continue
 
-        scanned = await asyncio.gather(
-            *[
-                _scan_object(
-                    object_client=object_client,
-                    workspace_id=workspace.id,
-                    workspace_name=ws_name,
-                    object_metadata=obj,
-                    semaphore=semaphore,
-                )
-                for obj in objects
-            ]
-        )
+        batch_size = max(1, max_concurrent)
+        scanned: list[dict[str, Any]] = []
+        for i in range(0, len(objects), batch_size):
+            batch = objects[i : i + batch_size]
+            batch_results = await asyncio.gather(
+                *[
+                    _scan_object(
+                        object_client=object_client,
+                        workspace_id=workspace.id,
+                        workspace_name=ws_name,
+                        object_metadata=obj,
+                        semaphore=semaphore,
+                    )
+                    for obj in batch
+                ]
+            )
+            scanned.extend(batch_results)
 
         ws_object_count = len(scanned)
         ws_error_count = sum(1 for result in scanned if result["scan_error"])
@@ -616,6 +622,7 @@ async def _download_blob_bytes(
     download_url: str,
     connector: APIConnector,
     *,
+    hub_url: str = "",
     session: aiohttp.ClientSession | None = None,
 ) -> bytes:
     """Download blob bytes, trying without auth first to avoid leaking tokens to pre-signed URLs."""
@@ -627,18 +634,22 @@ async def _download_blob_bytes(
                 response.raise_for_status()
                 return await response.read()
 
+        if hub_url:
+            hub_host = urlparse(hub_url).hostname or ""
+            download_host = urlparse(download_url).hostname or ""
+            if hub_host.lower() != download_host.lower():
+                raise PermissionError(
+                    f"Blob URL host '{download_host}' does not match hub host '{hub_host}'; "
+                    f"refusing to send auth headers to an external domain."
+                )
+
         auth_headers = await _get_authorization_headers(connector)
         if auth_headers:
             async with s.get(download_url, headers=auth_headers) as retry_response:
                 retry_response.raise_for_status()
                 return await retry_response.read()
 
-        raise aiohttp.ClientResponseError(
-            request_info=aiohttp.RequestInfo(url=download_url, method="GET", headers={}, real_url=download_url),
-            history=(),
-            status=403,
-            message="Unauthorized and no auth headers available",
-        )
+        raise PermissionError("Unauthorized and no auth headers available")
 
     if session is not None:
         return await _fetch(session)
@@ -682,6 +693,7 @@ async def _inspect_data_link(
     link: dict[str, Any],
     connector: APIConnector,
     *,
+    hub_url: str = "",
     session: aiohttp.ClientSession | None = None,
 ) -> dict[str, Any]:
     blob_name = str(link.get("name") or link.get("id") or "unknown")
@@ -696,7 +708,7 @@ async def _inspect_data_link(
         return result
 
     try:
-        blob_bytes = await _download_blob_bytes(str(download_url), connector, session=session)
+        blob_bytes = await _download_blob_bytes(str(download_url), connector, hub_url=hub_url, session=session)
         result.update(_inspect_parquet_bytes(blob_name, blob_bytes))
         return result
     except Exception as exc:
@@ -867,10 +879,11 @@ async def _resolve_object_side(
     object_payload = downloaded.as_dict()
     data_links = downloaded_object_data_links(downloaded)
 
+    hub_url_for_auth = instance["hub_url"]
     timeout = aiohttp.ClientTimeout(total=300)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         parquet_files = await asyncio.gather(
-            *[_inspect_data_link(link, connector, session=session) for link in data_links]
+            *[_inspect_data_link(link, connector, hub_url=hub_url_for_auth, session=session) for link in data_links]
         )
     schema_path = object_payload.get("schema")
 

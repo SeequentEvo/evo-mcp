@@ -90,7 +90,7 @@ class CompareEvoObjectsDetailedTests(unittest.IsolatedAsyncioTestCase):
         fake_connector = SimpleNamespace(_transport=object(), _authorizer=object())
         fake_evo_context = SimpleNamespace(connector=fake_connector)
 
-        async def fake_inspect_data_link(link, connector, *, session=None):
+        async def fake_inspect_data_link(link, connector, *, hub_url="", session=None):
             return {
                 "blob_name": link["name"],
                 "download_url": link["download_url"],
