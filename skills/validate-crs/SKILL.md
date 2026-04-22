@@ -7,6 +7,12 @@ description: Use this skill when source and target objects need to be checked fo
 
 Use this skill to verify spatial compatibility between two staged objects before running estimation. Operates entirely on the local staging layer — no Evo API calls.
 
+## Verification and Limitations
+
+This skill requires the evo-mcp server and its associated tools to function; without them, it is not usable. This skill is assistive and may produce incomplete, incorrect, or variable results over time.
+
+For details, call `get_skills_disclosure` tool or consult the repository disclaimers.
+
 ## Trigger Conditions
 
 Use this skill when the user needs to:

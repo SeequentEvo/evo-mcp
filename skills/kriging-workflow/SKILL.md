@@ -9,6 +9,12 @@ Guide the user through a complete kriging estimation workflow using natural-lang
 
 Users are geologists. They work with object names, attribute names, and geoscience concepts — never with internal identifiers, tool names, or payload structures.
 
+## Verification and Limitations
+
+This skill requires the evo-mcp server and its associated tools to function; without them, it is not usable. This skill is assistive and may produce incomplete, incorrect, or variable results over time.
+
+For details, call `get_skills_disclosure` tool or consult the repository disclaimers.
+
 ## Trigger Conditions
 
 Use this skill when the user wants to:

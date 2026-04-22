@@ -7,6 +7,12 @@ description: Use this skill when the user needs to design a new block model from
 
 Use this skill for local block model handling: design regular block model definitions from explicit extents and inspect block model payloads. All operations are local — no Evo API calls.
 
+## Verification and Limitations
+
+This skill requires the evo-mcp server and its associated tools to function; without them, it is not usable. This skill is assistive and may produce incomplete, incorrect, or variable results over time.
+
+For details, call `get_skills_disclosure` tool or consult the repository disclaimers.
+
 ## Trigger Conditions
 
 Use this skill when the user needs to:
