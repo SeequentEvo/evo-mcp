@@ -10,7 +10,22 @@ import logging
 import shutil
 from pathlib import Path
 
+from fastmcp import Context
+
 logger = logging.getLogger(__name__)
+
+# Canonical disclosure text — single source of truth for MCP access and sync-gate responses.
+# Keep this aligned with the ### Skill Disclosures section in README.md.
+_SKILLS_DISCLOSURE_TEXT = (
+    "Skills in this repository are intended to assist with workflow guidance and execution support, "
+    "not replace user review, domain judgment, or independent verification.\n\n"
+    "Skill outputs may be incomplete, incorrect, or vary over time as underlying models, prompts, "
+    "tools, and connected systems change.\n\n"
+    "Users should verify important results before relying on them, especially for operational, "
+    "technical, scientific, financial, regulatory, safety-related, or customer-facing decisions."
+)
+_DISCLAIMER_STATE_KEY = "skills_disclosure_acknowledged"
+_DISCLOSURE_SHOWN_STATE_KEY = "skills_disclosure_shown"
 
 # Platform → default skills directory (mirrors FastMCP vendor provider defaults)
 PLATFORM_DIRS: dict[str, Path] = {
@@ -28,11 +43,49 @@ def register_skills_sync_tools(mcp, skills_folder: Path):
     """Register skill sync tools with the FastMCP server."""
 
     @mcp.tool()
+    async def get_skills_disclosure(acknowledge: bool = False, ctx: Context = None) -> dict:
+        """Show the skills disclosure and record user acknowledgment.
+
+        Call without arguments first, then display the disclosure to the user and ask
+        if they accept it. Only call with acknowledge=true after receiving explicit
+        confirmation from the user — do not chain both calls in the same response.
+        """
+        shown = (await ctx.get_state(_DISCLOSURE_SHOWN_STATE_KEY)) if ctx is not None else False
+        acknowledged = (await ctx.get_state(_DISCLAIMER_STATE_KEY)) if ctx is not None else False
+
+        if acknowledge:
+            if not shown:
+                # Must view disclosure before acknowledging
+                if ctx is not None:
+                    await ctx.set_state(_DISCLOSURE_SHOWN_STATE_KEY, True)
+                return {
+                    "disclosure": _SKILLS_DISCLOSURE_TEXT,
+                    "acknowledged": False,
+                    "message": "Please read the disclosure above, then call again with acknowledge=true to confirm.",
+                }
+            if ctx is not None:
+                await ctx.set_state(_DISCLAIMER_STATE_KEY, True)
+            return {
+                "acknowledged": True,
+                "message": "Disclosure acknowledged. You may now call sync_skills.",
+            }
+
+        # First call — show the disclosure and mark it as shown
+        if ctx is not None:
+            await ctx.set_state(_DISCLOSURE_SHOWN_STATE_KEY, True)
+        return {
+            "disclosure": _SKILLS_DISCLOSURE_TEXT,
+            "acknowledged": acknowledged,
+            "message": "Call again with acknowledge=true to confirm you have read this disclosure.",
+        }
+
+    @mcp.tool()
     async def sync_skills(
         target_platform: str = "copilot",
         target_dir: str = "",
         skills: list[str] = [],
         overwrite: bool = False,
+        ctx: Context = None,
     ) -> dict:
         """Sync evo-mcp skills from this server to the user's local AI tool skills directory.
 
@@ -54,6 +107,12 @@ def register_skills_sync_tools(mcp, skills_folder: Path):
         Returns:
             A summary with synced, skipped, and failed skill names plus the target path.
         """
+        # Require get_skills_disclosure to have been called this session.
+        acknowledged = (await ctx.get_state(_DISCLAIMER_STATE_KEY)) if ctx is not None else False
+        if not acknowledged:
+            return {
+                "error": "Call get_skills_disclosure before syncing skills.",
+            }
         # Resolve target directory
         platform = target_platform.lower().strip()
         if platform == "custom":
