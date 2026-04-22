@@ -9,6 +9,12 @@ Use this skill to build a `SearchNeighborhood` — the ellipsoid and sample-limi
 
 This skill is local-only. All operations work against locally staged objects — no Evo API calls.
 
+## Verification and Limitations
+
+This skill requires the evo-mcp server and its associated tools to function; without them, it is not usable. This skill is assistive and may produce incomplete, incorrect, or variable results over time.
+
+For details, call `get_skills_disclosure` tool or consult the repository disclaimers.
+
 ## Trigger Conditions
 
 Use this skill when:
