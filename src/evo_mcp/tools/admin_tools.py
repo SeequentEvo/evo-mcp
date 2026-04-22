@@ -602,19 +602,31 @@ async def _get_authorization_headers(connector: APIConnector) -> dict[str, str]:
     return {str(key): str(value) for key, value in headers.items()}
 
 
-async def _download_blob_bytes(download_url: str, connector: APIConnector) -> bytes:
-    headers = await _get_authorization_headers(connector)
+async def _download_blob_bytes(
+    download_url: str,
+    connector: APIConnector,
+    *,
+    session: aiohttp.ClientSession | None = None,
+) -> bytes:
+    """Download blob bytes, trying without auth first to avoid leaking tokens to pre-signed URLs."""
     timeout = aiohttp.ClientTimeout(total=300)
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.get(download_url, headers=headers) as response:
-            if response.status in {401, 403} and headers:
-                async with session.get(download_url) as retry_response:
-                    retry_response.raise_for_status()
-                    return await retry_response.read()
-
+    async def _fetch(s: aiohttp.ClientSession) -> bytes:
+        async with s.get(download_url) as response:
+            if response.status in {401, 403}:
+                auth_headers = await _get_authorization_headers(connector)
+                if auth_headers:
+                    async with s.get(download_url, headers=auth_headers) as retry_response:
+                        retry_response.raise_for_status()
+                        return await retry_response.read()
             response.raise_for_status()
             return await response.read()
+
+    if session is not None:
+        return await _fetch(session)
+
+    async with aiohttp.ClientSession(timeout=timeout) as new_session:
+        return await _fetch(new_session)
 
 
 def _parquet_schema_fields(arrow_schema: pa.Schema) -> list[dict[str, Any]]:
@@ -648,7 +660,12 @@ def _inspect_parquet_bytes(blob_name: str, blob_bytes: bytes) -> dict[str, Any]:
     }
 
 
-async def _inspect_data_link(link: dict[str, Any], connector: APIConnector) -> dict[str, Any]:
+async def _inspect_data_link(
+    link: dict[str, Any],
+    connector: APIConnector,
+    *,
+    session: aiohttp.ClientSession | None = None,
+) -> dict[str, Any]:
     blob_name = str(link.get("name") or link.get("id") or "unknown")
     download_url = link.get("download_url")
     result = {
@@ -661,7 +678,7 @@ async def _inspect_data_link(link: dict[str, Any], connector: APIConnector) -> d
         return result
 
     try:
-        blob_bytes = await _download_blob_bytes(str(download_url), connector)
+        blob_bytes = await _download_blob_bytes(str(download_url), connector, session=session)
         result.update(_inspect_parquet_bytes(blob_name, blob_bytes))
         return result
     except Exception as exc:
@@ -715,6 +732,14 @@ def _compare_parquet_metadata(left_files: list[dict[str, Any]], right_files: lis
     }
 
 
+def _get_instance_hub_url(instance: Any) -> str:
+    """Extract hub URL from an instance, raising a clear error if hubs are missing."""
+    hubs = getattr(instance, "hubs", None)
+    if not hubs:
+        raise ValueError(f"Instance '{instance.display_name}' (id={instance.id}) has no hubs configured.")
+    return hubs[0].url
+
+
 async def _resolve_instance(
     *,
     instance_id: str = "",
@@ -733,7 +758,7 @@ async def _resolve_instance(
                 return {
                     "id": str(instance.id),
                     "name": instance.display_name,
-                    "hub_url": instance.hubs[0].url,
+                    "hub_url": _get_instance_hub_url(instance),
                 }
         if current_org_id and evo_context.hub_url:
             return {
@@ -748,13 +773,13 @@ async def _resolve_instance(
             return {
                 "id": str(instance.id),
                 "name": instance.display_name,
-                "hub_url": instance.hubs[0].url,
+                "hub_url": _get_instance_hub_url(instance),
             }
         if instance_name and instance.display_name == instance_name:
             return {
                 "id": str(instance.id),
                 "name": instance.display_name,
-                "hub_url": instance.hubs[0].url,
+                "hub_url": _get_instance_hub_url(instance),
             }
 
     raise ValueError(f"Could not resolve instance for instance_id={instance_id!r}, instance_name={instance_name!r}.")
@@ -824,7 +849,11 @@ async def _resolve_object_side(
     object_payload = downloaded.as_dict()
     data_links = downloaded_object_data_links(downloaded)
 
-    parquet_files = await asyncio.gather(*[_inspect_data_link(link, connector) for link in data_links])
+    timeout = aiohttp.ClientTimeout(total=300)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        parquet_files = await asyncio.gather(
+            *[_inspect_data_link(link, connector, session=session) for link in data_links]
+        )
     schema_path = object_payload.get("schema")
 
     return {
@@ -867,6 +896,8 @@ def register_admin_tools(mcp):
             description: Workspace description
             labels: Workspace labels (optional list)
         """
+        await ensure_initialized()
+
         workspace = await evo_context.workspace_client.create_workspace(
             name=name, description=description, labels=labels or []
         )
@@ -1233,8 +1264,8 @@ def register_admin_tools(mcp):
             ),
         )
 
-        left_crs_values = [entry["value"] for entry in left_side["crs_candidates"]]
-        right_crs_values = [entry["value"] for entry in right_side["crs_candidates"]]
+        left_crs_values = sorted(((entry["path"], entry["value"]) for entry in left_side["crs_candidates"]))
+        right_crs_values = sorted(((entry["path"], entry["value"]) for entry in right_side["crs_candidates"]))
         parquet_comparison = _compare_parquet_metadata(left_side["parquet_files"], right_side["parquet_files"])
 
         return {
