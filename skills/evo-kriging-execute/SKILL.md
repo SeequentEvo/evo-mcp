@@ -11,6 +11,12 @@ Only source, target, and variogram must be resolved to published Evo objects. Se
 
 This skill builds validated scenarios with `kriging_build_parameters`, then executes them with `kriging_run`.
 
+## Verification and Limitations
+
+This skill requires the evo-mcp server and its associated tools to function; without them, it is not usable. This skill is assistive and may produce incomplete, incorrect, or variable results over time.
+
+For details, call `get_skills_disclosure` tool or consult the repository disclaimers.
+
 ## Trigger Conditions
 
 Use this skill when:

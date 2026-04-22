@@ -7,6 +7,12 @@ description: Use this skill after a kriging run completes to interpret results, 
 
 Use this skill to interpret and present completed kriging results. Reads structured output from `evo-kriging-execute`, summarizes per-scenario outcomes, and guides the user on next steps. No tool calls — purely interpretive.
 
+## Verification and Limitations
+
+This skill requires the evo-mcp server and its associated tools to function; without them, it is not usable. This skill is assistive and may produce incomplete, incorrect, or variable results over time.
+
+For details, call `get_skills_disclosure` tool or consult the repository disclaimers.
+
 ## Trigger Conditions
 
 Use this skill when the user needs to:

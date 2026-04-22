@@ -7,6 +7,12 @@ description: Use this skill when the user has a CSV file with sample coordinates
 
 Use this skill for local point-set handling: build PointSet payloads from CSV, summarize geometry and attributes, and inspect attribute details. All operations are local — no Evo API calls.
 
+## Verification and Limitations
+
+This skill requires the evo-mcp server and its associated tools to function; without them, it is not usable. This skill is assistive and may produce incomplete, incorrect, or variable results over time.
+
+For details, call `get_skills_disclosure` tool or consult the repository disclaimers.
+
 ## Trigger Conditions
 
 Use this skill when the user needs to:
