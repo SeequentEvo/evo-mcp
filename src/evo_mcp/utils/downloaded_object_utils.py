@@ -23,6 +23,11 @@ def downloaded_object_data_links(downloaded: Any) -> list[dict[str, Any]]:
     if not urls_by_name:
         return []
 
+    filtered = sorted(
+        ((name, url) for name, url in urls_by_name.items() if name and url),
+        key=lambda item: str(item[0]),
+    )
+
     return [
         {
             "index": index,
@@ -30,9 +35,5 @@ def downloaded_object_data_links(downloaded: Any) -> list[dict[str, Any]]:
             "id": str(name),
             "download_url": str(download_url),
         }
-        for index, (name, download_url) in enumerate(
-            sorted(urls_by_name.items(), key=lambda item: str(item[0])),
-            start=1,
-        )
-        if name and download_url
+        for index, (name, download_url) in enumerate(filtered, start=1)
     ]

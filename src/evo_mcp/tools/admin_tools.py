@@ -235,12 +235,8 @@ async def _preview_workspaces() -> list[dict[str, Any]]:
         ws_env = Environment(hub_url=hub_url, org_id=org_id, workspace_id=workspace.id)
         object_client = ObjectAPIClient(ws_env, evo_context.connector)
         try:
-            objects = await _list_all_pages(
-                object_client.list_objects,
-                page_size=DEFAULT_OBJECT_PAGE_SIZE,
-                resource_name=f"objects in workspace {ws_name}",
-            )
-            object_count = len(objects)
+            page = await object_client.list_objects(offset=0, limit=1)
+            object_count = page.total if page.total is not None else len(page.items())
         except Exception as exc:
             logger.warning("Failed to list objects in workspace %s: %s", ws_name, exc)
             object_count = -1
