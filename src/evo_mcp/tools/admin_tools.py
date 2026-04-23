@@ -825,8 +825,14 @@ async def _inspect_parquet_metadata(
         request_headers={"Range": f"bytes=-{PARQUET_FOOTER_SIZE}"},
     )
 
-    if footer_status == 200 or footer_bytes.startswith(PARQUET_MAGIC):
+    if footer_bytes.startswith(PARQUET_MAGIC):
         return _inspect_parquet_bytes(blob_name, footer_bytes)
+
+    if footer_status == 200:
+        raise ValueError(
+            f"Server returned full response (HTTP 200) for Range request on blob '{blob_name}', "
+            f"but content does not start with Parquet magic bytes."
+        )
 
     metadata_length = _parquet_footer_metadata_length(footer_bytes)
     if metadata_length > MAX_PARQUET_METADATA_BYTES:
@@ -843,8 +849,14 @@ async def _inspect_parquet_metadata(
         request_headers={"Range": f"bytes=-{metadata_and_footer_size}"},
     )
 
-    if tail_status == 200 or tail_bytes.startswith(PARQUET_MAGIC):
+    if tail_bytes.startswith(PARQUET_MAGIC):
         return _inspect_parquet_bytes(blob_name, tail_bytes)
+
+    if tail_status == 200:
+        raise ValueError(
+            f"Server returned full response (HTTP 200) for Range request on blob '{blob_name}', "
+            f"but content does not start with Parquet magic bytes."
+        )
 
     blob_size_bytes = _content_range_total_size(tail_headers) or _content_range_total_size(footer_headers)
     return _inspect_parquet_footer_bytes(blob_name, tail_bytes, blob_size_bytes=blob_size_bytes)
