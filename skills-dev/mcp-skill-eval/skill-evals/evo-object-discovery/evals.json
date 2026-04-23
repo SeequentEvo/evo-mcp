@@ -1,0 +1,41 @@
+{
+  "skill_name": "evo-object-discovery",
+  "setup": {
+    "steps": [
+      {"step": 0, "tool": "staging_reset", "args": {}},
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/evo-object-discovery/fixtures.json"]}}
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Show me all objects available in my workspace",
+      "expected_output": "A list of all objects in the workspace is returned, grouped or annotated by schema type, with name, path, and schema_id for each object",
+      "category": "list-all-objects"
+    },
+    {
+      "id": 2,
+      "prompt": "Show me all variograms in my workspace",
+      "expected_output": "A filtered list of variogram objects is returned showing their names, paths, and relevant metadata",
+      "category": "filter-by-object-type"
+    },
+    {
+      "id": 3,
+      "prompt": "What point sets and block models do I have available?",
+      "expected_output": "Objects are returned grouped by type: point sets and block models listed separately with enough detail to identify each one",
+      "category": "multi-type-filter"
+    },
+    {
+      "id": 4,
+      "prompt": "Find the grade point set — I think it's called something with 'assay' in the name",
+      "expected_output": "A search is performed matching objects with 'assay' in their name or path, and candidate point set objects are returned so the user can identify the intended data source",
+      "category": "fuzzy-name-search"
+    },
+    {
+      "id": 5,
+      "prompt": "Are there any variograms in my workspace with 'gold' in the name?",
+      "expected_output": "A search is performed filtering for variogram objects containing 'gold'. No matches are found and the user is informed of the available variogram objects as alternatives",
+      "category": "no-matches-for-filter"
+    }
+  ]
+}
