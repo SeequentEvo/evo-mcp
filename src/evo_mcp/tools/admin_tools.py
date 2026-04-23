@@ -191,12 +191,12 @@ async def _scan_object(
         "object_name": object_metadata.name,
         "object_path": object_metadata.path,
         "version_id": object_metadata.version_id,
-        "schema_id": str(object_metadata.schema_id),
+        "schema_id": _normalize_schema_id(object_metadata.schema_id),
         "created_at": _fmt_dt(getattr(object_metadata, "created_at", None)),
         "created_by": _fmt_user(getattr(object_metadata, "created_by", None)),
         "updated_at": _fmt_dt(getattr(object_metadata, "modified_at", None)),
         "updated_by": _fmt_user(getattr(object_metadata, "modified_by", None)),
-        "blob_hashes": [],
+        "blob_names": [],
         "scan_error": None,
     }
 
@@ -209,7 +209,7 @@ async def _scan_object(
             )
 
             record["schema"] = downloaded.as_dict().get("schema")
-            record["blob_hashes"] = [link["name"] for link in downloaded_object_data_links(downloaded)]
+            record["blob_names"] = [link["name"] for link in downloaded_object_data_links(downloaded)]
         except Exception as exc:
             record["scan_error"] = str(exc)
 
@@ -393,7 +393,7 @@ async def _run_duplicate_analysis(
 
         for record in scanned:
             obj_key = (record["workspace_id"], record["object_id"])
-            unique_blobs = set(record["blob_hashes"])
+            unique_blobs = set(record["blob_names"])
             object_blob_counts[obj_key] = len(unique_blobs)
 
             if record["scan_error"]:
@@ -487,8 +487,8 @@ async def _run_duplicate_analysis(
             "objects_with_blob_refs": objects_with_blobs,
             "objects_without_blob_refs": objects_without_blobs,
             "objects_with_fetch_errors": total_errors,
-            "unique_blob_hashes": unique_blob_count,
-            "duplicate_blob_hashes": duplicate_blob_count,
+            "unique_blob_names": unique_blob_count,
+            "duplicate_blob_names": duplicate_blob_count,
             "duplicate_object_pairs": len(rows),
         },
         "workspaces": workspace_stats,
@@ -754,6 +754,8 @@ def _inspect_parquet_footer_bytes(
     *,
     blob_size_bytes: int | None,
 ) -> dict[str, Any]:
+    # Prepend PARQUET_MAGIC so PyArrow can parse the metadata-only buffer as a valid Parquet file.
+    # Size is bounded by MAX_PARQUET_METADATA_BYTES + PARQUET_FOOTER_SIZE checked upstream.
     parquet_file = pq.ParquetFile(pa.BufferReader(PARQUET_MAGIC + footer_bytes))
     return _inspect_parquet_file(blob_name, parquet_file, size_bytes=blob_size_bytes)
 
@@ -924,7 +926,8 @@ async def _resolve_instance(
         raise ValueError("No current Evo instance is selected.")
 
     for instance in instances:
-        if instance_id and str(instance.id) == instance_id:
+        instance_id_str = str(instance.id).lower()
+        if instance_id and instance_id.strip().lower() == instance_id_str:
             return {
                 "id": str(instance.id),
                 "name": instance.display_name,
@@ -1424,8 +1427,13 @@ def register_admin_tools(mcp):
                     version=right_version,
                 ),
             )
+        except asyncio.CancelledError:
+            raise
         except (ValueError, PermissionError) as exc:
             return {"error": str(exc)}
+        except Exception as exc:
+            logger.exception("Unexpected failure while resolving objects for detailed comparison")
+            return {"error": f"Unexpected error while resolving objects for comparison: {exc}"}
 
         left_crs_values = sorted(((entry["path"], entry["value"]) for entry in left_side["crs_candidates"]))
         right_crs_values = sorted(((entry["path"], entry["value"]) for entry in right_side["crs_candidates"]))
