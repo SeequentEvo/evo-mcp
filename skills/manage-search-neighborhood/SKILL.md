@@ -121,5 +121,5 @@ When a variogram is staged locally (for example, from `staging_create_object(obj
 Load these files only when the specific condition applies — do not load them proactively:
 
 - Read `references/tool_call_reference.md` if a tool invocation fails and you need to verify the exact parameter names or call structure.
-- Read `references/parameter_guidance.md` when the user asks how to tune ranges or sample limits.
+- Read `references/parameter_guidance.md` to guide range and sample-limit choices during workflow setup
 - Read `references/payload_contract.md` when you need exact input/output field contracts for neighborhood creation.
