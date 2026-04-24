@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import json
 import logging
 import re
 from collections import defaultdict
@@ -514,7 +513,7 @@ def _safe_value(value: Any, *, max_length: int = 240) -> Any:
         if isinstance(value, str) and len(value) > max_length:
             return f"{value[:max_length]}..."
         return value
-    text = json.dumps(value, sort_keys=True, default=str)
+    text = repr(value)
     if len(text) > max_length:
         text = f"{text[:max_length]}..."
     return text
@@ -656,17 +655,15 @@ async def _download_blob_response(
                 f"Response Content-Length ({content_length:,} bytes) exceeds the "
                 f"{max_bytes:,} byte download cap. Aborting before downloading."
             )
-        chunks: list[bytes] = []
-        total = 0
+        buf = bytearray()
         async for chunk in response.content.iter_chunked(1024 * 1024):
-            total += len(chunk)
-            if total > max_bytes:
+            buf.extend(chunk)
+            if len(buf) > max_bytes:
                 raise ValueError(
                     f"Response body exceeded the {max_bytes:,} byte download cap "
-                    f"after reading {total:,} bytes. Download aborted."
+                    f"after reading {len(buf):,} bytes. Download aborted."
                 )
-            chunks.append(chunk)
-        return b"".join(chunks)
+        return bytes(buf)
 
     async def _fetch(s: aiohttp.ClientSession) -> tuple[bytes, dict[str, str], int]:
         async with s.get(download_url, headers=base_headers) as response:
