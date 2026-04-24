@@ -20,6 +20,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+_pending_deletions: set[str] = set()
+
+
 def register_general_tools(mcp):
     """Register all general tools with the FastMCP server."""
 
@@ -108,6 +111,100 @@ def register_general_tools(mcp):
             "created_by": workspace.created_by.id if workspace.created_by else None,
             "default_coordinate_system": workspace.default_coordinate_system,
             "labels": workspace.labels,
+        }
+
+    @mcp.tool()
+    async def delete_workspace(workspace_id: str = "", workspace_name: str = "", confirm: bool = False) -> dict:
+        """Delete a workspace by ID or name.
+
+        When called without confirm=True, returns workspace details for the user
+        to review. Call again with confirm=True to proceed with deletion.
+
+        Args:
+            workspace_id: Workspace UUID (provide either this or workspace_name)
+            workspace_name: Workspace name (provide either this or workspace_id)
+            confirm: Set to True to confirm deletion. Defaults to False.
+        """
+        await ensure_initialized()
+
+        if workspace_id:
+            workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
+        elif workspace_name:
+            workspaces = await evo_context.workspace_client.list_workspaces(name=workspace_name)
+            matching = [ws for ws in workspaces.items() if ws.display_name == workspace_name]
+            if not matching:
+                raise ValueError(f"Workspace '{workspace_name}' not found")
+            workspace = matching[0]
+        else:
+            raise ValueError("Either workspace_id or workspace_name must be provided")
+
+        if workspace.user_role is None or workspace.user_role.name not in ("owner",):
+            role_name = workspace.user_role.name if workspace.user_role else "unknown"
+            raise PermissionError(
+                f"You do not have permission to delete workspace '{workspace.display_name}'. "
+                f"Your role is '{role_name}'. Only owners can delete workspaces."
+            )
+
+        ws_id_str = str(workspace.id)
+
+        if not confirm:
+            _pending_deletions.add(ws_id_str)
+            return {
+                "id": ws_id_str,
+                "name": workspace.display_name,
+                "description": workspace.description,
+                "user_role": workspace.user_role.name if workspace.user_role else None,
+                "message": (
+                    f"Are you sure you want to delete workspace '{workspace.display_name}' "
+                    f"(ID: {workspace.id})? Call delete_workspace again with confirm=True to proceed."
+                ),
+            }
+
+        if ws_id_str not in _pending_deletions:
+            raise ValueError(
+                f"Workspace '{workspace.display_name}' has not been previewed for deletion. "
+                "Call delete_workspace with confirm=False first to review before deleting."
+            )
+
+        _pending_deletions.discard(ws_id_str)
+        await evo_context.workspace_client.delete_workspace(workspace.id)
+        return {
+            "id": ws_id_str,
+            "name": workspace.display_name,
+            "message": f"Workspace '{workspace.display_name}' deleted successfully",
+        }
+
+    @mcp.tool()
+    async def restore_workspace(workspace_id: str = "", workspace_name: str = "") -> dict:
+        """Restore a soft-deleted workspace by ID or name.
+
+        Args:
+            workspace_id: Workspace UUID (provide either this or workspace_name)
+            workspace_name: Workspace name (provide either this or workspace_id)
+        """
+        await ensure_initialized()
+
+        if workspace_id:
+            ws_id = UUID(workspace_id)
+        elif workspace_name:
+            workspaces = await evo_context.workspace_client.list_workspaces(name=workspace_name, deleted=True)
+            matching = [ws for ws in workspaces.items() if ws.display_name == workspace_name]
+            if not matching:
+                raise ValueError(f"Deleted workspace '{workspace_name}' not found")
+            ws_id = matching[0].id
+        else:
+            raise ValueError("Either workspace_id or workspace_name must be provided")
+
+        await evo_context.workspace_client._workspaces_api.restore_soft_deleted_workspace(
+            workspace_id=str(ws_id),
+            org_id=str(evo_context.org_id),
+            deleted="false",
+        )
+        workspace = await evo_context.workspace_client.get_workspace(ws_id)
+        return {
+            "id": str(ws_id),
+            "name": workspace.display_name,
+            "message": f"Workspace '{workspace.display_name}' (ID: {ws_id}) restored successfully",
         }
 
     @mcp.tool()
