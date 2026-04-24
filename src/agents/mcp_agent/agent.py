@@ -25,7 +25,11 @@ if env_path.exists():
     load_dotenv(env_path)
 
 # Agent configuration from environment variables
-TOOL_FILTER = os.getenv("MCP_TOOL_FILTER", "all")
+# Valid filters must match those accepted by the MCP server (src/mcp_tools.py).
+VALID_TOOL_FILTERS = ["admin", "data", "all"]
+TOOL_FILTER = os.getenv("MCP_TOOL_FILTER", "all").lower()
+if TOOL_FILTER not in VALID_TOOL_FILTERS:
+    TOOL_FILTER = "all"
 MODEL = os.getenv("EVO_AGENT_MODEL", "gemini-3-flash-preview")
 
 # Get the absolute path to the MCP server script (in src directory)
