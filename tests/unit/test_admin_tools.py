@@ -23,7 +23,6 @@ def _register_admin_tools() -> FakeMCP:
     return mcp
 
 
-@pytest.mark.asyncio
 async def test_create_workspace_maps_response(monkeypatch):
     """Given a created workspace, when the tool runs, then workspace metadata is mapped into the response."""
     monkeypatch.setattr(admin_tools, "ensure_initialized", AsyncMock())
@@ -55,7 +54,6 @@ async def test_create_workspace_maps_response(monkeypatch):
     )
 
 
-@pytest.mark.asyncio
 async def test_get_workspace_summary_counts_by_schema(monkeypatch):
     """Given workspace objects with mixed schema types, when summarized, then counts are grouped by schema."""
     monkeypatch.setattr(admin_tools, "ensure_initialized", AsyncMock())
@@ -94,7 +92,6 @@ async def test_get_workspace_summary_counts_by_schema(monkeypatch):
     get_file_client.assert_awaited_once_with(admin_tools.UUID(workspace_id))
 
 
-@pytest.mark.asyncio
 async def test_create_workspace_snapshot_includes_blob_metadata_when_requested(monkeypatch):
     """Given objects with downloadable data, when snapshotting with blobs enabled, then data blob references are included."""
     monkeypatch.setattr(admin_tools, "ensure_initialized", AsyncMock())
@@ -145,7 +142,6 @@ async def test_create_workspace_snapshot_includes_blob_metadata_when_requested(m
     assert result["snapshot"]["objects"][1]["data_blobs"] == []
 
 
-@pytest.mark.asyncio
 async def test_workspace_copy_object_copies_blob_data_and_clears_uuid(monkeypatch):
     """Given a source object with blob references, when copied, then blobs are copied and the created object has no uuid."""
     monkeypatch.setattr(admin_tools, "ensure_initialized", AsyncMock())
@@ -186,7 +182,6 @@ async def test_workspace_copy_object_copies_blob_data_and_clears_uuid(monkeypatc
     assert result["version_id"] == "v9"
 
 
-@pytest.mark.asyncio
 async def test_workspace_duplicate_workspace_filters_objects_and_tracks_failures(monkeypatch):
     """Given filtered source objects, when duplicating, then only matching objects are copied and failures are counted."""
     monkeypatch.setattr(admin_tools, "ensure_initialized", AsyncMock())

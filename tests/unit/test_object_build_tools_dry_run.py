@@ -18,7 +18,6 @@ def _register_builder_tools() -> FakeMCP:
     return mcp
 
 
-@pytest.mark.asyncio
 async def test_build_and_create_pointset_dry_run_passes(tmp_path):
     """Given valid pointset CSV input, when dry-run is enabled, then validation passes with a preview."""
     csv_path = tmp_path / "points.csv"
@@ -44,7 +43,6 @@ async def test_build_and_create_pointset_dry_run_passes(tmp_path):
     assert "object_preview" in result
 
 
-@pytest.mark.asyncio
 async def test_build_and_create_pointset_missing_required_column_fails(tmp_path):
     """Given missing coordinate columns, when validating pointset CSV, then validation fails."""
     csv_path = tmp_path / "points_missing.csv"
@@ -69,7 +67,6 @@ async def test_build_and_create_pointset_missing_required_column_fails(tmp_path)
     assert "Missing required columns" in result["validation"]["errors"][0]
 
 
-@pytest.mark.asyncio
 async def test_build_and_create_line_segments_dry_run_passes(tmp_path):
     """Given valid line inputs, when dry-run is enabled, then validation passes with counts."""
     vertices_path = tmp_path / "vertices.csv"
@@ -101,7 +98,6 @@ async def test_build_and_create_line_segments_dry_run_passes(tmp_path):
     assert result["object_preview"]["segments"] == 2
 
 
-@pytest.mark.asyncio
 async def test_build_and_create_line_segments_invalid_indices_fail(tmp_path):
     """Given out-of-range segment indices, when validating, then the tool reports invalid indices."""
     vertices_path = tmp_path / "vertices.csv"
@@ -132,7 +128,6 @@ async def test_build_and_create_line_segments_invalid_indices_fail(tmp_path):
     assert "Segment indices exceed vertex count" in result["validation"]["errors"][0]
 
 
-@pytest.mark.asyncio
 async def test_build_and_create_downhole_collection_dry_run_passes(tmp_path):
     """Given valid collar, survey, and interval inputs, when dry-run is enabled, then validation passes."""
     collar_path = tmp_path / "collar.csv"
@@ -189,7 +184,6 @@ async def test_build_and_create_downhole_collection_dry_run_passes(tmp_path):
     assert result["object_preview"]["collections"] == ["assay"]
 
 
-@pytest.mark.asyncio
 async def test_build_and_create_downhole_collection_missing_interval_column_fails(tmp_path):
     """Given an invalid interval config, when validating, then the missing interval columns are reported."""
     collar_path = tmp_path / "collar.csv"
@@ -235,7 +229,6 @@ async def test_build_and_create_downhole_collection_missing_interval_column_fail
     assert "Interval 'assay' missing columns" in result["validation"]["errors"][0]
 
 
-@pytest.mark.asyncio
 async def test_build_and_create_downhole_intervals_dry_run_passes(tmp_path):
     """Given valid interval coordinates, when dry-run is enabled, then validation passes with preview details."""
     csv_path = tmp_path / "intervals.csv"
@@ -275,7 +268,6 @@ async def test_build_and_create_downhole_intervals_dry_run_passes(tmp_path):
     assert result["object_preview"]["holes"] == 1
 
 
-@pytest.mark.asyncio
 async def test_build_and_create_downhole_intervals_missing_required_column_fails(tmp_path):
     """Given a missing midpoint column, when validating, then the tool reports the required column error."""
     csv_path = tmp_path / "intervals_missing.csv"

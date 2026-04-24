@@ -31,7 +31,6 @@ def _fake_user(index: int) -> SimpleNamespace:
     )
 
 
-@pytest.mark.asyncio
 async def test_get_users_in_instance_pages_and_respects_count(monkeypatch):
     """Given paged API results, when listing users with a count, then the result is trimmed to that count."""
     monkeypatch.setattr(instance_users_admin_tools, "ensure_initialized", AsyncMock())
@@ -55,7 +54,6 @@ async def test_get_users_in_instance_pages_and_respects_count(monkeypatch):
     assert workspace_client.list_instance_users.await_args_list[1].kwargs == {"offset": 100, "limit": 100}
 
 
-@pytest.mark.asyncio
 async def test_list_roles_in_instance_returns_workspace_roles(monkeypatch):
     """Given instance roles from the workspace client, when listed, then the response is returned unchanged."""
     monkeypatch.setattr(instance_users_admin_tools, "ensure_initialized", AsyncMock())
@@ -73,7 +71,6 @@ async def test_list_roles_in_instance_returns_workspace_roles(monkeypatch):
     workspace_client.list_instance_roles.assert_awaited_once_with()
 
 
-@pytest.mark.asyncio
 async def test_add_users_to_instance_maps_invitations_and_members(monkeypatch):
     """Given add-user results, when users are added, then invitations and members are mapped by email."""
     monkeypatch.setattr(instance_users_admin_tools, "ensure_initialized", AsyncMock())
@@ -106,7 +103,6 @@ async def test_add_users_to_instance_maps_invitations_and_members(monkeypatch):
     )
 
 
-@pytest.mark.asyncio
 async def test_remove_user_from_instance_calls_workspace_client(monkeypatch):
     """Given a user removal request, when the tool runs, then the workspace client is called and the removed email is returned."""
     monkeypatch.setattr(instance_users_admin_tools, "ensure_initialized", AsyncMock())
@@ -124,7 +120,6 @@ async def test_remove_user_from_instance_calls_workspace_client(monkeypatch):
     workspace_client.remove_instance_user.assert_awaited_once_with(user_id=user_id)
 
 
-@pytest.mark.asyncio
 async def test_update_user_role_in_instance_calls_workspace_client(monkeypatch):
     """Given a role update request, when the tool runs, then the workspace client is called and the new roles are returned."""
     monkeypatch.setattr(instance_users_admin_tools, "ensure_initialized", AsyncMock())
@@ -146,7 +141,6 @@ async def test_update_user_role_in_instance_calls_workspace_client(monkeypatch):
     workspace_client.update_instance_user_roles.assert_awaited_once_with(user_id=user_id, roles=role_ids)
 
 
-@pytest.mark.asyncio
 async def test_instance_user_tools_require_connected_workspace_client(monkeypatch):
     """Given no selected instance, when an instance-user admin tool runs, then a clear ValueError is raised."""
     monkeypatch.setattr(instance_users_admin_tools, "ensure_initialized", AsyncMock())

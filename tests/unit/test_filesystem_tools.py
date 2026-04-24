@@ -12,7 +12,6 @@ from tests.helpers import FakeMCP
 pytestmark = pytest.mark.unit
 
 
-@pytest.mark.asyncio
 async def test_configure_local_data_directory_invalid_path_returns_error(tmp_path):
     """Given a missing directory, when configured, then status is invalid."""
     mcp = FakeMCP()
@@ -25,7 +24,6 @@ async def test_configure_local_data_directory_invalid_path_returns_error(tmp_pat
     assert "does not exist" in result["error"]
 
 
-@pytest.mark.asyncio
 async def test_list_local_data_files_recursive_finds_csv(tmp_path, monkeypatch):
     """Given nested CSV files, when listing recursively, then both files are returned."""
     (tmp_path / "a.csv").write_text("x,y,z\n1,2,3\n", encoding="utf-8")
@@ -46,7 +44,6 @@ async def test_list_local_data_files_recursive_finds_csv(tmp_path, monkeypatch):
     assert names == ["a.csv", "b.csv"]
 
 
-@pytest.mark.asyncio
 async def test_preview_csv_file_returns_schema_and_sample(tmp_path, monkeypatch):
     """Given a valid CSV, when previewed, then schema metadata and sample rows are returned."""
     csv_path = tmp_path / "points.csv"
@@ -66,7 +63,6 @@ async def test_preview_csv_file_returns_schema_and_sample(tmp_path, monkeypatch)
     assert any(col["name"] == "X" for col in result["columns"])
 
 
-@pytest.mark.asyncio
 async def test_preview_csv_file_missing_returns_file_missing(tmp_path, monkeypatch):
     """Given a missing CSV, when previewed, then the response status is file_missing."""
     monkeypatch.setenv("EVO_LOCAL_DATA_DIR", str(tmp_path))

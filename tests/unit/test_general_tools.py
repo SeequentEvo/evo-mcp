@@ -23,7 +23,6 @@ def _register_general_tools() -> FakeMCP:
     return mcp
 
 
-@pytest.mark.asyncio
 async def test_get_workspace_requires_identifier(monkeypatch):
     """Given no workspace identifier, when get_workspace is called, then it raises ValueError."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
@@ -35,7 +34,6 @@ async def test_get_workspace_requires_identifier(monkeypatch):
         await tool()
 
 
-@pytest.mark.asyncio
 async def test_get_workspace_by_name_not_found(monkeypatch):
     """Given no matching workspace name, when looked up, then a not-found ValueError is raised."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
@@ -50,7 +48,6 @@ async def test_get_workspace_by_name_not_found(monkeypatch):
         await tool(workspace_name="does-not-exist")
 
 
-@pytest.mark.asyncio
 async def test_list_workspaces_maps_shape(monkeypatch):
     """Given SDK workspace objects, when listed, then output is mapped to response dictionaries."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
@@ -76,7 +73,6 @@ async def test_list_workspaces_maps_shape(monkeypatch):
     assert result[0]["user_role"] == "ADMIN"
 
 
-@pytest.mark.asyncio
 async def test_select_instance_switches_by_name(monkeypatch):
     """Given a matching instance name, when selected, then evo_context.switch_instance is called."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
@@ -101,7 +97,6 @@ async def test_select_instance_switches_by_name(monkeypatch):
     assert result.display_name == "Sandbox"
 
 
-@pytest.mark.asyncio
 async def test_workspace_health_check_includes_workspace_and_object_services(monkeypatch):
     """Given workspace and object clients, when health is checked, then both service statuses are returned."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
@@ -128,7 +123,6 @@ async def test_workspace_health_check_includes_workspace_and_object_services(mon
     get_object_client.assert_awaited_once_with(general_tools.UUID(workspace_id))
 
 
-@pytest.mark.asyncio
 async def test_list_objects_maps_shape(monkeypatch):
     """Given SDK object results, when listed, then object metadata is mapped to response dictionaries."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
@@ -179,7 +173,6 @@ async def test_list_objects_maps_shape(monkeypatch):
     get_object_client.assert_awaited_once_with(general_tools.UUID(workspace_id))
 
 
-@pytest.mark.asyncio
 async def test_get_object_by_path_maps_metadata(monkeypatch):
     """Given an object path, when object metadata is fetched, then the downloaded metadata is mapped correctly."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
@@ -232,7 +225,6 @@ async def test_get_object_by_path_maps_metadata(monkeypatch):
     get_object_client.assert_awaited_once_with(general_tools.UUID(workspace_id))
 
 
-@pytest.mark.asyncio
 async def test_get_object_requires_identifier(monkeypatch):
     """Given no object identifier, when get_object is called, then it raises ValueError."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
@@ -245,7 +237,6 @@ async def test_get_object_requires_identifier(monkeypatch):
         await tool(workspace_id=str(uuid4()))
 
 
-@pytest.mark.asyncio
 async def test_list_my_instances_reports_selected_instance(monkeypatch):
     """Given a selected instance, when listing instances, then context info is emitted and discovery results are returned."""
     monkeypatch.setattr(general_tools, "ensure_initialized", AsyncMock())
