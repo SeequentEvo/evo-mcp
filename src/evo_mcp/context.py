@@ -41,6 +41,8 @@ load_dotenv(dotenv_path=env_path)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") == "1" else logging.INFO)
 
+DEFAULT_ISSUER_URL = "https://ims.bentley.com"
+
 
 class EvoContext:
     """Maintains Evo SDK connection state and clients."""
@@ -91,14 +93,37 @@ class EvoContext:
         with open(self.cache_path / "variables.json", "w", encoding="utf-8") as f:
             json.dump(variables, f)
 
+    def get_auth_method(self) -> str:
+        """Return the configured authentication method."""
+        auth_method = os.getenv("AUTH_METHOD", "native_app").strip().lower()
+        return auth_method or "native_app"
+
+    def _should_bypass_token_cache(self) -> bool:
+        return os.getenv("EVO_DISABLE_TOKEN_CACHE") == "1"
+
+    def _get_token_cache_candidates(self) -> list[Path]:
+        auth_method = self.get_auth_method().replace("-", "_")
+        candidates = [self.cache_path / f"evo_token_cache_{auth_method}.json"]
+
+        # Preserve compatibility with older native-app token cache naming.
+        if auth_method == "native_app":
+            candidates.append(self.cache_path / "evo_token_cache.json")
+
+        return candidates
+
     def get_access_token_from_cache(self) -> Optional[str]:
         """Retrieve access token from cache if valid, else return None."""
-        # Token cache file location - use repo directory for easier debugging
-        token_cache_path = self.cache_path / "evo_token_cache.json"
+        if self._should_bypass_token_cache():
+            logger.info("Token cache disabled by EVO_DISABLE_TOKEN_CACHE=1")
+            return None
+
         # Try to load cached token first
 
-        logger.debug(f"Checking for cached token at {token_cache_path}")
-        if token_cache_path.exists():
+        for token_cache_path in self._get_token_cache_candidates():
+            logger.debug(f"Checking for cached token at {token_cache_path}")
+            if not token_cache_path.exists():
+                continue
+
             try:
                 with open(token_cache_path, "r") as f:
                     token_data = json.load(f)
@@ -117,13 +142,17 @@ class EvoContext:
             except Exception as e:
                 # Token expired or invalid, need to re-authenticate
                 logger.info(f"Cached token invalid or expired: {type(e).__name__} - {str(e)}")
-        else:
-            logger.info(f"No cached token found at {token_cache_path}")
+
+        logger.info("No valid cached token found for auth method %s", self.get_auth_method())
         return None
 
     def save_access_token_to_cache(self, access_token: str) -> None:
         """Save access token to cache file."""
-        token_cache_path = self.cache_path / "evo_token_cache.json"
+        if self._should_bypass_token_cache():
+            logger.info("Skipping token cache write because EVO_DISABLE_TOKEN_CACHE=1")
+            return
+
+        token_cache_path = self._get_token_cache_candidates()[0]
         with open(token_cache_path, "w") as f:
             json.dump({"access_token": access_token}, f)
         logger.info(f"Access token saved to cache at {token_cache_path}")
@@ -136,11 +165,15 @@ class EvoContext:
         self.transport = AioTransport(user_agent=f"{__dist_name__}/{__version__}")
         return self.transport
 
+    def get_issuer_url(self) -> str:
+        """Return the configured OAuth issuer URL."""
+        return os.getenv("ISSUER_URL", DEFAULT_ISSUER_URL)
+
     async def get_access_token_via_client_credentials(self) -> str:
         logger.debug("Obtaining a new service token")
         client_id = os.getenv("EVO_CLIENT_ID")
         client_secret = os.getenv("EVO_CLIENT_SECRET")
-        issuer_url = os.getenv("ISSUER_URL")
+        issuer_url = self.get_issuer_url()
         if not client_id or not client_secret:
             raise ValueError(
                 "EVO_CLIENT_ID and EVO_CLIENT_SECRET environment variables are required with client credentials authentication method"
@@ -165,7 +198,7 @@ class EvoContext:
         # Set up OAuth authentication (following SDK example pattern)
         redirect_url = os.getenv("EVO_REDIRECT_URL")
         client_id = os.getenv("EVO_CLIENT_ID")
-        issuer_url = os.getenv("ISSUER_URL")
+        issuer_url = self.get_issuer_url()
         if not client_id:
             raise ValueError("EVO_CLIENT_ID environment variable is required")
 
@@ -195,7 +228,7 @@ class EvoContext:
 
         # If no valid cached token, do full OAuth login
         if access_token is None:
-            auth_method = os.environ.get("AUTH_METHOD")
+            auth_method = self.get_auth_method()
             if auth_method == "client_credentials":
                 access_token = await self.get_access_token_via_client_credentials()
             else:
@@ -208,8 +241,11 @@ class EvoContext:
 
     async def initialize(self):
         """Initialize connection to Evo platform with OAuth authentication."""
-        if self._initialized and self.get_access_token_from_cache() is not None:
-            return
+        if self._initialized:
+            if self._should_bypass_token_cache():
+                return
+            if self.get_access_token_from_cache() is not None:
+                return
 
         # Get configuration from environment variables
         discovery_url = os.getenv("EVO_DISCOVERY_URL")
