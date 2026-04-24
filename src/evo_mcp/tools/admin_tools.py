@@ -822,6 +822,7 @@ async def _inspect_parquet_metadata(
         hub_url=hub_url,
         session=session,
         request_headers={"Range": f"bytes=-{PARQUET_FOOTER_SIZE}"},
+        max_bytes=PARQUET_FOOTER_SIZE,
     )
 
     if footer_bytes.startswith(PARQUET_MAGIC):
@@ -846,6 +847,7 @@ async def _inspect_parquet_metadata(
         hub_url=hub_url,
         session=session,
         request_headers={"Range": f"bytes=-{metadata_and_footer_size}"},
+        max_bytes=metadata_and_footer_size,
     )
 
     if tail_bytes.startswith(PARQUET_MAGIC):
