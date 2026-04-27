@@ -9,33 +9,33 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Find all objects in my workspace that I could use for a kriging workflow",
-      "expected_output": "A list of workspace objects relevant to kriging is returned, including point sets (sample sources), block models (estimation targets), and variogram models (spatial continuity), with enough detail to identify each object's role",
-      "category": "kriging-workflow-discovery"
+      "prompt": "How do I run a kriging workflow?",
+      "expected_output": "The system explains the step-by-step kriging workflow in plain language, including workspace confirmation, object resolution or creation, search neighborhood design, attribute confirmation, publish requirements, and final handoff readiness. It does not execute kriging",
+      "category": "workflow-guidance-step-by-step"
     },
     {
       "id": 2,
-      "prompt": "Run ordinary kriging on my KO Copper Samples targeting the KO Estimate Target, using the KO CU Variogram and a 2x search neighborhood with 16 max samples",
-      "expected_output": "A kriging scenario is configured with ordinary kriging, the CU_pct attribute selected from KO Copper Samples, KO CU Variogram as the variogram model, a 2x-scaled search neighborhood with 16 max samples, and the run is submitted successfully against KO Estimate Target",
-      "category": "single-scenario-happy-path"
+      "prompt": "Find all objects in my workspace that I could use for a kriging workflow",
+      "expected_output": "A list of workspace objects relevant to kriging is returned, including point sets (sample sources), block models (estimation targets), and variogram models (spatial continuity), with enough detail to identify each object's role and prepare the workflow inputs",
+      "category": "kriging-workflow-discovery"
     },
     {
       "id": 3,
-      "prompt": "Compare ordinary kriging and simple kriging with a mean of 0.5 for the gold attribute, both using the default neighborhood",
-      "expected_output": "Two kriging scenarios are built: one using ordinary kriging and one using simple kriging with mean=0.5. Both reference AU_gpt from KO Copper Samples and use the default search neighborhood. Both scenarios are submitted for execution",
-      "category": "multi-scenario-comparison"
+      "prompt": "Prepare ordinary kriging on my KO Copper Samples targeting the KO Estimate Target, using the KO CU Variogram and a 2x search neighborhood with 16 max samples",
+      "expected_output": "A kriging scenario is configured with ordinary kriging, the CU_pct attribute selected from KO Copper Samples, KO CU Variogram as the variogram model, and a 2x-scaled search neighborhood with 16 max samples. Before handoff, the system presents a final confirmation summary (source, variogram, target, method, neighborhood, and attributes) and requires explicit user confirmation. No execution is submitted",
+      "category": "single-scenario-happy-path"
     },
     {
       "id": 4,
-      "prompt": "Run kriging without specifying which attribute to estimate",
-      "expected_output": "The request fails with a clear error indicating that an estimation attribute must be specified before kriging can proceed",
-      "category": "missing-attribute-error"
+      "prompt": "Compare ordinary kriging and simple kriging with a mean of 0.5 for the gold attribute, both using the default neighborhood",
+      "expected_output": "Two kriging scenarios are prepared: one using ordinary kriging and one using simple kriging with mean=0.5. Both reference AU_gpt from KO Copper Samples and use the default search neighborhood. Before handoff, the system presents a final confirmation summary for both scenarios and requires explicit user confirmation. No execution is submitted",
+      "category": "multi-scenario-comparison"
     },
     {
       "id": 5,
-      "prompt": "Set up kriging for zinc using inverse distance weighting as a fallback where the variogram coverage is poor, and ordinary kriging everywhere else",
-      "expected_output": "The system explains that kriging does not support hybrid interpolation methods in a single run. It offers to configure ordinary kriging for ZN_pct as the primary method and suggests running inverse distance weighting as a separate pass if needed",
-      "category": "hybrid-method-request"
+      "prompt": "Prepare kriging using KO Copper Samples, KO CU Variogram, and KO Estimate Target.",
+      "expected_output": "Before producing a handoff-ready scenario, the system explicitly asks for both the source estimation attribute and the target output attribute name. It does not proceed with implicit attribute assumptions",
+      "category": "attribute-confirmation-checkpoint"
     }
   ]
 }

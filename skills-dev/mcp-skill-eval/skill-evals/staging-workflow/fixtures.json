@@ -26,6 +26,33 @@
       }
     ]
   },
+  "import_variogram_discard_workspace": {
+    "seed_mode": "workspace",
+    "object_type": "variogram",
+    "name": "EOM Import Variogram Discard",
+    "description": "Workspace-only variogram fixture dedicated to import-then-discard eval",
+    "sill": 1.15,
+    "nugget": 0.04,
+    "is_rotation_fixed": false,
+    "structures": [
+      {
+        "variogram_type": "spherical",
+        "contribution": 1.0,
+        "anisotropy": {
+          "ellipsoid_ranges": {
+            "major": 195.0,
+            "semi_major": 145.0,
+            "minor": 95.0
+          },
+          "rotation": {
+            "dip_azimuth": 0.0,
+            "dip": 0.0,
+            "pitch": 0.0
+          }
+        }
+      }
+    ]
+  },
   "import_point_set_workspace": {
     "seed_mode": "workspace",
     "object_type": "point_set",
@@ -78,6 +105,58 @@
       }
     }
   },
+  "import_point_set_duplicate_workspace": {
+    "seed_mode": "workspace",
+    "object_type": "point_set",
+    "name": "EOM Import Point Set Duplicate",
+    "description": "Workspace-only point set fixture dedicated to duplicate-name eval",
+    "data": {
+      "coordinates": {
+        "x": [
+          1060.0,
+          1070.0,
+          1080.0,
+          1090.0,
+          1100.0,
+          1110.0
+        ],
+        "y": [
+          2060.0,
+          2070.0,
+          2080.0,
+          2090.0,
+          2100.0,
+          2110.0
+        ],
+        "z": [
+          360.0,
+          362.0,
+          364.0,
+          366.0,
+          368.0,
+          370.0
+        ]
+      },
+      "attributes": {
+        "GRADE": [
+          0.51,
+          0.49,
+          0.55,
+          0.57,
+          0.53,
+          0.5
+        ],
+        "DOMAIN": [
+          4,
+          4,
+          5,
+          5,
+          6,
+          6
+        ]
+      }
+    }
+  },
   "import_block_model_workspace": {
     "seed_mode": "workspace",
     "object_type": "regular_block_model",
@@ -117,6 +196,33 @@
             "major": 180.0,
             "semi_major": 130.0,
             "minor": 90.0
+          },
+          "rotation": {
+            "dip_azimuth": 0.0,
+            "dip": 0.0,
+            "pitch": 0.0
+          }
+        }
+      }
+    ]
+  },
+  "interaction_variogram_staged": {
+    "seed_mode": "staged",
+    "object_type": "variogram",
+    "name": "EOM Stage Variogram Interaction",
+    "description": "Staged-only variogram fixture dedicated to interaction summary eval",
+    "sill": 1.1,
+    "nugget": 0.06,
+    "is_rotation_fixed": false,
+    "structures": [
+      {
+        "variogram_type": "spherical",
+        "contribution": 1.0,
+        "anisotropy": {
+          "ellipsoid_ranges": {
+            "major": 205.0,
+            "semi_major": 155.0,
+            "minor": 105.0
           },
           "rotation": {
             "dip_azimuth": 0.0,
