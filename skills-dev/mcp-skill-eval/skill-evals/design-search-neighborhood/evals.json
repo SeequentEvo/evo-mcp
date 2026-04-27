@@ -1,5 +1,5 @@
 {
-  "skill_name": "manage-search-neighborhood",
+  "skill_name": "design-search-neighborhood",
   "setup": {
     "steps": [
       {"step": 0, "tool": "staging_reset", "args": {}},

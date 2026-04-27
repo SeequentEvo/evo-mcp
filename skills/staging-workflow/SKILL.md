@@ -20,7 +20,6 @@ Use this skill when the user needs to:
 - fetch objects from Evo into the session
 - inspect object contents or readiness
 - apply updates or transformations to a staged object
-- check spatial compatibility before compute operations
 - publish objects back to Evo
 - list what objects are currently staged in the session
 - remove or discard a staged object
@@ -40,7 +39,6 @@ Do not use this skill when:
 | `staging_list_object_types` | Discover supported object types |
 | `staging_list_interactions` | Discover interactions available for an object type |
 | `staging_invoke_interaction` | Run an interaction on a staged object |
-| `staging_spatial_validation` | Validate CRS compatibility between two staged objects |
 | `staging_publish_object` | Publish a staged object to Evo |
 | `staging_list` | List all objects currently in the session |
 | `staging_discard_object` | Discard/remove/delete an object from the session |
@@ -50,9 +48,8 @@ Do not use this skill when:
 1. Translate the request into object actions.
 2. Fetch or create the working object.
 3. Inspect and apply requested updates.
-4. Run compatibility checks when relevant.
-5. Publish when requested.
-6. Return a short outcome-focused response.
+4. Publish when requested.
+5. Return a short outcome-focused response.
 
 When the user asks what's in the session, use `staging_list` and present the results as a plain-language table.
 
@@ -81,7 +78,7 @@ When the user asks to remove or discard an object, use `staging_discard_object` 
 
 ## Required Inputs
 
-- User intent: fetch, inspect, update, validate, publish, list, or remove
+- User intent: fetch, inspect, update, publish, list, or remove
 - Enough object context to identify source/target objects
 
 ## Optional Inputs
