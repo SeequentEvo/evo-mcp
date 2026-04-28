@@ -557,7 +557,6 @@ def _collect_crs_candidates(
             normalized = re.sub(r"[^a-z0-9]", "", key.lower())
             if normalized in {
                 "crs",
-                "coordinatecoordinatesystem",
                 "coordinatereferencesystem",
                 "coordinatesystem",
                 "coordinatesystemname",
@@ -882,6 +881,30 @@ async def _inspect_data_link(
         return result
 
 
+def _compare_parquet_field(left: dict[str, Any], right: dict[str, Any], key: str) -> bool | str:
+    """Compare a single metadata field, returning 'inconclusive' if either side has an error."""
+    if "error" in left or "error" in right:
+        return "inconclusive"
+    return left.get(key) == right.get(key)
+
+
+def _compare_parquet_pair(
+    left: dict[str, Any],
+    right: dict[str, Any],
+    *,
+    extra: dict[str, Any] | None = None,
+    include_row_group_count: bool = False,
+) -> dict[str, Any]:
+    """Build a comparison dict for a pair of parquet metadata items."""
+    result: dict[str, Any] = dict(extra) if extra else {}
+    result["same_parquet_format_version"] = _compare_parquet_field(left, right, "parquet_format_version")
+    result["same_arrow_schema"] = _compare_parquet_field(left, right, "arrow_schema")
+    result["same_row_count"] = _compare_parquet_field(left, right, "num_rows")
+    if include_row_group_count:
+        result["same_row_group_count"] = _compare_parquet_field(left, right, "num_row_groups")
+    return result
+
+
 def _compare_parquet_metadata(left_files: list[dict[str, Any]], right_files: list[dict[str, Any]]) -> dict[str, Any]:
     left_by_name = {item["blob_name"]: item for item in left_files}
     right_by_name = {item["blob_name"]: item for item in right_files}
@@ -895,28 +918,26 @@ def _compare_parquet_metadata(left_files: list[dict[str, Any]], right_files: lis
         left_item = left_by_name[blob_name]
         right_item = right_by_name[blob_name]
         shared_blob_comparisons.append(
-            {
-                "blob_name": blob_name,
-                "same_parquet_format_version": left_item.get("parquet_format_version")
-                == right_item.get("parquet_format_version"),
-                "same_arrow_schema": left_item.get("arrow_schema") == right_item.get("arrow_schema"),
-                "same_row_count": left_item.get("num_rows") == right_item.get("num_rows"),
-                "same_row_group_count": left_item.get("num_row_groups") == right_item.get("num_row_groups"),
-            }
+            _compare_parquet_pair(
+                left_item,
+                right_item,
+                extra={"blob_name": blob_name},
+                include_row_group_count=True,
+            )
         )
 
     index_pairs = []
     for index, (left_item, right_item) in enumerate(zip(left_files, right_files, strict=False), start=1):
         index_pairs.append(
-            {
-                "index": index,
-                "left_blob_name": left_item.get("blob_name"),
-                "right_blob_name": right_item.get("blob_name"),
-                "same_parquet_format_version": left_item.get("parquet_format_version")
-                == right_item.get("parquet_format_version"),
-                "same_arrow_schema": left_item.get("arrow_schema") == right_item.get("arrow_schema"),
-                "same_row_count": left_item.get("num_rows") == right_item.get("num_rows"),
-            }
+            _compare_parquet_pair(
+                left_item,
+                right_item,
+                extra={
+                    "index": index,
+                    "left_blob_name": left_item.get("blob_name"),
+                    "right_blob_name": right_item.get("blob_name"),
+                },
+            )
         )
 
     return {
