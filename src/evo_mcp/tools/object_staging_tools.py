@@ -255,9 +255,7 @@ def register_object_staging_tools(mcp) -> None:
             name=data.name,
             object_type=descriptor.object_type,
             stage_id=envelope.stage_id,
-            source="imported",
             workspace_id=workspace_id,
-            summary=envelope.summary,
         )
         return {
             "name": data.name,
@@ -348,8 +346,6 @@ def register_object_staging_tools(mcp) -> None:
         object_registry.mark_published(
             name=object_name,
             object_type=entry.object_type,
-            object_id=str(metadata.id),
-            version_id=metadata.version_id,
             workspace_id=workspace_id,
         )
         return {

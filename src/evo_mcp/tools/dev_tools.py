@@ -71,8 +71,6 @@ def _stage_one(name: str, raw: dict, fixture_file: str) -> str:
         name=typed_payload.name,
         object_type=object_type,
         stage_id=envelope.stage_id,
-        source="fixture",
-        summary=envelope.summary,
     )
     logger.info("Staged '%s' → %s", name, envelope.stage_id)
     return envelope.stage_id
@@ -143,9 +141,7 @@ async def _publish_one(
             name=stage_payload.name,
             object_type=stage_type,
             stage_id=envelope.stage_id,
-            source="seeded",
             workspace_id=workspace_id,
-            summary=envelope.summary,
         )
 
     logger.info("Published '%s' → %s (%s)", name, obj_id, object_type)

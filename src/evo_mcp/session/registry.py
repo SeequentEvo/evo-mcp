@@ -18,9 +18,7 @@ Usage::
         name="CU variogram",
         object_type="variogram",
         stage_id=envelope.stage_id,
-        summary=envelope.summary,
     )
-
     # Downstream tool resolves by name
     entry, payload = object_registry.get_payload("CU variogram")
 """
@@ -68,9 +66,7 @@ class ObjectRegistry:
         name: str,
         object_type: ObjectType,
         stage_id: str,
-        source: str = "built_local",
         workspace_id: str | None = None,
-        summary: dict[str, Any] | None = None,
     ) -> RegistryEntry:
         """Register an object after it has been staged.
 
@@ -82,9 +78,7 @@ class ObjectRegistry:
             object_type=object_type,
             stage_id=stage_id,
             status="staged",
-            source=source,
             workspace_id=workspace_id,
-            summary=summary or {},
             created_at=now_iso(),
         )
         key = self._make_key(name, object_type)
@@ -141,8 +135,6 @@ class ObjectRegistry:
         self,
         name: str,
         object_type: ObjectType,
-        object_id: str,
-        version_id: str | None = None,
         workspace_id: str | None = None,
     ) -> RegistryEntry:
         """Update a registry entry after successful publication."""
@@ -150,8 +142,6 @@ class ObjectRegistry:
         updated = replace(
             entry,
             status="published",
-            published_object_id=object_id,
-            published_version_id=version_id,
             workspace_id=workspace_id or entry.workspace_id,
         )
         key = self._make_key(name, object_type)

@@ -4,7 +4,7 @@
 
 """Session-scoped object registry entry model."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Literal
 
 # Object type is an open string — mirrors staging.models.ObjectType
@@ -26,11 +26,7 @@ class RegistryEntry:
     object_type: ObjectType
     stage_id: str
     status: RegistryStatus = "staged"
-    source: str = "built_local"
     workspace_id: str | None = None
-    published_object_id: str | None = None
-    published_version_id: str | None = None
-    summary: dict[str, Any] = field(default_factory=dict)
     created_at: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -38,8 +34,5 @@ class RegistryEntry:
             "name": self.name,
             "object_type": self.object_type,
             "status": self.status,
-            "source": self.source,
             "workspace_id": self.workspace_id,
-            "published_object_id": self.published_object_id,
-            "summary": self.summary,
         }
