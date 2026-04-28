@@ -281,6 +281,7 @@ async def _get_ellipsoid_details(payload: VariogramData, params: GetEllipsoidDet
         }
     return result
 
+
 # ── Create interaction helpers ─────────────────────────────────────────────────
 
 
@@ -329,7 +330,9 @@ class CreateSearchNeighborhoodParams(BaseModel):
     object_name: str = Field(..., description="Name for the new staged search neighborhood.")
     max_samples: int = Field(..., ge=1, description="Maximum number of samples to use in kriging.")
     min_samples: int | None = Field(None, ge=0, description="Minimum number of samples (optional).")
-    structure_index: int | None = Field(None, ge=0, description="Zero-based structure index. Uses selection_mode if omitted.")
+    structure_index: int | None = Field(
+        None, ge=0, description="Zero-based structure index. Uses selection_mode if omitted."
+    )
     selection_mode: Literal["first", "largest_major"] = Field("first", description="Auto-selection strategy.")
     scale_factor: float = Field(1.0, gt=0, description="Multiplier applied to all ellipsoid ranges.")
     dip_azimuth: float | None = Field(None, description="Override dip azimuth in degrees.")
@@ -462,7 +465,6 @@ class VariogramObjectType(EvoStagedObjectType):
     evo_class = Variogram
     data_class = VariogramData
     supported_publish_modes = frozenset({"create", "new_version"})
-
 
     def _validate(self, payload: VariogramData) -> None:
         if not payload.structures:

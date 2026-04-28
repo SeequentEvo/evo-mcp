@@ -15,12 +15,11 @@ to avoid a circular import with ``evo_mcp.session``.
 """
 
 from evo_mcp.staging.errors import StageError
-from evo_mcp.staging.models import ObjectType, SourceType, StagedEnvelope, StageStatus
+from evo_mcp.staging.models import ObjectType, StagedEnvelope, StageStatus
 from evo_mcp.staging.service import StagingService, staging_service
 
 __all__ = [
     "ObjectType",
-    "SourceType",
     "StageError",
     "StageStatus",
     "StagedEnvelope",

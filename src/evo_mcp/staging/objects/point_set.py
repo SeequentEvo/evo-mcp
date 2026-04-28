@@ -209,7 +209,6 @@ class PointSetObjectType(EvoStagedObjectType):
     data_class = PointSetData
     supported_publish_modes = frozenset({"create", "new_version"})
 
-
     def _validate(self, payload: PointSetData) -> None:
         df = payload.locations
         if df is None or len(df) == 0:

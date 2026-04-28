@@ -88,7 +88,6 @@ class BlockModelObjectType(EvoStagedObjectType):
     data_class = BlockModelData
     supported_publish_modes = frozenset({"new_version"})
 
-
     def summarize(self, payload: Any) -> dict[str, Any]:
         return _details_from_block_model_data(payload)
 

@@ -211,7 +211,6 @@ class RegularBlockModelObjectType(EvoStagedObjectType):
     data_class = RegularBlockModelData
     supported_publish_modes = frozenset({"create"})
 
-
     def from_dict(self, data: dict[str, Any]) -> RegularBlockModelData:
         try:
             name = data["name"]
