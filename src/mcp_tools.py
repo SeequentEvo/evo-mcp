@@ -53,7 +53,6 @@ from evo_mcp.tools import (
     register_object_builder_tools,
     register_object_staging_tools,
     register_skills_sync_tools,
-    register_visualisation_tools,
 )
 
 staging_runtime.configure(object_registry, staging_service)
@@ -150,7 +149,6 @@ if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
     register_file_tools(mcp)
-    register_visualisation_tools(mcp)
     if TOOL_FILTER == "data":
         print("Evo MCP Server configured for Data Agent")
     else:
