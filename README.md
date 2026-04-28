@@ -25,6 +25,8 @@
   - [Testing with curl](#testing-with-curl)
   - [Testing with a Google ADK agent](#testing-with-a-google-adk-agent)
 - [Development](#development)
+  - [Adding new tools](#adding-new-tools)
+  - [Testing](#testing)
 - [Contributing](#contributing)
 - [Code of conduct](#code-of-conduct)
 - [License](#license)
@@ -517,11 +519,53 @@ Browse to http://localhost:8000 to interact with the agent.
 
 ## Development
 
+### Adding new tools
+
 To add new MCP tools:
 1. Add tool function to appropriate module in `src/evo_mcp/tools/`
 2. Decorate with `@mcp.tool()` decorator
 3. Tools are auto-registered based on their module (general/admin/data) on server startup
 4. Test using VS Code integration or the ADK agent
+
+### Testing
+
+The project includes both unit and integration test suites under `tests/`.
+
+- Unit tests (`tests/unit/`) are isolated and do not call live Evo services.
+- Integration tests (`tests/integration/`) are optional, can call live Evo APIs, and are not run by default.
+
+Run tests from the repository root:
+
+```bash
+# All tests (integration tests are skipped by default)
+uv run python -m pytest -q
+
+# Unit tests only
+uv run python -m pytest -q -m unit
+
+# Integration tests only
+uv run python -m pytest -q -m integration
+```
+
+At the moment, the default local test commands and the GitHub Actions workflow run unit tests only. Live integration tests are opt-in and require explicit environment configuration.
+
+To run live integration tests, set these environment variables:
+
+- `RUN_EVO_LIVE_TESTS=1`
+- `AUTH_METHOD=client_credentials`
+- `EVO_CLIENT_ID`
+- `EVO_CLIENT_SECRET`
+- `EVO_DISCOVERY_URL`
+- `EVO_TEST_INSTANCE_ID`
+- `EVO_TEST_WORKSPACE_ID`
+
+For the path-based object metadata test, also set:
+
+- `EVO_TEST_OBJECT_PATH`
+
+`ISSUER_URL` is optional here and defaults to `https://ims.bentley.com` if unset.
+
+See `tests/README.md` for full details on test structure, markers, and CI workflow files.
 
 ### Linting
 

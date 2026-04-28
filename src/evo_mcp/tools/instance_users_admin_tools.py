@@ -53,11 +53,11 @@ def register_instance_users_admin_tools(mcp):
                 page = await func(offset=offset, limit=limit)
                 ret.extend(page.items())
 
-                if len(page) < limit:
-                    break
-
                 if up_to and len(ret) >= up_to:
                     ret = ret[:up_to]
+                    break
+
+                if len(page) < limit:
                     break
 
                 offset += limit
