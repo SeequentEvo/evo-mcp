@@ -7,17 +7,13 @@ A FastMCP server that provides tools for interacting with the Evo platform,
 including workspace management, object ops, and data transfer.
 
 Configuration:
-    Set MCP_DEV_MODE=true to enable dev mode:
-    - Enables dev tools for staging inspection and fixture management
-    - Use staging_seed(fixture_file, fixture_names) to load skill-specific fixtures
-    - Use staging_reset() to clear state between eval runs
-    - Fixtures are available for the full session (24-hour TTL)
-
     Set MCP_TOOL_FILTER environment variable to filter tools and prompts:
-    - "admin" : Workspace management tools
-    - "data"  : Object query, file operations, and management tools
+    - "admin"   : Workspace management tools
+    - "data"    : Object query, file operations, and management tools
     - "compute" : Compute and geostatistics tools
-    - "all"       : All tools (default)
+    - "dev"     : Dev tools for staging inspection and fixture management
+                  (staging_seed, staging_reset, staging_get_info, staging_gc)
+    - "all"     : All tools except dev tools (default)
 
     Set MCP_TRANSPORT environment variable to choose transport mode:
     - "stdio" (default): Standard input/output, used by VS Code, Cursor, Claude Desktop
@@ -83,13 +79,11 @@ TOOL_FILTER = os.getenv(
         "all",
     ),
 ).lower()
-VALID_TOOL_FILTERS = ["admin", "data", "compute", "all"]
+VALID_TOOL_FILTERS = ["admin", "data", "compute", "dev", "all"]
 
 if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
     TOOL_FILTER = "all"
-
-DEV_MODE = os.getenv("MCP_DEV_MODE", "").lower() in ("1", "true", "yes")
 
 # Initialize FastMCP server with agent type in name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
@@ -134,10 +128,10 @@ register_general_tools(mcp)
 # Skills sync — always available so chat users can install skills locally
 register_skills_sync_tools(mcp, skills_folder)
 
-# Dev tools — only register in dev mode (staging is internal infrastructure)
-if DEV_MODE:
+# Dev tools — only register when explicitly requested (not included in "all")
+if TOOL_FILTER == "dev":
     register_dev_tools(mcp)
-    print("DEV MODE: Dev tools registered (use seed_fixtures to load skill fixtures)")
+    print("DEV MODE: Dev tools registered")
 
 if TOOL_FILTER in ["all", "admin"]:
     # Admin Agent: Workspace and instance management tools

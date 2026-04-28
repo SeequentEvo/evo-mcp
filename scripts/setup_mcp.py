@@ -50,7 +50,7 @@ CLIENT_CHOICES = {
 DEFAULT_REDIRECT_URL = "http://localhost:3000/signin-callback"
 DEFAULT_HTTP_HOST = "localhost"
 DEFAULT_HTTP_PORT = "5000"
-TOOL_FILTER_CHOICES = {"1": "all", "2": "admin", "3": "data"}
+TOOL_FILTER_CHOICES = {"1": "all", "2": "admin", "3": "data", "4": "compute"}
 AUTH_METHOD_CHOICES = {"1": "native_app", "2": "client_credentials"}
 
 
@@ -149,9 +149,11 @@ def prompt_tool_filter(current_value: str | None) -> str:
     """Prompt for MCP tool filter selection."""
     print()
     print("Select which tools to enable:")
-    print("1. all - All tools (workspace management + data operations)")
-    print("2. admin - Workspace/instance management and bulk operations")
-    print("3. data - Object import, download and query operations")
+    print("1. all     - All tools except dev (workspace management + data operations)")
+    print("2. admin   - Workspace/instance management and bulk operations")
+    print("3. data    - Object import, download and query operations")
+    print("4. compute - Compute and geostatistics tools")
+    print("5. dev     - Dev tools for staging inspection and fixture management")
     print()
 
     if current_value:
@@ -160,10 +162,10 @@ def prompt_tool_filter(current_value: str | None) -> str:
             return current_value
 
     choice = prompt_choice(
-        "Enter your choice [1-3] (default: 1): ",
+        "Enter your choice [1-5] (default: 1): ",
         set(TOOL_FILTER_CHOICES.keys()),
         "1",
-        "Invalid choice. Please enter 1, 2, or 3.",
+        "Invalid choice. Please enter 1, 2, 3, 4, or 5.",
     )
     return TOOL_FILTER_CHOICES[choice]
 
