@@ -74,10 +74,6 @@ def _details_from_regular(parsed: RegularBlockModelData) -> dict[str, Any]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _get_summary(payload: Any) -> dict[str, Any]:
-    return _details_from_regular(payload)
-
-
 # ── Create interaction helpers ─────────────────────────────────────────────────
 
 
@@ -216,24 +212,6 @@ class RegularBlockModelObjectType(EvoStagedObjectType):
     supported_publish_modes = frozenset({"create"})
 
 
-    def summarize(self, payload: RegularBlockModelData) -> dict[str, Any]:
-        n = payload.n_blocks
-        b = payload.block_size
-        total = n.nx * n.ny * n.nz
-        attr_count = len(payload.cell_data.columns) if payload.cell_data is not None else 0
-        return {
-            "block_model_kind": "regular",
-            "total_blocks": total,
-            "nx": n.nx,
-            "ny": n.ny,
-            "nz": n.nz,
-            "block_size_dx": b.dx,
-            "block_size_dy": b.dy,
-            "block_size_dz": b.dz,
-            "attribute_count": attr_count,
-            "coordinate_reference_system": payload.coordinate_reference_system,
-        }
-
     def from_dict(self, data: dict[str, Any]) -> RegularBlockModelData:
         try:
             name = data["name"]
@@ -261,8 +239,15 @@ class RegularBlockModelObjectType(EvoStagedObjectType):
             block_size=block_size,
         )
 
+    def summarize(self, payload: Any) -> dict[str, Any]:
+        return _details_from_regular(payload)
+
     def __init__(self) -> None:
         super().__init__()
+
+        async def _get_summary(p: Any) -> dict[str, Any]:
+            return self.summarize(p)
+
         self._register_interaction(
             Interaction(
                 name="get_summary",

@@ -205,22 +205,6 @@ def _structure_payload(structure: dict[str, Any], index: int) -> dict[str, Any]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _summarize(payload: VariogramData) -> dict[str, Any]:
-    structures = payload.get_structures_as_dicts()
-    return {
-        "name": payload.name,
-        "sill": payload.sill,
-        "nugget": payload.nugget,
-        "structure_count": len(structures),
-        "modelling_space": payload.modelling_space,
-        "is_rotation_fixed": payload.is_rotation_fixed,
-        "data_variance": payload.data_variance,
-        "attribute": payload.attribute,
-        "domain": payload.domain,
-        "structure_types": [s.get("variogram_type") for s in structures],
-    }
-
-
 async def _get_structure_details(payload: VariogramData, params: StructureSelectionParams) -> dict[str, Any]:
     structures = payload.get_structures_as_dicts()
     idx, selected, selected_by = _select_structure(
@@ -393,7 +377,6 @@ async def _create_search_neighborhood(payload: VariogramData, params: CreateSear
         name=params.object_name,
         object_type="search_neighborhood",
         stage_id=envelope.stage_id,
-        summary=envelope.summary,
     )
     return {
         "name": params.object_name,
@@ -439,7 +422,6 @@ async def _create(params: VariogramCreateParams) -> dict[str, Any]:
         name=params.object_name,
         object_type="variogram",
         stage_id=envelope.stage_id,
-        summary=envelope.summary,
     )
     return {
         "name": params.object_name,
@@ -488,16 +470,6 @@ class VariogramObjectType(EvoStagedObjectType):
         if payload.sill <= 0:
             raise StageValidationError("VariogramData sill must be greater than zero.")
 
-    def summarize(self, payload: VariogramData) -> dict[str, Any]:
-        structures = payload.get_structures_as_dicts()
-        return {
-            "structure_count": len(structures),
-            "sill": payload.sill,
-            "nugget": payload.nugget,
-            "structure_types": [s.get("variogram_type") for s in structures],
-            "modelling_space": payload.modelling_space,
-        }
-
     def from_dict(self, data: dict[str, Any]) -> VariogramData:
         structures_raw = data.get("structures")
         if not isinstance(structures_raw, list):
@@ -525,14 +497,33 @@ class VariogramObjectType(EvoStagedObjectType):
             attribute=data.get("attribute"),
         )
 
+    def summarize(self, payload: VariogramData) -> dict[str, Any]:
+        structures = payload.get_structures_as_dicts()
+        return {
+            "name": payload.name,
+            "sill": payload.sill,
+            "nugget": payload.nugget,
+            "structure_count": len(structures),
+            "modelling_space": payload.modelling_space,
+            "is_rotation_fixed": payload.is_rotation_fixed,
+            "data_variance": payload.data_variance,
+            "attribute": payload.attribute,
+            "domain": payload.domain,
+            "structure_types": [s.get("variogram_type") for s in structures],
+        }
+
     def __init__(self) -> None:
         super().__init__()
+
+        async def _get_summary(p: VariogramData) -> dict[str, Any]:
+            return self.summarize(p)
+
         self._register_interaction(
             Interaction(
                 name="get_summary",
                 display_name="Get Summary",
                 description="Return summary statistics for the variogram (sill, nugget, structures).",
-                handler=_summarize,
+                handler=_get_summary,
             )
         )
         self._register_interaction(

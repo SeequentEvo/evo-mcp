@@ -8,12 +8,13 @@ All tools in this module are gated behind MCP_DEV_MODE=true and are NOT
 exposed in production.
 
 Tools:
-  - staging_get_info, staging_clone, staging_gc
+  - staging_get_info, staging_gc
   - staging_seed, staging_reset
 """
 
 import json
 import logging
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -169,18 +170,7 @@ def register_dev_tools(mcp) -> None:
             envelope = staging_service.get_stage_info(stage_id)
         except StageError as exc:
             raise ValueError(str(exc)) from exc
-        return {"stage": envelope.to_dict()}
-
-    @mcp.tool()
-    async def staging_clone(
-        stage_id: str,
-    ) -> dict[str, Any]:
-        """Clone an active stage into a new stage with source_type='cloned'. Returns the new stage envelope."""
-        try:
-            envelope = staging_service.clone_stage(stage_id)
-        except StageError as exc:
-            raise ValueError(str(exc)) from exc
-        return {"stage": envelope.to_dict()}
+        return {"stage": asdict(envelope)}
 
     @mcp.tool()
     async def staging_gc(

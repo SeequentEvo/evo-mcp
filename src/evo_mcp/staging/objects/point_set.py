@@ -106,16 +106,6 @@ def _attribute_inspection(df: pd.DataFrame) -> list[dict[str, Any]]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _summarize(payload: Any) -> dict[str, Any]:
-    df = payload.locations
-    summary = _point_set_summary(df)
-    return {
-        "name": payload.name,
-        "coordinate_reference_system": payload.coordinate_reference_system,
-        "summary": summary,
-    }
-
-
 async def _attribute_details(payload: Any) -> dict[str, Any]:
     df = payload.locations
     return {
@@ -228,16 +218,6 @@ class PointSetObjectType(EvoStagedObjectType):
             if col not in df.columns:
                 raise StageValidationError(f"PointSetData locations must contain column '{col}'.")
 
-    def summarize(self, payload: PointSetData) -> dict[str, Any]:
-        df = payload.locations
-        attribute_names = [c for c in df.columns if c not in {"x", "y", "z"}]
-        return {
-            "point_count": int(len(df)),
-            "attribute_count": len(attribute_names),
-            "attribute_names": attribute_names,
-            "coordinate_reference_system": payload.coordinate_reference_system,
-        }
-
     def from_dict(self, data: dict[str, Any]) -> PointSetData:
         raw = data.get("data", {})
         coords = raw.get("coordinates", {})
@@ -274,14 +254,26 @@ class PointSetObjectType(EvoStagedObjectType):
             locations=df,
         )
 
+    def summarize(self, payload: Any) -> dict[str, Any]:
+        df = payload.locations
+        return {
+            "name": payload.name,
+            "coordinate_reference_system": payload.coordinate_reference_system,
+            "summary": _point_set_summary(df),
+        }
+
     def __init__(self) -> None:
         super().__init__()
+
+        async def _get_summary(p: Any) -> dict[str, Any]:
+            return self.summarize(p)
+
         self._register_interaction(
             Interaction(
                 name="get_summary",
                 display_name="Get Summary",
                 description="Return point count, attribute names, and bounding box.",
-                handler=_summarize,
+                handler=_get_summary,
             )
         )
         self._register_interaction(

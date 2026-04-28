@@ -53,10 +53,6 @@ def _details_from_block_model_data(parsed: BlockModelData) -> dict[str, Any]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _get_summary(payload: Any) -> dict[str, Any]:
-    return _details_from_block_model_data(payload)
-
-
 # ── Import / publish handlers ─────────────────────────────────────────────────
 
 
@@ -93,28 +89,15 @@ class BlockModelObjectType(EvoStagedObjectType):
     supported_publish_modes = frozenset({"new_version"})
 
 
-    def summarize(self, payload: BlockModelData) -> dict[str, Any]:
-        g = payload.geometry
-        n = g.n_blocks
-        b = g.block_size
-        total = n.nx * n.ny * n.nz
-        return {
-            "block_model_kind": "subblocked",
-            "model_type": g.model_type,
-            "total_blocks": total,
-            "nx": n.nx,
-            "ny": n.ny,
-            "nz": n.nz,
-            "block_size_dx": b.dx,
-            "block_size_dy": b.dy,
-            "block_size_dz": b.dz,
-            "attribute_count": len(payload.attributes),
-            "attribute_names": [attr.name for attr in payload.attributes],
-            "coordinate_reference_system": payload.coordinate_reference_system,
-        }
+    def summarize(self, payload: Any) -> dict[str, Any]:
+        return _details_from_block_model_data(payload)
 
     def __init__(self) -> None:
         super().__init__()
+
+        async def _get_summary(p: Any) -> dict[str, Any]:
+            return self.summarize(p)
+
         self._register_interaction(
             Interaction(
                 name="get_summary",

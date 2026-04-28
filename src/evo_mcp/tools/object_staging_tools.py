@@ -15,7 +15,7 @@ Lifecycle tools that bring objects into/out of staging:
                                  supported lifecycle operations
   - staging_import_object      — import an object from Evo into the session
   - staging_publish_object     — push a staged object back to Evo
-  - staging_create_object      — create a new staged object locally via a named interaction
+  - staging_create_object      — create a new staged object locally
   - staging_discard_object     — remove a staged object from the session
   - staging_list               — list all staged objects in the session
 
@@ -23,6 +23,7 @@ Object-type-specific logic (SDK calls, CRS coercion, etc.) lives in the
 object type modules under ``evo_mcp.staging.objects``, not here.
 """
 
+from dataclasses import asdict
 from typing import Any, Literal
 
 from evo.objects.typed import object_from_uuid
@@ -194,7 +195,7 @@ def register_object_staging_tools(mcp) -> None:
             limit=limit,
         )
         return {
-            "stages": [e.to_dict() for e in envelopes],
+            "stages": [asdict(e) for e in envelopes],
             "count": len(envelopes),
         }
 
@@ -218,7 +219,8 @@ def register_object_staging_tools(mcp) -> None:
             raise ValueError(f"Could not resolve object '{object_id}' for import.") from exc
 
         importable = [
-            t for t in staged_object_type_registry.all()
+            t
+            for t in staged_object_type_registry.all()
             if isinstance(t, EvoStagedObjectType) and t.evo_class is not None and isinstance(obj, t.evo_class)
         ]
         if len(importable) > 1:
@@ -300,15 +302,14 @@ def register_object_staging_tools(mcp) -> None:
 
         descriptor = next(
             (
-                t for t in staged_object_type_registry.all()
+                t
+                for t in staged_object_type_registry.all()
                 if isinstance(t, EvoStagedObjectType) and t.data_class is not None and isinstance(data, t.data_class)
             ),
             None,
         )
         if descriptor is None:
-            raise ValueError(
-                f"'{object_name}' ({entry.object_type}) does not support publishing."
-            )
+            raise ValueError(f"'{object_name}' ({entry.object_type}) does not support publishing.")
 
         if mode not in descriptor.supported_publish_modes:
             raise ValueError(
@@ -354,4 +355,3 @@ def register_object_staging_tools(mcp) -> None:
             "path": getattr(metadata, "path", None),
             "links": build_links_from_metadata(environment, str(metadata.id)),
         }
-

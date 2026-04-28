@@ -81,8 +81,7 @@ class StagedObjectType(abc.ABC):
     knowledge required. Types that can import from or publish to Evo should
     inherit ``EvoStagedObjectType`` instead.
 
-    Every subclass **must** implement:
-    - ``summarize`` — return a lightweight summary dict for the ``StagedEnvelope``.
+    Every subclass **must** implement: *(no abstract requirements currently)*
 
     Optionally override:
     - ``_validate`` — raise ``StageValidationError`` for domain-level payload
@@ -111,7 +110,7 @@ class StagedObjectType(abc.ABC):
 
     @abc.abstractmethod
     def summarize(self, payload: Any) -> dict[str, Any]:
-        """Return a lightweight summary dict stored in the ``StagedEnvelope``."""
+        """Return a summary dict for the staged object. Called fresh on demand."""
 
     def from_dict(self, data: dict[str, Any]) -> Any:
         """Deserialize a fixture dict into a typed payload (for dev seeding)."""

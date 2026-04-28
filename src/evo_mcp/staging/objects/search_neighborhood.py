@@ -51,35 +51,8 @@ class SearchNeighborhoodData(BaseModel):
     dip: float = 0.0
     pitch: float = 0.0
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "max_samples": self.max_samples,
-            "min_samples": self.min_samples,
-            "ellipsoid": {
-                "ranges": {
-                    "major": self.major,
-                    "semi_major": self.semi_major,
-                    "minor": self.minor,
-                },
-                "rotation": {
-                    "dip_azimuth": self.dip_azimuth,
-                    "dip": self.dip,
-                    "pitch": self.pitch,
-                },
-            },
-        }
-
 
 # ── Interaction handlers ──────────────────────────────────────────────────────
-
-
-async def _summarize(payload: SearchNeighborhoodData) -> dict[str, Any]:
-    return {
-        "name": payload.name,
-        "configuration": payload.to_dict(),
-        "message": "Search neighborhood summary.",
-    }
 
 
 # ── Create interaction handlers ────────────────────────────────────────────────
@@ -131,7 +104,7 @@ async def _create_from_ranges(params: CreateFromRangesParams) -> dict[str, Any]:
     )
     return {
         "name": params.object_name,
-        "configuration": data.to_dict(),
+        "configuration": data.model_dump(),
         "message": "Search neighborhood created from explicit ranges.",
     }
 
@@ -148,21 +121,23 @@ class SearchNeighborhoodObjectType(StagedObjectType):
 
     def summarize(self, payload: SearchNeighborhoodData) -> dict[str, Any]:
         return {
-            "max_samples": payload.max_samples,
-            "min_samples": payload.min_samples,
-            "major": payload.major,
-            "semi_major": payload.semi_major,
-            "minor": payload.minor,
+            "name": payload.name,
+            "configuration": payload.model_dump(),
+            "message": "Search neighborhood summary.",
         }
 
     def __init__(self) -> None:
         super().__init__()
+
+        async def _get_summary(p: SearchNeighborhoodData) -> dict[str, Any]:
+            return self.summarize(p)
+
         self._register_interaction(
             Interaction(
                 name="get_summary",
                 display_name="Get Summary",
                 description="Return the full neighborhood configuration (ellipsoid, samples, derivation).",
-                handler=_summarize,
+                handler=_get_summary,
             )
         )
 

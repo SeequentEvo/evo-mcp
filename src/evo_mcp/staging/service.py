@@ -12,7 +12,6 @@ Combines what was previously split across ``StagingService`` and
 
 """
 
-import copy
 import sys
 import uuid
 from dataclasses import replace
@@ -25,7 +24,7 @@ from evo_mcp.staging.errors import (
     StageNotFoundError,
     StageValidationError,
 )
-from evo_mcp.staging.models import ObjectType, SourceType, StagedEnvelope, StageStatus
+from evo_mcp.staging.models import ObjectType, StagedEnvelope, StageStatus
 from evo_mcp.staging.objects import staged_object_type_registry
 
 __all__ = [
@@ -79,14 +78,11 @@ class StagingService:
         object_type: ObjectType,
         typed_payload: Any,
         *,
-        source_type: SourceType,
         workspace_id: str | None = None,
         source_ref: dict[str, str | None] | None = None,
         ttl_seconds: int | None = None,
     ) -> StagedEnvelope:
         """Stage a typed payload and return its envelope.
-
-        Validates and summarizes the payload via the object type.
 
         Parameters
         ----------
@@ -94,8 +90,6 @@ class StagingService:
             Registered object type string (e.g. ``"variogram"``).
         typed_payload:
             The domain data object to stage.
-        source_type:
-            How the payload was produced (``"imported"``, ``"built_local"``, etc.).
         workspace_id:
             Associated workspace UUID, if any.
         source_ref:
@@ -105,7 +99,6 @@ class StagingService:
         """
         obj_type = staged_object_type_registry.get(object_type)
         obj_type.validate(typed_payload)
-        summary = obj_type.summarize(typed_payload)
 
         stage_id = str(uuid.uuid4())
         ts = now_iso()
@@ -114,11 +107,8 @@ class StagingService:
             stage_id=stage_id,
             object_type=object_type,
             workspace_id=workspace_id,
-            source_type=source_type,
             source_ref=source_ref or {},
-            summary=summary,
             status="active",
-            created_at=ts,
             updated_at=ts,
             expires_at=_expires_iso(effective_ttl),
         )
@@ -136,7 +126,6 @@ class StagingService:
         return self.stage(
             object_type,
             typed_payload,
-            source_type="imported",
             workspace_id=workspace_id,
             source_ref=source_ref,
         )
@@ -152,7 +141,6 @@ class StagingService:
         return self.stage(
             object_type,
             typed_payload,
-            source_type="built_local",
             workspace_id=workspace_id,
             source_ref=source_ref,
             ttl_seconds=ttl_seconds,
@@ -166,27 +154,6 @@ class StagingService:
     def get_stage_payload(self, stage_id: str) -> tuple[StagedEnvelope, Any]:
         """Return (envelope, typed_payload) for a stage."""
         return self._get(stage_id)
-
-    def clone_stage(self, stage_id: str) -> StagedEnvelope:
-        """Clone an active stage into a new stage with source_type='cloned'."""
-        envelope, payload = self._get(stage_id)
-        new_id = str(uuid.uuid4())
-        now = now_iso()
-        cloned = StagedEnvelope(
-            stage_id=new_id,
-            object_type=envelope.object_type,
-            workspace_id=envelope.workspace_id,
-            source_type="cloned",
-            source_ref={**envelope.source_ref, "cloned_from": stage_id},
-            summary=copy.deepcopy(envelope.summary),
-            status="active",
-            created_at=now,
-            updated_at=now,
-            expires_at=_expires_iso(self._ttl_seconds),
-        )
-        self._envelopes[new_id] = cloned
-        self._payloads[new_id] = copy.deepcopy(payload)
-        return cloned
 
     def discard_stage(self, stage_id: str) -> None:
         """Mark a stage as discarded and release its payload."""
