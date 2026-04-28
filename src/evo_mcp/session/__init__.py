@@ -15,9 +15,10 @@ Usage::
 
 from evo_mcp.session.models import RegistryEntry, RegistryStatus
 from evo_mcp.session.registry import ObjectRegistry, object_registry
-from evo_mcp.session.resolver import ObjectResolver, ResolutionError
+from evo_mcp.session.resolver import DuplicateNameError, ObjectResolver, ResolutionError
 
 __all__ = [
+    "DuplicateNameError",
     "ObjectRegistry",
     "ObjectResolver",
     "RegistryEntry",

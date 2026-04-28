@@ -27,7 +27,7 @@ from dataclasses import replace
 from typing import Any
 
 from evo_mcp.session.models import ObjectType, RegistryEntry
-from evo_mcp.session.resolver import ObjectResolver, ResolutionError
+from evo_mcp.session.resolver import DuplicateNameError, ObjectResolver, ResolutionError
 from evo_mcp.staging.service import StagingService, now_iso
 
 __all__ = [
@@ -70,9 +70,12 @@ class ObjectRegistry:
     ) -> RegistryEntry:
         """Register an object after it has been staged.
 
-        If a name+type combination already exists, the new registration
-        replaces the old one (latest-wins).
+        Raises DuplicateNameError if a name+type combination already exists in
+        the session. The caller must discard the existing object first.
         """
+        key = self._make_key(name, object_type)
+        if key in self._entries:
+            raise DuplicateNameError(name, object_type)
         entry = RegistryEntry(
             name=name,
             object_type=object_type,
@@ -81,7 +84,6 @@ class ObjectRegistry:
             workspace_id=workspace_id,
             created_at=now_iso(),
         )
-        key = self._make_key(name, object_type)
         self._entries[key] = entry
         return entry
 

@@ -11,6 +11,22 @@ class ResolutionError(Exception):
     """Raised when an object reference cannot be resolved unambiguously."""
 
 
+class DuplicateNameError(ValueError):
+    """Raised when registering a name that already exists in the session.
+
+    The caller must discard the existing object before registering a new one
+    with the same name and type.
+    """
+
+    def __init__(self, name: str, object_type: str) -> None:
+        super().__init__(
+            f"An object named '{name}' of type '{object_type}' is already staged. "
+            f"Discard it first with staging_discard_object before registering a new one."
+        )
+        self.name = name
+        self.object_type = object_type
+
+
 class ObjectResolver:
     """Resolves user-provided names to registry entries.
 
