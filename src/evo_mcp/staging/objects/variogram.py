@@ -7,15 +7,12 @@
 Interactions:
   - summarize: Return summary statistics.
   - get_structure_details: Inspect a selected structure.
-  - get_search_params: Extract and scale search ellipsoid parameters.
   - get_ellipsoid_details: Return ellipsoid details with optional 3D points.
-  - get_curve_details: Return principal-direction curves for 2D plotting.
 """
 
 import math
 from typing import Any, Literal
 
-import numpy as np
 from evo.objects.typed import (
     CubicStructure,
     Ellipsoid,
@@ -30,7 +27,6 @@ from evo.objects.typed import (
     Variogram,
     VariogramData,
 )
-from evo.objects.typed.variogram import _evaluate_structure
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from evo_mcp.staging.errors import StageValidationError
@@ -176,41 +172,12 @@ class StructureSelectionParams(BaseModel):
     )
 
 
-class GetSearchParamsParams(StructureSelectionParams):
-    scale_factor: float = Field(2.0, gt=0, description="Multiplier applied to all ellipsoid ranges.")
-
-
 class GetEllipsoidDetailsParams(StructureSelectionParams):
     center_x: float = Field(0.0, description="Ellipsoid center X coordinate.")
     center_y: float = Field(0.0, description="Ellipsoid center Y coordinate.")
     center_z: float = Field(0.0, description="Ellipsoid center Z coordinate.")
     include_surface_points: bool = Field(True, description="Include surface mesh points for 3D plotting.")
     include_wireframe_points: bool = Field(True, description="Include wireframe points for 3D plotting.")
-
-
-class GetCurveDetailsParams(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    n_points: int = Field(200, ge=10, description="Number of sample points along the distance axis.")
-    max_distance: float | None = Field(
-        None,
-        gt=0,
-        description="Maximum distance for curves. Auto-calculated from ranges if omitted.",
-    )
-    azimuth: float | None = Field(
-        None,
-        description="Azimuth (degrees) for arbitrary-direction curve. Requires dip.",
-    )
-    dip: float | None = Field(
-        None,
-        description="Dip (degrees) for arbitrary-direction curve. Requires azimuth.",
-    )
-
-    @model_validator(mode="after")
-    def azimuth_dip_together(self) -> "GetCurveDetailsParams":
-        if (self.azimuth is None) != (self.dip is None):
-            raise ValueError("Provide both azimuth and dip together for arbitrary-direction curves.")
-        return self
 
 
 def _structure_payload(structure: dict[str, Any], index: int) -> dict[str, Any]:
@@ -233,43 +200,6 @@ def _structure_payload(structure: dict[str, Any], index: int) -> dict[str, Any]:
         "is_valid_for_ellipsoid": min(major, semi_major, minor) > 0,
         "has_rotation": any(abs(v) > 0 for v in [dip_azimuth, dip_val, pitch]),
     }
-
-
-def _principal_direction_curves(
-    variogram_data: VariogramData,
-    n_points: int,
-    max_distance: float | None,
-) -> tuple[dict[str, Any], float]:
-    structures = variogram_data.get_structures_as_dicts()
-    if not structures:
-        raise ValueError("Variogram must contain at least one structure.")
-    max_ranges = {"major": 0.0, "semi_major": 0.0, "minor": 0.0}
-    for s in structures:
-        ranges = s.get("anisotropy", {}).get("ellipsoid_ranges", {})
-        for d in max_ranges:
-            max_ranges[d] = max(max_ranges[d], float(ranges.get(d, 0.0)))
-    resolved = max_distance
-    if resolved is None:
-        resolved = max(max_ranges.values()) * 1.2 if max(max_ranges.values()) > 0 else 100.0
-    h = np.linspace(0.0, resolved, n_points)
-    curves: dict[str, Any] = {}
-    for direction in ["major", "semi_major", "minor"]:
-        gamma = np.full_like(h, variogram_data.nugget, dtype=float)
-        for s in structures:
-            gamma += _evaluate_structure(
-                s.get("variogram_type", "unknown"),
-                h,
-                float(s.get("contribution", 0.0)),
-                float(s.get("anisotropy", {}).get("ellipsoid_ranges", {}).get(direction, 1.0)),
-                s.get("alpha"),
-            )
-        curves[direction] = {
-            "distance": h.tolist(),
-            "semivariance": gamma.tolist(),
-            "range": max_ranges[direction],
-            "final_semivariance": float(gamma[-1]),
-        }
-    return curves, float(resolved)
 
 
 # ── Interaction handlers ──────────────────────────────────────────────────────
@@ -305,31 +235,6 @@ async def _get_structure_details(payload: VariogramData, params: StructureSelect
         "selected_by": selected_by,
         "selection_mode": params.selection_mode,
         "structure": _structure_payload(selected, idx),
-    }
-
-
-async def _get_search_params(payload: VariogramData, params: GetSearchParamsParams) -> dict[str, Any]:
-    structures = payload.get_structures_as_dicts()
-    idx, selected, selected_by = _select_structure(
-        structures,
-        params.structure_index,
-        params.selection_mode,
-    )
-    details = _structure_payload(selected, idx)
-    original = details["ranges"]
-    scaled = {k: v * params.scale_factor for k, v in original.items()}
-    return {
-        "variogram_name": payload.name,
-        "structure_count": len(structures),
-        "selected_structure_index": idx,
-        "selected_by": selected_by,
-        "selection_mode": params.selection_mode,
-        "structure_type": details["structure_type"],
-        "scale_factor": params.scale_factor,
-        "original_ranges": original,
-        "scaled_ranges": scaled,
-        "rotation": details["rotation"],
-        "message": f"Search ellipsoid scaled to {params.scale_factor}x from selected variogram structure.",
     }
 
 
@@ -391,80 +296,6 @@ async def _get_ellipsoid_details(payload: VariogramData, params: GetEllipsoidDet
             "z": wz.tolist(),
         }
     return result
-
-
-async def _get_curve_details(payload: VariogramData, params: GetCurveDetailsParams) -> dict[str, Any]:
-    curves, resolved_max = _principal_direction_curves(payload, params.n_points, params.max_distance)
-
-    arbitrary_curve: dict[str, Any] | None = None
-    if params.azimuth is not None and params.dip is not None:
-        azimuth_f, dip_f = params.azimuth, params.dip
-        structures = payload.get_structures_as_dicts()
-        az_rad = math.radians(azimuth_f)
-        dip_rad = math.radians(dip_f)
-        direction = np.array(
-            [
-                math.sin(az_rad) * math.cos(dip_rad),
-                math.cos(az_rad) * math.cos(dip_rad),
-                -math.sin(dip_rad),
-            ]
-        )
-        h = np.linspace(0.0, resolved_max, params.n_points)
-        gamma = np.full_like(h, payload.nugget, dtype=float)
-        for s in structures:
-            anisotropy = s.get("anisotropy", {})
-            ranges = anisotropy.get("ellipsoid_ranges", {})
-            rotation_dict = anisotropy.get("rotation", {})
-            major = float(ranges.get("major", 1.0))
-            semi_major = float(ranges.get("semi_major", 1.0))
-            minor = float(ranges.get("minor", 1.0))
-            effective_range = major
-            if major > 0 and semi_major > 0 and minor > 0:
-                rot = Rotation(
-                    dip_azimuth=float(rotation_dict.get("dip_azimuth", 0.0)),
-                    dip=float(rotation_dict.get("dip", 0.0)),
-                    pitch=float(rotation_dict.get("pitch", 0.0)),
-                )
-                local_dir = rot.as_rotation_matrix().T @ direction
-                scaled_dir = np.array(
-                    [
-                        local_dir[0] / major,
-                        local_dir[1] / semi_major,
-                        local_dir[2] / minor,
-                    ]
-                )
-                norm = np.linalg.norm(scaled_dir)
-                if norm > 0:
-                    effective_range = 1.0 / norm
-            gamma += _evaluate_structure(
-                s.get("variogram_type", "unknown"),
-                h,
-                float(s.get("contribution", 0.0)),
-                effective_range,
-                s.get("alpha"),
-            )
-        arbitrary_curve = {
-            "azimuth": azimuth_f,
-            "dip": dip_f,
-            "distance": h.tolist(),
-            "semivariance": gamma.tolist(),
-            "final_semivariance": float(gamma[-1]),
-        }
-
-    return {
-        "variogram_name": payload.name,
-        "sample_count": params.n_points,
-        "max_distance": resolved_max,
-        "sill": payload.sill,
-        "nugget": payload.nugget,
-        "variogram_curves": curves,
-        "arbitrary_direction_curve": arbitrary_curve,
-        "visualization_note": (
-            "Use variogram_curves with plotly Scatter for principal direction 2D charts, add a horizontal sill reference line, "
-            "and optionally plot arbitrary_direction_curve when azimuth and dip are provided."
-        ),
-    }
-
 
 # ── Create interaction helpers ─────────────────────────────────────────────────
 
@@ -715,29 +546,11 @@ class VariogramObjectType(EvoStagedObjectType):
         )
         self._register_interaction(
             Interaction(
-                name="get_search_parameters",
-                display_name="Get Search Parameters",
-                description="Extract and scale search ellipsoid parameters from a variogram structure.",
-                handler=_get_search_params,
-                params_model=GetSearchParamsParams,
-            )
-        )
-        self._register_interaction(
-            Interaction(
                 name="get_ellipsoid_details",
                 display_name="Get Ellipsoid Details",
                 description="Return ellipsoid details with optional 3D surface/wireframe plotting points.",
                 handler=_get_ellipsoid_details,
                 params_model=GetEllipsoidDetailsParams,
-            )
-        )
-        self._register_interaction(
-            Interaction(
-                name="get_curve_details",
-                display_name="Get Curve Details",
-                description="Return principal-direction curves and optional arbitrary-direction curve for 2D plotting.",
-                handler=_get_curve_details,
-                params_model=GetCurveDetailsParams,
             )
         )
         self._register_interaction(

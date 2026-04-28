@@ -7,7 +7,7 @@
 Supports ``RegularBlockModelData`` (locally designed regular grids).
 
 Interactions:
-  - get_definition_details: Inspect grid geometry, origin, block size, and bounding box.
+  - get_summary: Inspect grid geometry, origin, block size, and bounding box.
 """
 
 import math
@@ -74,7 +74,7 @@ def _details_from_regular(parsed: RegularBlockModelData) -> dict[str, Any]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _get_definition_details(payload: Any) -> dict[str, Any]:
+async def _get_summary(payload: Any) -> dict[str, Any]:
     return _details_from_regular(payload)
 
 
@@ -265,10 +265,10 @@ class RegularBlockModelObjectType(EvoStagedObjectType):
         super().__init__()
         self._register_interaction(
             Interaction(
-                name="get_definition_details",
+                name="get_summary",
                 display_name="Get Definition Details",
                 description="Inspect grid geometry, origin, block size, bounding box, and attributes.",
-                handler=_get_definition_details,
+                handler=_get_summary,
             )
         )
 

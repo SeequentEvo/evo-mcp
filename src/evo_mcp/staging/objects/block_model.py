@@ -7,7 +7,7 @@
 Supports ``BlockModelData`` (imported/subblocked block models).
 
 Interactions:
-  - get_definition_details: Inspect grid geometry, origin, block size, and attributes.
+  - get_summary: Inspect grid geometry, origin, block size, and attributes.
 """
 
 from typing import Any
@@ -53,7 +53,7 @@ def _details_from_block_model_data(parsed: BlockModelData) -> dict[str, Any]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _get_definition_details(payload: Any) -> dict[str, Any]:
+async def _get_summary(payload: Any) -> dict[str, Any]:
     return _details_from_block_model_data(payload)
 
 
@@ -117,10 +117,10 @@ class BlockModelObjectType(EvoStagedObjectType):
         super().__init__()
         self._register_interaction(
             Interaction(
-                name="get_definition_details",
+                name="get_summary",
                 display_name="Get Definition Details",
                 description="Inspect grid geometry, origin, block size, bounding box, and attributes.",
-                handler=_get_definition_details,
+                handler=_get_summary,
             )
         )
 

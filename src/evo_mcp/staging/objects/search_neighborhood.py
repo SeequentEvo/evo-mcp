@@ -14,7 +14,6 @@ variogram's anisotropy structure.
 
 Interactions:
   - get_summary: Return the neighborhood configuration.
-  - get_validation_report: Check parameter consistency and range validity.
 
 Create:
   - staging_create_object("search_neighborhood", params): Stage from explicit ellipsoid ranges.
@@ -83,24 +82,6 @@ async def _summarize(payload: SearchNeighborhoodData) -> dict[str, Any]:
     }
 
 
-async def _validate(payload: SearchNeighborhoodData) -> dict[str, Any]:
-    issues: list[str] = []
-
-    if payload.min_samples is not None and payload.min_samples > payload.max_samples:
-        issues.append("min_samples cannot exceed max_samples.")
-    if payload.major < payload.semi_major:
-        issues.append("major range should be >= semi_major range.")
-    if payload.semi_major < payload.minor:
-        issues.append("semi_major range should be >= minor range.")
-
-    return {
-        "name": payload.name,
-        "is_valid": len(issues) == 0,
-        "issues": issues,
-        "message": "No issues found." if not issues else f"{len(issues)} issue(s) detected.",
-    }
-
-
 # ── Create interaction handlers ────────────────────────────────────────────────
 
 
@@ -147,7 +128,6 @@ async def _create_from_ranges(params: CreateFromRangesParams) -> dict[str, Any]:
         name=params.object_name,
         object_type="search_neighborhood",
         stage_id=envelope.stage_id,
-        summary=envelope.summary,
     )
     return {
         "name": params.object_name,
@@ -183,14 +163,6 @@ class SearchNeighborhoodObjectType(StagedObjectType):
                 display_name="Get Summary",
                 description="Return the full neighborhood configuration (ellipsoid, samples, derivation).",
                 handler=_summarize,
-            )
-        )
-        self._register_interaction(
-            Interaction(
-                name="get_validation_report",
-                display_name="Get Validation Report",
-                description="Check parameter consistency: sample limits, range ordering, positive ranges.",
-                handler=_validate,
             )
         )
 
