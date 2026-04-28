@@ -24,6 +24,7 @@ from evo_mcp.context import ensure_initialized, evo_context
 from evo_mcp.session import object_registry
 from evo_mcp.staging.errors import StageError
 from evo_mcp.staging.objects import staged_object_type_registry
+from evo_mcp.staging.objects.base import EvoStagedObjectType
 from evo_mcp.staging.service import staging_service
 from evo_mcp.utils.tool_support import get_workspace_context
 
@@ -58,7 +59,7 @@ def _stage_one(name: str, raw: dict, fixture_file: str) -> str:
     raw = dict(raw)
     object_type = raw.pop("object_type")
     raw.pop("seed_mode", None)
-    descriptor = staged_object_type_registry.get_or_raise(object_type)
+    descriptor = staged_object_type_registry.get(object_type)
     typed_payload = descriptor.from_dict(raw)
     envelope = staging_service.stage_local_build(
         object_type=object_type,
@@ -96,13 +97,13 @@ async def _publish_one(
     raw = dict(raw)
     object_type = raw.pop("object_type")
     raw.pop("seed_mode", None)
-    descriptor = staged_object_type_registry.get_or_raise(object_type)
+    descriptor = staged_object_type_registry.get(object_type)
     typed_payload = descriptor.from_dict(raw)
 
-    if "create" not in descriptor.supported_publish_modes:
+    if not isinstance(descriptor, EvoStagedObjectType) or "create" not in descriptor.supported_publish_modes:
         raise ValueError(f"{descriptor.display_name} fixtures are import-only and cannot be published.")
 
-    object_path = f"{path_prefix}/{descriptor.fixture_path_segment}/{name}.json"
+    object_path = f"{path_prefix}/{descriptor.object_type}/{name}.json"
     published_obj = await descriptor.publish_create(context, typed_payload, object_path)
 
     metadata = published_obj.metadata

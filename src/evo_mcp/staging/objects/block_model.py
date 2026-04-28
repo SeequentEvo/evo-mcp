@@ -18,10 +18,10 @@ from evo.objects.typed import (
     BlockModelData,
 )
 
-from evo_mcp.staging.helpers import _bbox_dict, _validate_grid_geometry
+from evo_mcp.staging.helpers import _bbox_dict
 from evo_mcp.staging.objects.base import (
+    EvoStagedObjectType,
     Interaction,
-    StagedObjectType,
     staged_object_type_registry,
 )
 from evo_mcp.utils.tool_support import extract_crs, format_crs, schema_label
@@ -53,7 +53,7 @@ def _details_from_block_model_data(parsed: BlockModelData) -> dict[str, Any]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _get_definition_details(payload: Any, params: dict[str, Any]) -> dict[str, Any]:
+async def _get_definition_details(payload: Any) -> dict[str, Any]:
     return _details_from_block_model_data(payload)
 
 
@@ -83,7 +83,7 @@ async def _import_block_model(obj: Any, context: Any) -> tuple[Any, dict[str, An
 # ── Object type definition ───────────────────────────────────────────────────
 
 
-class BlockModelObjectType(StagedObjectType):
+class BlockModelObjectType(EvoStagedObjectType):
     """Staged imported/subblocked block model."""
 
     object_type = "block_model"
@@ -91,14 +91,7 @@ class BlockModelObjectType(StagedObjectType):
     evo_class = BlockModel
     data_class = BlockModelData
     supported_publish_modes = frozenset({"new_version"})
-    fixture_path_segment = "blockmodels"
-    role_label = "Block model"
-    role_article = "a BlockModel"
-    create_params_model = None  # import-only; local creation not supported
 
-    def _validate(self, payload: BlockModelData) -> None:
-        g = payload.geometry
-        _validate_grid_geometry(g.block_size, g.n_blocks, "BlockModelData")
 
     def summarize(self, payload: BlockModelData) -> dict[str, Any]:
         g = payload.geometry
@@ -119,12 +112,6 @@ class BlockModelObjectType(StagedObjectType):
             "attribute_names": [attr.name for attr in payload.attributes],
             "coordinate_reference_system": payload.coordinate_reference_system,
         }
-
-    async def create(self, params: Any) -> dict[str, Any]:
-        raise NotImplementedError(
-            "BlockModel does not support local creation. "
-            "Use stage_import_object to import an existing block model from Evo."
-        )
 
     def __init__(self) -> None:
         super().__init__()

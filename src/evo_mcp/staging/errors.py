@@ -9,7 +9,6 @@ __all__ = [
     "StageError",
     "StageExpiredError",
     "StageNotFoundError",
-    "StageRevisionConflictError",
     "StageValidationError",
 ]
 
@@ -36,16 +35,6 @@ class StageExpiredError(StageError):
 
 class StageValidationError(StageError):
     """Raised when a staged payload fails type or schema validation."""
-
-
-class StageRevisionConflictError(StageError):
-    """Raised on optimistic-concurrency violation (expected_revision mismatch)."""
-
-    def __init__(self, stage_id: str, expected: int, actual: int) -> None:
-        super().__init__(f"Revision conflict on stage {stage_id!r}: expected {expected}, got {actual}.")
-        self.stage_id = stage_id
-        self.expected = expected
-        self.actual = actual
 
 
 class StageCapacityError(StageError):

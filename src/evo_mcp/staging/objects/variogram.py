@@ -36,8 +36,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from evo_mcp.staging.errors import StageValidationError
 from evo_mcp.staging.helpers import RotationSchema
 from evo_mcp.staging.objects.base import (
+    EvoStagedObjectType,
     Interaction,
-    StagedObjectType,
     staged_object_type_registry,
 )
 from evo_mcp.staging.runtime import get_registry, get_staging_service
@@ -275,7 +275,7 @@ def _principal_direction_curves(
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _summarize(payload: VariogramData, params: dict[str, Any]) -> dict[str, Any]:
+async def _summarize(payload: VariogramData) -> dict[str, Any]:
     structures = payload.get_structures_as_dicts()
     return {
         "name": payload.name,
@@ -503,7 +503,79 @@ def _build_variogram_structures(
     return [s.to_sdk() for s in structures_payload]
 
 
-# ── Create interaction handler ────────────────────────────────────────────────
+# ── Create interaction helpers ─────────────────────────────────────────────────
+
+
+class CreateSearchNeighborhoodParams(BaseModel):
+    """Parameters for deriving a search neighborhood from a staged variogram."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    object_name: str = Field(..., description="Name for the new staged search neighborhood.")
+    max_samples: int = Field(..., ge=1, description="Maximum number of samples to use in kriging.")
+    min_samples: int | None = Field(None, ge=0, description="Minimum number of samples (optional).")
+    structure_index: int | None = Field(None, ge=0, description="Zero-based structure index. Uses selection_mode if omitted.")
+    selection_mode: Literal["first", "largest_major"] = Field("first", description="Auto-selection strategy.")
+    scale_factor: float = Field(1.0, gt=0, description="Multiplier applied to all ellipsoid ranges.")
+    dip_azimuth: float | None = Field(None, description="Override dip azimuth in degrees.")
+    dip: float | None = Field(None, description="Override dip in degrees.")
+    pitch: float | None = Field(None, description="Override pitch in degrees.")
+
+    @model_validator(mode="after")
+    def check_samples(self) -> "CreateSearchNeighborhoodParams":
+        if self.min_samples is not None and self.min_samples > self.max_samples:
+            raise ValueError("min_samples cannot exceed max_samples.")
+        return self
+
+
+async def _create_search_neighborhood(payload: VariogramData, params: CreateSearchNeighborhoodParams) -> dict[str, Any]:
+    """Derive a search neighborhood from this variogram and stage it."""
+    from evo_mcp.staging.objects.search_neighborhood import SearchNeighborhoodData  # lazy — avoids circular import
+
+    structures = payload.get_structures_as_dicts()
+    if not structures:
+        raise ValueError("Variogram must contain at least one structure.")
+
+    sel_idx, sel_struct, sel_by = _select_structure(structures, params.structure_index, params.selection_mode)
+    ranges_d = sel_struct.get("anisotropy", {}).get("ellipsoid_ranges", {})
+    rot_d = sel_struct.get("anisotropy", {}).get("rotation", {})
+
+    maj = float(ranges_d.get("major", 0.0)) * params.scale_factor
+    smaj = float(ranges_d.get("semi_major", 0.0)) * params.scale_factor
+    mnr = float(ranges_d.get("minor", 0.0)) * params.scale_factor
+    if min(maj, smaj, mnr) <= 0:
+        raise ValueError("Selected variogram structure must have positive ranges.")
+
+    data = SearchNeighborhoodData(
+        name=params.object_name,
+        max_samples=params.max_samples,
+        min_samples=params.min_samples,
+        major=maj,
+        semi_major=smaj,
+        minor=mnr,
+        dip_azimuth=params.dip_azimuth if params.dip_azimuth is not None else float(rot_d.get("dip_azimuth", 0.0)),
+        dip=params.dip if params.dip is not None else float(rot_d.get("dip", 0.0)),
+        pitch=params.pitch if params.pitch is not None else float(rot_d.get("pitch", 0.0)),
+    )
+    envelope = get_staging_service().stage_local_build(object_type="search_neighborhood", typed_payload=data)
+    get_registry().register(
+        name=params.object_name,
+        object_type="search_neighborhood",
+        stage_id=envelope.stage_id,
+        summary=envelope.summary,
+    )
+    return {
+        "name": params.object_name,
+        "configuration": data.to_dict(),
+        "derivation": {
+            "variogram_name": payload.name,
+            "selected_structure_index": sel_idx,
+            "selected_by": sel_by,
+            "selection_mode": params.selection_mode,
+            "scale_factor": params.scale_factor,
+        },
+        "message": "Search neighborhood derived from variogram.",
+    }
 
 
 async def _create(params: VariogramCreateParams) -> dict[str, Any]:
@@ -569,7 +641,7 @@ async def _import_variogram(obj: Any, context: Any) -> tuple[Any, dict[str, Any]
 # ── Object type definition ────────────────────────────────────────────────────
 
 
-class VariogramObjectType(StagedObjectType):
+class VariogramObjectType(EvoStagedObjectType):
     """Staged variogram with inspection, search-param extraction, curve, and create interactions."""
 
     object_type = "variogram"
@@ -577,10 +649,7 @@ class VariogramObjectType(StagedObjectType):
     evo_class = Variogram
     data_class = VariogramData
     supported_publish_modes = frozenset({"create", "new_version"})
-    fixture_path_segment = "variograms"
-    role_label = "Variogram"
-    role_article = "a Variogram"
-    create_params_model = VariogramCreateParams
+
 
     def _validate(self, payload: VariogramData) -> None:
         if not payload.structures:
@@ -624,9 +693,6 @@ class VariogramObjectType(StagedObjectType):
             domain=data.get("domain"),
             attribute=data.get("attribute"),
         )
-
-    async def create(self, params: VariogramCreateParams) -> dict[str, Any]:
-        return await _create(params)
 
     def __init__(self) -> None:
         super().__init__()
@@ -674,6 +740,22 @@ class VariogramObjectType(StagedObjectType):
                 params_model=GetCurveDetailsParams,
             )
         )
+        self._register_interaction(
+            Interaction(
+                name="create_search_neighborhood",
+                display_name="Create Search Neighborhood",
+                description=(
+                    "Derive a search neighborhood from this variogram's anisotropy structure "
+                    "and stage it as a new search_neighborhood object."
+                ),
+                handler=_create_search_neighborhood,
+                params_model=CreateSearchNeighborhoodParams,
+            )
+        )
+
+    async def create(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        validated = VariogramCreateParams.model_validate(params or {})
+        return await _create(validated)
 
     async def import_handler(self, obj, context):
         return await _import_variogram(obj, context)

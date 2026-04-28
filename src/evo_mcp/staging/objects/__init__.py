@@ -14,7 +14,7 @@ Usage::
     from evo_mcp.staging.objects import staged_object_type_registry
 
     # Discover interactions for a variogram
-    vtype = staged_object_type_registry.get_or_raise("variogram")
+    vtype = staged_object_type_registry.get("variogram")
     vtype.list_interactions()
 """
 
@@ -28,6 +28,7 @@ import evo_mcp.staging.objects.search_neighborhood  # noqa: F401
 # not from evo_mcp.session or evo_mcp.staging.service directly.
 import evo_mcp.staging.objects.variogram  # noqa: F401
 from evo_mcp.staging.objects.base import (
+    EvoStagedObjectType,
     Interaction,
     StagedObjectType,
     StagedObjectTypeRegistry,
@@ -35,6 +36,7 @@ from evo_mcp.staging.objects.base import (
 )
 
 __all__ = [
+    "EvoStagedObjectType",
     "Interaction",
     "StagedObjectType",
     "StagedObjectTypeRegistry",

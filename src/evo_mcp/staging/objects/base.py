@@ -11,19 +11,25 @@ hard-coding tool lists per type and enables a simple two-tool pattern:
 1. ``stage_list_interactions`` — discover what you can do with an object type
 2. ``stage_invoke_interaction`` — call an interaction by name on a staged object
 
+Two base classes are provided:
+
+- ``StagedObjectType`` — minimal base for any locally-staged object type.
+- ``EvoStagedObjectType`` — extends the base for types that integrate with the
+  Evo SDK (import from Evo, publish to Evo).
+
 Standalone object type modules register themselves with the
-``staged_object_type_registry`` at import time. The registry also provides
-lookups by Evo SDK class and data class, replacing the former
-``DescriptorRegistry``.
+``staged_object_type_registry`` at import time.
 """
 
 import abc
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, ClassVar
+from typing import Any, Awaitable, Callable
 
 from evo_mcp.staging.errors import StageValidationError
+from evo_mcp.staging.runtime import get_registry
 
 __all__ = [
+    "EvoStagedObjectType",
     "Interaction",
     "StagedObjectType",
     "StagedObjectTypeRegistry",
@@ -38,26 +44,22 @@ class Interaction:
     Parameters
     ----------
     name : str
-        Machine-readable identifier (e.g. ``"summarize"``, ``"get_structure_details"``).
+        Machine-readable identifier (e.g. ``"get_summary"``, ``"get_structure_details"``).
     display_name : str
         Human-readable label.
     description : str
         One-line explanation of what the interaction does.
-    handler : async (payload, params) -> dict
+    handler : async callable
         The async callable that executes the interaction.
-        When ``params_model`` is set the handler receives a validated model
-        instance; otherwise it receives the raw params dict.
     params_model : type | None
-        Optional Pydantic ``BaseModel`` subclass. When set, incoming params are
-        validated and coerced before the handler is called. The JSON Schema
-        produced by the model is included in ``describe()`` output so LLMs can
-        discover accepted fields.
+        Optional Pydantic ``BaseModel`` subclass for validated input parameters.
+        The JSON Schema is included in ``describe()`` output for LLM discovery.
     """
 
     name: str
     display_name: str
     description: str
-    handler: Callable[[Any, Any], Awaitable[dict[str, Any]]]
+    handler: Callable[..., Awaitable[dict[str, Any]]]
     params_model: type | None = None
 
     def describe(self) -> dict[str, Any]:
@@ -73,88 +75,109 @@ class Interaction:
 
 
 class StagedObjectType(abc.ABC):
-    """Base class for a staged object type that exposes discoverable interactions.
+    """Base class for a staged object type with discoverable interactions.
+
+    Covers the minimal contract for any locally-staged object — no Evo SDK
+    knowledge required. Types that can import from or publish to Evo should
+    inherit ``EvoStagedObjectType`` instead.
 
     Every subclass **must** implement:
-    - ``validate`` — raise ``StageValidationError`` if the payload is invalid.
     - ``summarize`` — return a lightweight summary dict for the ``StagedEnvelope``.
-    - ``create`` — create a new staged object from validated params.
-    - ``create_params_model`` — set to a Pydantic ``BaseModel`` class, or ``None``
-      if the type does not support local creation.
 
     Optionally override:
-    - ``from_dict`` — deserialize a fixture dict into a typed payload (for seeding).
+    - ``_validate`` — raise ``StageValidationError`` for domain-level payload
+      constraints (called after the data_class type-check by ``validate``).
+    - ``from_dict`` — deserialize a fixture dict into a typed payload.
 
-    Class-level attributes for SDK integration:
-
-    - ``evo_class`` — the SDK wrapper class (``Variogram``, ``PointSet``, ``BlockModel``).
-    - ``data_class`` — the single typed data class accepted as a staged payload.
-    - ``supported_publish_modes`` — subset of ``{"create", "new_version"}``.
-    - ``fixture_path_segment`` — sub-folder under ``/fixtures/`` for dev seeding.
-    - ``role_label`` / ``role_article`` — for error messages.
-    - ``priority`` — higher-priority types are checked first in ``get_by_evo_class``
-      when multiple types share the same ``evo_class``. Default is ``0``.
+    Create interactions are registered in ``__init__`` via ``_register_interaction``.
     """
 
     object_type: str = ""
     display_name: str = ""
-
-    # SDK integration
-    evo_class: type | None = None
     data_class: type | None = None
-    supported_publish_modes: frozenset[str] = frozenset()
-    fixture_path_segment: str = ""
-    role_label: str = ""
-    role_article: str = ""
-    priority: int = 0
-
-    # Set to a Pydantic BaseModel subclass to enable stage_create_object.
-    # Set to None for import-only types (e.g. BlockModel).
-    create_params_model: ClassVar[type | None] = None
 
     def __init__(self) -> None:
         self._interactions: dict[str, Interaction] = {}
 
     def validate(self, payload: Any) -> None:
-        """Validate a payload: type-check against ``data_class``, then domain rules.
-
-        Raises ``StageValidationError`` if the payload is invalid.
-        Called by the staging service before storing every payload.
-        """
+        """Validate a payload: type-check against ``data_class``, then domain rules."""
         if self.data_class is not None and not isinstance(payload, self.data_class):
             raise StageValidationError(f"Expected {self.data_class.__name__}, got {type(payload).__name__}.")
         self._validate(payload)
 
-    @abc.abstractmethod
     def _validate(self, payload: Any) -> None:
-        """Type-specific validation rules (after the type-check passes).
-
-        Override in subclasses to enforce domain constraints.
-        """
+        """Type-specific validation rules. Override in subclasses."""
+        pass
 
     @abc.abstractmethod
     def summarize(self, payload: Any) -> dict[str, Any]:
-        """Return a lightweight summary dict stored in the ``StagedEnvelope``.
-
-        Keep this sync and cheap — it is called on every stage operation.
-        """
+        """Return a lightweight summary dict stored in the ``StagedEnvelope``."""
 
     def from_dict(self, data: dict[str, Any]) -> Any:
-        """Deserialize a fixture dict into a typed payload.
-
-        Override in object types that support fixture seeding via ``dev_tools``.
-        """
+        """Deserialize a fixture dict into a typed payload (for dev seeding)."""
         raise NotImplementedError(f"{type(self).__name__} does not support deserialization from dict.")
 
-    @abc.abstractmethod
-    async def create(self, params: Any) -> dict[str, Any]:
-        """Create a new staged object from validated create params.
+    async def create(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Create a new staged object of this type. Override in subclasses."""
+        raise NotImplementedError(f"{type(self).__name__} does not support create.")
 
-        ``params`` is an instance of ``create_params_model`` when set.
-        Types that do not support local creation must raise ``NotImplementedError``.
+    # ── Interaction discovery & dispatch ───────────────────────────────────────
+
+    def _register_interaction(self, interaction: Interaction) -> None:
+        self._interactions[interaction.name] = interaction
+
+    def list_interactions(self) -> list[dict[str, Any]]:
+        """Return JSON-serializable descriptions of all registered interactions."""
+        return [interaction.describe() for interaction in self._interactions.values()]
+
+    def get_interaction(self, name: str) -> Interaction:
+        """Look up an interaction by name. Raises ValueError if not found."""
+        interaction = self._interactions.get(name)
+        if interaction is None:
+            available = ", ".join(sorted(self._interactions.keys()))
+            raise ValueError(f"Unknown interaction '{name}' on {self.display_name}. Available: {available}")
+        return interaction
+
+    async def _dispatch(
+        self,
+        interaction: Interaction,
+        payload: Any,
+        params: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Validate params and call the interaction handler with the staged payload."""
+        if interaction.params_model is not None:
+            validated = interaction.params_model.model_validate(params or {})
+            return await interaction.handler(payload, validated)
+        return await interaction.handler(payload)
+
+    async def invoke(
+        self,
+        name: str,
+        object_name: str,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Invoke an interaction by name on a staged object.
+
+        The payload is fetched internally from the registry using ``object_name``.
         """
+        _, payload = get_registry().get_payload(name=object_name, object_type=self.object_type)
+        return await self._dispatch(self.get_interaction(name), payload, params)
 
-    # ── Import / publish hooks (override in subclasses) ───────────────────────
+
+class EvoStagedObjectType(StagedObjectType):
+    """Staged object type with Evo SDK integration (import and/or publish).
+
+    Extends ``StagedObjectType`` with the properties and hooks needed to move
+    objects between the local staging area and Evo:
+
+    - ``evo_class`` — the SDK wrapper class used to match imported objects
+      (e.g. ``Variogram``, ``PointSet``, ``BlockModel``). Set to ``None``
+      for locally-created types that can only be published, not imported.
+    - ``supported_publish_modes`` — subset of ``{"create", "new_version"}``.
+    """
+
+    evo_class: type | None = None
+    supported_publish_modes: frozenset[str] = frozenset()
 
     async def import_handler(
         self,
@@ -175,90 +198,24 @@ class StagedObjectType(abc.ABC):
         """SDK call for ``mode='new_version'``."""
         raise NotImplementedError(f"{type(self).__name__} does not support publish_replace.")
 
-    def import_guard(self, evo_obj: Any) -> bool:
-        """Predicate for disambiguation when multiple types share ``evo_class``.
-
-        Override together with setting ``priority > 0`` to ensure this type
-        is checked before lower-priority types sharing the same ``evo_class``.
-        """
-        return True
-
-    # ── Interaction discovery & dispatch ───────────────────────────────────────
-
-    def _register_interaction(self, interaction: Interaction) -> None:
-        self._interactions[interaction.name] = interaction
-
-    def list_interactions(self) -> list[dict[str, Any]]:
-        """Return JSON-serializable descriptions of all registered interactions."""
-        return [interaction.describe() for interaction in self._interactions.values()]
-
-    def get_interaction(self, name: str) -> Interaction:
-        """Look up an interaction by name. Raises ValueError if not found."""
-        interaction = self._interactions.get(name)
-        if interaction is None:
-            available = ", ".join(sorted(self._interactions.keys()))
-            raise ValueError(f"Unknown interaction '{name}' on {self.display_name}. Available: {available}")
-        return interaction
-
-    async def invoke(
-        self,
-        name: str,
-        payload: Any,
-        params: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Invoke an interaction by name with the given payload and parameters.
-
-        If the interaction declares a ``params_model``, the params dict is
-        validated and coerced by the model before being passed to the handler.
-        """
-        interaction = self.get_interaction(name)
-        if interaction.params_model is not None:
-            validated = interaction.params_model.model_validate(params or {})
-            return await interaction.handler(payload, validated)
-        return await interaction.handler(payload, params or {})
-
 
 class StagedObjectTypeRegistry:
-    """Registry mapping object types to their StagedObjectType instances."""
+    """Registry mapping object type identifiers to their ``StagedObjectType`` instances."""
 
     def __init__(self) -> None:
         self._types: dict[str, StagedObjectType] = {}
 
     def register(self, staged_type: StagedObjectType) -> None:
+        if not staged_type.object_type:
+            raise ValueError(f"{type(staged_type).__name__}.object_type must not be empty.")
         self._types[staged_type.object_type] = staged_type
 
-    def get(self, object_type: str) -> StagedObjectType | None:
-        return self._types.get(object_type)
-
-    def get_or_raise(self, object_type: str) -> StagedObjectType:
+    def get(self, object_type: str) -> StagedObjectType:
         result = self._types.get(object_type)
         if result is None:
             available = ", ".join(sorted(self._types.keys()))
             raise ValueError(f"No staged object type registered for '{object_type}'. Available: {available}")
         return result
-
-    def get_by_evo_class(self, evo_obj: Any) -> StagedObjectType:
-        """Find the type that matches an Evo SDK object.
-
-        Types are checked in descending ``priority`` order. When priorities
-        are equal the first match wins. Override ``import_guard`` on higher-
-        priority types for fine-grained disambiguation.
-        """
-        candidates = [t for t in self._types.values() if t.evo_class is not None and isinstance(evo_obj, t.evo_class)]
-        if not candidates:
-            raise ValueError(f"No type registered for Evo class '{type(evo_obj).__name__}'.")
-        candidates.sort(key=lambda t: t.priority, reverse=True)
-        for t in candidates:
-            if t.import_guard(evo_obj):
-                return t
-        raise ValueError(f"No type matched for Evo class '{type(evo_obj).__name__}' after import_guard checks.")
-
-    def get_by_data_class(self, data: Any) -> StagedObjectType:
-        """Find the type whose ``data_class`` matches a staged payload."""
-        for obj_type in self._types.values():
-            if obj_type.data_class is not None and isinstance(data, obj_type.data_class):
-                return obj_type
-        raise ValueError(f"No type registered for data class '{type(data).__name__}'.")
 
     def all(self) -> list[StagedObjectType]:
         return list(self._types.values())

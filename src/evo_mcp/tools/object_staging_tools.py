@@ -15,13 +15,9 @@ Lifecycle tools that bring objects into/out of staging:
                                  supported lifecycle operations
   - staging_import_object      — import an object from Evo into the session
   - staging_publish_object     — push a staged object back to Evo
-  - staging_create_object      — create a new staged object locally
+  - staging_create_object      — create a new staged object locally via a named interaction
   - staging_discard_object     — remove a staged object from the session
   - staging_list               — list all staged objects in the session
-
-Special staging tools:
-
-  - staging_spatial_validation — validate spatial compatibility between staged objects
 
 Object-type-specific logic (SDK calls, CRS coercion, etc.) lives in the
 object type modules under ``evo_mcp.staging.objects``, not here.
@@ -34,29 +30,15 @@ from evo.objects.typed import object_from_uuid
 from evo_mcp.session import ResolutionError, object_registry
 from evo_mcp.staging.errors import StageError
 from evo_mcp.staging.objects import staged_object_type_registry
+from evo_mcp.staging.objects.base import EvoStagedObjectType
 from evo_mcp.staging.service import staging_service
 from evo_mcp.utils.tool_support import (
     build_links_from_metadata,
-    extract_crs,
-    format_crs,
     get_workspace_context,
     get_workspace_environment,
     require_object_role,
     schema_label,
 )
-
-
-def _compare_crs(source_crs: Any, target_crs: Any) -> str:
-    source_label = format_crs(source_crs)
-    target_label = format_crs(target_crs)
-
-    if source_label == "unspecified" or target_label == "unspecified":
-        return "unknown"
-
-    if source_label == target_label:
-        return "compatible"
-
-    return "mismatch"
 
 
 def register_object_staging_tools(mcp) -> None:
@@ -76,13 +58,13 @@ def register_object_staging_tools(mcp) -> None:
         """
         result = []
         for t in staged_object_type_registry.all():
+            is_evo = isinstance(t, EvoStagedObjectType)
             result.append(
                 {
                     "object_type": t.object_type,
                     "display_name": t.display_name,
-                    "supports_create": t.create_params_model is not None,
-                    "supports_import": t.evo_class is not None,
-                    "publish_modes": sorted(t.supported_publish_modes),
+                    "supports_import": is_evo and t.evo_class is not None,
+                    "publish_modes": sorted(t.supported_publish_modes) if is_evo else [],
                 }
             )
         return {"object_types": result}
@@ -99,7 +81,7 @@ def register_object_staging_tools(mcp) -> None:
             object_type: The object type identifier. Use ``staging_list_object_types``
                          to discover valid types.
         """
-        staged_type = staged_object_type_registry.get_or_raise(object_type)
+        staged_type = staged_object_type_registry.get(object_type)
         return {
             "object_type": object_type,
             "display_name": staged_type.display_name,
@@ -126,12 +108,12 @@ def register_object_staging_tools(mcp) -> None:
             params: Optional parameters for the interaction (depends on interaction).
         """
         try:
-            entry, payload = object_registry.get_payload(name=object_name)
-        except (StageError, ResolutionError) as exc:
+            entry = object_registry.resolve(name=object_name)
+        except ResolutionError as exc:
             raise ValueError(str(exc)) from exc
 
-        staged_type = staged_object_type_registry.get_or_raise(entry.object_type)
-        result = await staged_type.invoke(interaction_name, payload, params)
+        staged_type = staged_object_type_registry.get(entry.object_type)
+        result = await staged_type.invoke(interaction_name, object_name, params)
         return {
             "object_name": entry.name,
             "object_type": entry.object_type,
@@ -144,26 +126,20 @@ def register_object_staging_tools(mcp) -> None:
     @mcp.tool()
     async def staging_create_object(
         object_type: str,
-        params: dict[str, Any],
+        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Create a new staged object of the given type locally.
+        """Create a new staged object of the given type.
 
-        Use ``staging_list_object_types`` to see which types support local creation
-        and the parameter schema required.
+        Each object type has a single create path. Use ``staging_list_object_types``
+        to discover valid types and ``staging_list_interactions`` to see what
+        instance interactions are available after creation.
+
+        Args:
+            object_type: The object type identifier (e.g. ``variogram``, ``search_neighborhood``).
+            params: Parameters for the create operation.
         """
-        staged_type = staged_object_type_registry.get_or_raise(object_type)
-
-        if staged_type.create_params_model is None:
-            raise ValueError(
-                f"Object type '{object_type}' does not support local creation. Use staging_import_object instead."
-            )
-
-        try:
-            validated_params = staged_type.create_params_model.model_validate(params)
-        except Exception as exc:
-            raise ValueError(f"Invalid parameters for '{object_type}' create: {exc}") from exc
-
-        result = await staged_type.create(validated_params)
+        staged_type = staged_object_type_registry.get(object_type)
+        result = await staged_type.create(params)
         return {
             "object_type": object_type,
             "result": result,
@@ -241,15 +217,24 @@ def register_object_staging_tools(mcp) -> None:
         except Exception as exc:
             raise ValueError(f"Could not resolve object '{object_id}' for import.") from exc
 
-        try:
-            descriptor = staged_object_type_registry.get_by_evo_class(obj)
-        except ValueError:
+        importable = [
+            t for t in staged_object_type_registry.all()
+            if isinstance(t, EvoStagedObjectType) and t.evo_class is not None and isinstance(obj, t.evo_class)
+        ]
+        if len(importable) > 1:
+            raise ValueError(
+                f"Ambiguous import: multiple types match Evo class '{type(obj).__name__}': "
+                + ", ".join(t.object_type for t in importable)
+                + ". Register distinct evo_class values to disambiguate."
+            )
+        if not importable:
             raise ValueError(
                 f"Object '{object_id}' has an unsupported type "
                 f"'{schema_label(obj)}'. Supported types: "
                 + ", ".join(d.display_name for d in staged_object_type_registry.all())
                 + "."
             )
+        descriptor = importable[0]
 
         source_ref: dict[str, Any] = {
             "object_id": str(obj.metadata.id),
@@ -315,7 +300,17 @@ def register_object_staging_tools(mcp) -> None:
         except StageError as exc:
             raise ValueError(str(exc)) from exc
 
-        descriptor = staged_object_type_registry.get_by_data_class(data)
+        descriptor = next(
+            (
+                t for t in staged_object_type_registry.all()
+                if isinstance(t, EvoStagedObjectType) and t.data_class is not None and isinstance(data, t.data_class)
+            ),
+            None,
+        )
+        if descriptor is None:
+            raise ValueError(
+                f"'{object_name}' ({entry.object_type}) does not support publishing."
+            )
 
         if mode not in descriptor.supported_publish_modes:
             raise ValueError(
@@ -339,8 +334,8 @@ def register_object_staging_tools(mcp) -> None:
             require_object_role(
                 existing,
                 descriptor.evo_class,
-                descriptor.role_label,
-                descriptor.role_article,
+                descriptor.display_name,
+                f"a {descriptor.evo_class.__name__}",
             )
             try:
                 published = await descriptor.publish_replace(context, str(existing.metadata.url), data)
@@ -364,62 +359,3 @@ def register_object_staging_tools(mcp) -> None:
             "links": build_links_from_metadata(environment, str(metadata.id)),
         }
 
-    # ── Spatial validation ────────────────────────────────────────────────────
-
-    @mcp.tool()
-    async def staging_spatial_validation(
-        source_name: str,
-        target_name: str,
-    ) -> dict[str, Any]:
-        """Validate spatial compatibility between two staged objects.
-
-        Compares the coordinate reference systems of both objects using staged
-        payloads only. No Evo API call required.
-
-        Args:
-            source_name: Name of the source staged object.
-            target_name: Name of the target staged object.
-        """
-        try:
-            source_entry, source_payload = object_registry.get_payload(name=source_name, object_type="point_set")
-        except (ResolutionError, Exception) as exc:
-            raise ValueError(f"Could not resolve source '{source_name}' as a point set.") from exc
-
-        try:
-            target_entry, target_payload = object_registry.get_payload(
-                name=target_name, object_type="regular_block_model"
-            )
-        except (ResolutionError, Exception):
-            try:
-                target_entry, target_payload = object_registry.get_payload(name=target_name, object_type="block_model")
-            except (ResolutionError, Exception) as exc:
-                raise ValueError(f"Could not resolve target '{target_name}' as a block model.") from exc
-
-        source_crs = extract_crs(source_payload)
-        target_crs = extract_crs(target_payload)
-        status = _compare_crs(source_crs, target_crs)
-
-        if status == "compatible":
-            message = "Source and target CRS match."
-        elif status == "unknown":
-            message = "At least one CRS is unspecified. Manual confirmation is required before execution."
-        else:
-            message = "Source and target CRS do not match. Resolve this before running kriging."
-
-        return {
-            "status": status,
-            "message": message,
-            "source": {
-                "name": source_name,
-                "object_type": source_entry.object_type,
-                "coordinate_reference_system": format_crs(source_crs),
-            },
-            "target": {
-                "name": target_name,
-                "object_type": target_entry.object_type,
-                "coordinate_reference_system": format_crs(target_crs),
-            },
-            "unit_context": {
-                "guidance": ("Search-neighborhood ranges should use the same coordinate units as the resolved CRS.")
-            },
-        }

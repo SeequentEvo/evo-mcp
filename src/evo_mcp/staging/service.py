@@ -103,7 +103,7 @@ class StagingService:
         ttl_seconds:
             Override the default TTL for this stage.
         """
-        obj_type = staged_object_type_registry.get_or_raise(object_type)
+        obj_type = staged_object_type_registry.get(object_type)
         obj_type.validate(typed_payload)
         summary = obj_type.summarize(typed_payload)
 
@@ -118,7 +118,6 @@ class StagingService:
             source_ref=source_ref or {},
             summary=summary,
             status="active",
-            payload_revision=1,
             created_at=ts,
             updated_at=ts,
             expires_at=_expires_iso(effective_ttl),
@@ -181,7 +180,6 @@ class StagingService:
             source_ref={**envelope.source_ref, "cloned_from": stage_id},
             summary=copy.deepcopy(envelope.summary),
             status="active",
-            payload_revision=1,
             created_at=now,
             updated_at=now,
             expires_at=_expires_iso(self._ttl_seconds),
@@ -238,7 +236,7 @@ class StagingService:
         now_dt = datetime.now(timezone.utc)
         to_remove = []
         for stage_id, envelope in self._envelopes.items():
-            if envelope.status in ("discarded", "published"):
+            if envelope.status in ("discarded", "published", "expired"):
                 to_remove.append(stage_id)
             elif envelope.status == "active" and _parse_iso(envelope.expires_at) <= now_dt:
                 to_remove.append(stage_id)
@@ -291,8 +289,6 @@ class StagingService:
     def _get(self, stage_id: str) -> tuple[StagedEnvelope, Any]:
         envelope = self._envelopes.get(stage_id)
         if envelope is None:
-            raise StageNotFoundError(stage_id)
-        if envelope.status in ("discarded", "published"):
             raise StageNotFoundError(stage_id)
         envelope = self._check_expiry(envelope)
         return envelope, self._payloads[stage_id]

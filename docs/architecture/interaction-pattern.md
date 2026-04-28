@@ -35,14 +35,3 @@ self._register_interaction(Interaction(
     params_model=ExportParams,   # optional — Pydantic schema auto-discovered by LLM
 ))
 ```
-
----
-
-## Interaction Inventory
-
-| Type | Interactions |
-|---|---|
-| `variogram` | `get_summary`, `get_structure_details`, `get_search_parameters`, `get_ellipsoid_details`, `get_curve_details` |
-| `point_set` | `get_summary`, `get_attribute_details` |
-| `block_model` / `regular_block_model` | `get_definition_details` |
-| `search_neighborhood` | `get_summary`, `get_validation_report` |

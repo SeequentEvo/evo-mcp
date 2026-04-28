@@ -31,7 +31,6 @@ class StagedEnvelope:
     source_ref: dict[str, str | None]
     summary: dict[str, Any]
     status: StageStatus
-    payload_revision: int
     created_at: str
     updated_at: str
     expires_at: str

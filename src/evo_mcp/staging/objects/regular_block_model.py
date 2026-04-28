@@ -24,11 +24,10 @@ from evo_mcp.staging.helpers import (
     Size3dSchema,
     Size3iSchema,
     _bbox_dict,
-    _validate_grid_geometry,
 )
 from evo_mcp.staging.objects.base import (
+    EvoStagedObjectType,
     Interaction,
-    StagedObjectType,
     staged_object_type_registry,
 )
 from evo_mcp.staging.runtime import get_registry, get_staging_service
@@ -75,7 +74,7 @@ def _details_from_regular(parsed: RegularBlockModelData) -> dict[str, Any]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _get_definition_details(payload: Any, params: dict[str, Any]) -> dict[str, Any]:
+async def _get_definition_details(payload: Any) -> dict[str, Any]:
     return _details_from_regular(payload)
 
 
@@ -203,24 +202,19 @@ async def _create(params: RegularBlockModelCreateParams) -> dict[str, Any]:
 # ── Object type definition ───────────────────────────────────────────────────
 
 
-class RegularBlockModelObjectType(StagedObjectType):
-    """Staged locally-designed regular block model."""
+class RegularBlockModelObjectType(EvoStagedObjectType):
+    """Staged locally-designed regular block model.
+
+    Cannot be imported from Evo (``evo_class = None``) — locally created only.
+    Published via ``mode='create'`` as a new BlockModel in Evo.
+    """
 
     object_type = "regular_block_model"
     display_name = "Regular Block Model"
-    # evo_class is None: regular block models imported from Evo come back as
-    # BlockModelData (handled by BlockModelObjectType). Locally designed ones
-    # are matched via get_by_data_class using RegularBlockModelData.
     evo_class = None
     data_class = RegularBlockModelData
     supported_publish_modes = frozenset({"create"})
-    fixture_path_segment = "blockmodels"
-    role_label = "Block model"
-    role_article = "a BlockModel"
-    create_params_model = RegularBlockModelCreateParams
 
-    def _validate(self, payload: RegularBlockModelData) -> None:
-        _validate_grid_geometry(payload.block_size, payload.n_blocks, "RegularBlockModelData")
 
     def summarize(self, payload: RegularBlockModelData) -> dict[str, Any]:
         n = payload.n_blocks
@@ -267,9 +261,6 @@ class RegularBlockModelObjectType(StagedObjectType):
             block_size=block_size,
         )
 
-    async def create(self, params: RegularBlockModelCreateParams) -> dict[str, Any]:
-        return await _create(params)
-
     def __init__(self) -> None:
         super().__init__()
         self._register_interaction(
@@ -280,6 +271,10 @@ class RegularBlockModelObjectType(StagedObjectType):
                 handler=_get_definition_details,
             )
         )
+
+    async def create(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        validated = RegularBlockModelCreateParams.model_validate(params or {})
+        return await _create(validated)
 
     async def publish_create(self, context, data, path):
         return await BlockModel.create_regular(context, data, path=path)

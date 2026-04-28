@@ -19,8 +19,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from evo_mcp.staging.errors import StageValidationError
 from evo_mcp.staging.objects.base import (
+    EvoStagedObjectType,
     Interaction,
-    StagedObjectType,
     staged_object_type_registry,
 )
 from evo_mcp.staging.runtime import get_registry, get_staging_service
@@ -106,7 +106,7 @@ def _attribute_inspection(df: pd.DataFrame) -> list[dict[str, Any]]:
 # ── Interaction handlers ──────────────────────────────────────────────────────
 
 
-async def _summarize(payload: Any, params: dict[str, Any]) -> dict[str, Any]:
+async def _summarize(payload: Any) -> dict[str, Any]:
     df = payload.locations
     summary = _point_set_summary(df)
     return {
@@ -116,7 +116,7 @@ async def _summarize(payload: Any, params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def _attribute_details(payload: Any, params: dict[str, Any]) -> dict[str, Any]:
+async def _attribute_details(payload: Any) -> dict[str, Any]:
     df = payload.locations
     return {
         "name": payload.name,
@@ -210,7 +210,7 @@ async def _import_point_set(obj: Any, context: Any) -> tuple[Any, dict[str, Any]
 # ── Object type definition ────────────────────────────────────────────────────
 
 
-class PointSetObjectType(StagedObjectType):
+class PointSetObjectType(EvoStagedObjectType):
     """Staged point set with geometry and attribute inspection interactions."""
 
     object_type = "point_set"
@@ -218,10 +218,7 @@ class PointSetObjectType(StagedObjectType):
     evo_class = PointSet
     data_class = PointSetData
     supported_publish_modes = frozenset({"create", "new_version"})
-    fixture_path_segment = "pointsets"
-    role_label = "PointSet"
-    role_article = "a PointSet"
-    create_params_model = PointSetCreateParams
+
 
     def _validate(self, payload: PointSetData) -> None:
         df = payload.locations
@@ -277,9 +274,6 @@ class PointSetObjectType(StagedObjectType):
             locations=df,
         )
 
-    async def create(self, params: PointSetCreateParams) -> dict[str, Any]:
-        return await _create(params)
-
     def __init__(self) -> None:
         super().__init__()
         self._register_interaction(
@@ -298,6 +292,10 @@ class PointSetObjectType(StagedObjectType):
                 handler=_attribute_details,
             )
         )
+
+    async def create(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        validated = PointSetCreateParams.model_validate(params or {})
+        return await _create(validated)
 
     async def import_handler(self, obj, context):
         return await _import_point_set(obj, context)

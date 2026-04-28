@@ -19,7 +19,6 @@ from evo_mcp.staging.errors import (
     StageError,
     StageExpiredError,
     StageNotFoundError,
-    StageRevisionConflictError,
     StageValidationError,
 )
 from evo_mcp.staging.models import ObjectType, SourceType, StagedEnvelope, StageStatus
@@ -32,7 +31,6 @@ __all__ = [
     "StageError",
     "StageExpiredError",
     "StageNotFoundError",
-    "StageRevisionConflictError",
     "StageStatus",
     "StageValidationError",
     "StagedEnvelope",
