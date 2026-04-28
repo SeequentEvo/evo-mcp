@@ -133,12 +133,12 @@ if TOOL_FILTER == "dev":
     register_dev_tools(mcp)
     print("DEV MODE: Dev tools registered")
 
-if TOOL_FILTER in ["all", "admin"]:
+if TOOL_FILTER in ["all", "dev", "admin"]:
     # Admin Agent: Workspace and instance management tools
     # Includes: workspace creation, snapshots, duplication, permissions management
     register_admin_tools(mcp)
     register_instance_users_admin_tools(mcp)
-if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
+if TOOL_FILTER in ["all", "dev", "data"]:  #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
@@ -148,7 +148,7 @@ if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
     else:
         print("Evo MCP Server configured - Data tools enabled")
 
-if TOOL_FILTER in ["all", "compute"]:
+if TOOL_FILTER in ["all", "dev", "compute"]:
     register_compute_tools(mcp)
     register_object_staging_tools(mcp)
     if TOOL_FILTER == "compute":

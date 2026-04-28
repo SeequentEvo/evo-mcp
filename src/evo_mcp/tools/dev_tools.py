@@ -4,8 +4,8 @@
 
 """Dev-only MCP tools for internal staging inspection and fixture management.
 
-All tools in this module are gated behind MCP_DEV_MODE=true and are NOT
-exposed in production.
+All tools in this module are enabled with MCP_TOOL_FILTER=dev and are NOT
+exposed in production or when using the "all" filter.
 
 Tools:
   - staging_get_info, staging_gc

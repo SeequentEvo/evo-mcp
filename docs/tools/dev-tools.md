@@ -1,11 +1,10 @@
 # Dev Tools — `tools/dev_tools.py`
 
-Gated behind `MCP_DEV_MODE=true`. Not exposed in production.
+Enabled with `MCP_TOOL_FILTER=dev`. Not exposed in production or when using `all`.
 
 | Tool | Purpose |
 |---|---|
 | `staging_get_info` | Inspect a stage envelope by ID |
-| `staging_clone` | Clone a stage for experimentation |
 | `staging_gc` | Garbage-collect expired/discarded stages |
 | `staging_seed` | Seed fixture JSON files into the session |
 | `staging_reset` | Wipe all staged objects — clean slate for evals |

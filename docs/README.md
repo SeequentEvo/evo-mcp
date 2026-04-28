@@ -35,7 +35,7 @@ MCP tool groups introduced in this branch.
 | File | Description |
 |---|---|
 | [compute-tools.md](tools/compute-tools.md) | Kriging build + run tools |
-| [dev-tools.md](tools/dev-tools.md) | Dev/eval tools (fixture seeding, reset) — gated behind `MCP_DEV_MODE` |
+| [dev-tools.md](tools/dev-tools.md) | Dev/eval tools (fixture seeding, reset) — enabled with `MCP_TOOL_FILTER=dev` |
 
 ### `skills/`
 LLM skill guides and the eval harness.
