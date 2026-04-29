@@ -625,8 +625,19 @@ def update_json_config_file(config_file: Path, top_level_key: str, config_entry:
     else:
         settings = {}
 
+    if not isinstance(settings, dict):
+        print_color(f"✗ Unexpected format in config file (expected a JSON object): {config_file}", Colors.RED)
+        sys.exit(1)
+
     if top_level_key not in settings:
         settings[top_level_key] = {}
+
+    if not isinstance(settings[top_level_key], dict):
+        print_color(
+            f"✗ Unexpected format for key '{top_level_key}' in config file (expected a JSON object): {config_file}",
+            Colors.RED,
+        )
+        sys.exit(1)
 
     settings[top_level_key]["evo-mcp"] = config_entry
 
