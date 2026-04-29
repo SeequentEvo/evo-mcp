@@ -1,0 +1,101 @@
+{
+  "skill_name": "staging-workflow",
+  "setup": {
+    "steps": [
+      {"step": 0, "tool": "staging_reset", "args": {}},
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/staging-workflow/fixtures.json"]}}
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Download my EOM Import Variogram so I can use it locally.",
+      "expected_output": "Import succeeds and summary confirms the variogram properties including sill, nugget, and structure count.",
+      "category": "import-variogram"
+    },
+    {
+      "id": 2,
+      "prompt": "Import my EOM Import Point Set so I can check it has the GRADE and DOMAIN attributes.",
+      "expected_output": "Import succeeds and summary confirms the point set with its attributes (GRADE, DOMAIN), point count, and coordinate reference system.",
+      "category": "import-point-set"
+    },
+    {
+      "id": 3,
+      "prompt": "Import my EOM Import Block Model so I can inspect its grid dimensions.",
+      "expected_output": "Import succeeds and summary confirms the block model grid dimensions and block size.",
+      "category": "import-block-model"
+    },
+    {
+      "id": 4,
+      "prompt": "Publish my local variogram EOM Stage Variogram New to the workspace as a brand new object at object_path /evals/staging-workflow/eom-stage-variogram-new.",
+      "expected_output": "Publish succeeds for the staged-only variogram using mode=create and the provided object_path. A new workspace object is created with a valid object ID and version ID.",
+      "category": "publish-new-variogram"
+    },
+    {
+      "id": 5,
+      "prompt": "Publish my local point set EOM Stage Point Set New to the workspace as a new object at object_path /evals/staging-workflow/eom-stage-point-set-new.",
+      "expected_output": "Publish succeeds for the staged-only point set using mode=create and the provided object_path. A new workspace object is created with a valid object ID and version ID.",
+      "category": "publish-new-point-set"
+    },
+    {
+      "id": 6,
+      "prompt": "Publish my local block model EOM Stage Block Model New to the workspace as a new object at object_path /evals/staging-workflow/eom-stage-block-model-new.",
+      "expected_output": "Publish succeeds for the staged-only regular block model using mode=create and the provided object_path. A new workspace object is created with a valid object ID and version ID.",
+      "category": "publish-new-block-model"
+    },
+    {
+      "id": 7,
+      "prompt": "Use my already staged EOM Both Variogram and publish it back as an updated version of the same Evo object.",
+      "expected_output": "Publish as new version succeeds for EOM Both Variogram without requiring a re-import. The object ID stays the same but the version ID changes.",
+      "category": "publish-new-version-variogram"
+    },
+    {
+      "id": 8,
+      "prompt": "Use my already staged EOM Both Point Set and publish it back as an updated version.",
+      "expected_output": "Publish as new version succeeds for EOM Both Point Set without requiring a re-import. The object ID stays the same but the version ID changes.",
+      "category": "publish-new-version-point-set"
+    },
+    {
+      "id": 9,
+      "prompt": "What objects do I currently have locally?",
+      "expected_output": "A current staged inventory is returned in plain language using available staging fields (at minimum object type plus stage identity/source reference details for each staged entry).",
+      "category": "list-staged-objects"
+    },
+    {
+      "id": 10,
+      "prompt": "Import EOM Import Variogram Discard from the workspace, then delete the local copy.",
+      "expected_output": "Import succeeds. After discarding, EOM Import Variogram Discard is no longer present in the session.",
+      "category": "import-then-discard"
+    },
+    {
+      "id": 11,
+      "prompt": "Import EOM Import Point Set Duplicate from the workspace, then try importing EOM Import Point Set Duplicate again without discarding it first.",
+      "expected_output": "The second import raises a duplicate-name error that states an object named EOM Import Point Set Duplicate is already staged and must be discarded first.",
+      "category": "duplicate-name-error"
+    },
+    {
+      "id": 12,
+      "prompt": "Show me which object types are available for local staging and whether each one supports import and publish.",
+      "expected_output": "The response lists stageable object types and includes support details for import and publish modes.",
+      "category": "list-object-types"
+    },
+    {
+      "id": 13,
+      "prompt": "Create a local search neighborhood named EOM Eval Search Neighborhood with max_samples 24, min_samples 8, major 180, semi_major 120, minor 80, dip_azimuth 0, dip 0, and pitch 0.",
+      "expected_output": "Creation succeeds for a new local search neighborhood named EOM Eval Search Neighborhood with the requested configuration.",
+      "category": "create-search-neighborhood"
+    },
+    {
+      "id": 14,
+      "prompt": "List the available interactions for variogram objects.",
+      "expected_output": "The response includes variogram interaction names and descriptions, including get_summary.",
+      "category": "list-variogram-interactions"
+    },
+    {
+      "id": 15,
+      "prompt": "Run the get_summary interaction on my staged variogram named EOM Stage Variogram Interaction.",
+      "expected_output": "Interaction invocation succeeds and returns a variogram summary for EOM Stage Variogram Interaction.",
+      "category": "invoke-variogram-summary"
+    }
+  ]
+}
