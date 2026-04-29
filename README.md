@@ -585,6 +585,14 @@ limitations under the License.
 
 Before using an MCP Server, you should consider conducting your own independent assessment to ensure that your use would comply with your own specific security and quality control practices and standards, as well as the laws, rules, and regulations that govern you and your content.
 
+### Skill Disclosures
+
+Skills in this repository are intended to assist with workflow guidance and execution support, not replace user review, domain judgment, or independent verification.
+
+Skill outputs may be incomplete, incorrect, or vary over time as underlying models, prompts, tools, and connected systems change.
+
+Users should verify important results before relying on them, especially for operational, technical, scientific, financial, regulatory, safety-related, or customer-facing decisions.
+
 ## Acknowledgements
 
 Much of this document was inspired by the excellent guides written by [FastMCP](https://gofastmcp.com) and [AWS Labs](https://github.com/awslabs/mcp).
