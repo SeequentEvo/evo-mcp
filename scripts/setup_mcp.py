@@ -261,7 +261,7 @@ def configure_env_settings(project_dir: Path) -> dict[str, str]:
     ensure_env_file_exists(project_dir)
     current_values = load_env_file(project_dir)
 
-    new_values = {}
+    new_values = current_values.copy()
 
     new_values["AUTH_METHOD"] = prompt_auth_method(current_values.get("AUTH_METHOD"))
 
@@ -359,21 +359,45 @@ def get_client_choice() -> ClientChoice:
 
     ordered_choices = sorted(CLIENT_CHOICES.items(), key=lambda item: int(item[0]))
     for key, client in ordered_choices:
-        suffix = " (recommended)" if key == "1" else ""
-        print(f"{key}. {client.display_name}{suffix}")
+        print(f"{key}. {client.display_name}")
 
     print()
 
     choice_keys = {key for key, _ in ordered_choices}
     choice_list = ", ".join(sorted(choice_keys, key=int))
 
-    choice = prompt_choice(
-        "Enter your choice (default: 1): ",
-        choice_keys,
-        "1",
-        f"Invalid choice. Please enter one of: {choice_list}.",
-    )
-    return CLIENT_CHOICES[choice]
+    while True:
+        choice = input(f"Enter your choice [{choice_list}]: ").strip()
+        if choice in choice_keys:
+            return CLIENT_CHOICES[choice]
+        print_color(f"Invalid choice. Please enter one of: {choice_list}.", Colors.RED)
+
+
+def get_client_choices() -> list[ClientChoice]:
+    """Ask which client apps to configure in this run."""
+    selected_clients: list[ClientChoice] = []
+    selected_keys: set[str] = set()
+
+    while True:
+        print()
+        client = get_client_choice()
+
+        matching_key = next(key for key, value in CLIENT_CHOICES.items() if value is client)
+        if matching_key in selected_keys:
+            print_color(f"{client.display_name} is already selected.", Colors.RED)
+        else:
+            selected_clients.append(client)
+            selected_keys.add(matching_key)
+
+        remaining_clients = [
+            item for item in CLIENT_CHOICES.items() if item[0] not in selected_keys
+        ]
+        if not remaining_clients:
+            return selected_clients
+
+        print()
+        if not is_confirmed("Configure another client app? [y/N]: ", default_yes=False):
+            return selected_clients
 
 
 def get_protocol_choice(
@@ -516,26 +540,41 @@ def get_cursor_config_dir(variant: str) -> Path | None:
     return None
 
 
-def get_claude_config_dir() -> Path | None:
-    """Get the Claude Desktop configuration directory for the current platform."""
+def get_claude_config_dirs() -> list[Path]:
+    """Get Claude Desktop configuration directories for the current platform."""
     system = platform.system()
 
     if system == "Windows":
+        config_dirs: list[Path] = []
         appdata = os.environ.get("APPDATA")
-        if not appdata:
-            return None
-        config_dir = Path(appdata) / "Claude"
-        return config_dir if config_dir.exists() else config_dir
+        if appdata:
+            config_dirs.append(Path(appdata) / "Claude")
+
+        local_appdata = os.environ.get("LOCALAPPDATA")
+        if local_appdata:
+            packages_dir = Path(local_appdata) / "Packages"
+            if packages_dir.exists():
+                for package_dir in packages_dir.glob("Claude*"):
+                    config_dirs.append(package_dir / "LocalCache" / "Roaming" / "Claude")
+
+        unique_dirs: list[Path] = []
+        seen_paths: set[Path] = set()
+        for config_dir in config_dirs:
+            resolved = config_dir.resolve(strict=False)
+            if resolved not in seen_paths:
+                seen_paths.add(resolved)
+                unique_dirs.append(config_dir)
+        return unique_dirs
 
     if system == "Darwin":
         config_dir = Path.home() / "Library" / "Application Support" / "Claude"
-        return config_dir if config_dir.exists() else config_dir
+        return [config_dir]
 
     if system == "Linux":
         config_dir = Path.home() / ".config" / "Claude"
-        return config_dir if config_dir.exists() else config_dir
+        return [config_dir]
 
-    return None
+    return []
 
 
 def get_config_dir(client: ClientChoice) -> Path | None:
@@ -543,8 +582,36 @@ def get_config_dir(client: ClientChoice) -> Path | None:
     if client.client_type == "vscode":
         return get_vscode_config_dir(client.variant)
     if client.client_type == "claude":
-        return get_claude_config_dir()
+        config_dirs = get_claude_config_dirs()
+        return config_dirs[0] if config_dirs else None
     return get_cursor_config_dir(client.variant)
+
+
+def update_json_config_file(config_file: Path, top_level_key: str, config_entry: dict) -> None:
+    """Load, update, and write a single JSON config file."""
+    if config_file.exists():
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                raw_config = f.read()
+
+            if raw_config.strip():
+                settings = json.loads(raw_config)
+            else:
+                settings = {}
+        except json.JSONDecodeError as e:
+            print_color(f"✗ Invalid JSON in existing config file: {e}", Colors.RED)
+            print(f"Please fix the syntax error in: {config_file}")
+            sys.exit(1)
+    else:
+        settings = {}
+
+    if top_level_key not in settings:
+        settings[top_level_key] = {}
+
+    settings[top_level_key]["evo-mcp"] = config_entry
+
+    with open(config_file, "w", encoding="utf-8") as f:
+        json.dump(settings, f, indent=2)
 
 
 def get_python_executable() -> str:
@@ -636,6 +703,32 @@ def build_config_entry(
     return top_level_key, entry
 
 
+def kill_claude_processes() -> None:
+    """Force-quit all running Claude Desktop processes so the app reloads config on next launch."""
+    system = platform.system()
+    try:
+        if system == "Windows":
+            subprocess.run(
+                ["taskkill", "/F", "/IM", "Claude.exe"],
+                capture_output=True,
+                check=False,
+            )
+        elif system == "Darwin":
+            subprocess.run(
+                ["pkill", "-f", "Claude"],
+                capture_output=True,
+                check=False,
+            )
+        else:
+            subprocess.run(
+                ["pkill", "-f", "[Cc]laude"],
+                capture_output=True,
+                check=False,
+            )
+    except (OSError, ValueError):
+        pass
+
+
 def setup_mcp_config(
     client: ClientChoice,
     protocol: str,
@@ -650,36 +743,29 @@ def setup_mcp_config(
     script_dir = Path(__file__).parent.resolve()
     project_dir = script_dir.parent
 
-    config_dir = get_config_dir(client)
-    if not config_dir:
+    config_dirs: list[Path]
+    if client.client_type == "claude":
+        config_dirs = get_claude_config_dirs()
+    else:
+        config_dir = get_config_dir(client)
+        config_dirs = [config_dir] if config_dir else []
+
+    if not config_dirs:
         print_color(f"✗ Could not find {client.display_name} installation directory", Colors.RED)
         sys.exit(1)
-    config_file = config_dir / ("claude_desktop_config.json" if client.client_type == "claude" else "mcp.json")
+
+    config_files = [
+        config_dir / ("claude_desktop_config.json" if client.client_type == "claude" else "mcp.json")
+        for config_dir in config_dirs
+    ]
     print_color(f"Using user configuration for {client.display_name}", Colors.GREEN)
 
-    print(f"Configuration file: {config_file}")
+    for config_file in config_files:
+        print(f"Configuration file: {config_file}")
     print()
 
     python_exe = choose_python_executable(get_python_executable())
     mcp_script = str(project_dir / "src" / "mcp_tools.py")
-
-    config_dir.mkdir(parents=True, exist_ok=True)
-
-    if config_file.exists():
-        try:
-            with open(config_file, "r", encoding="utf-8") as f:
-                raw_config = f.read()
-
-            if raw_config.strip():
-                settings = json.loads(raw_config)
-            else:
-                settings = {}
-        except json.JSONDecodeError as e:
-            print_color(f"✗ Invalid JSON in existing config file: {e}", Colors.RED)
-            print(f"Please fix the syntax error in: {config_file}")
-            sys.exit(1)
-    else:
-        settings = {}
 
     top_level_key, config_entry = build_config_entry(
         client,
@@ -689,14 +775,10 @@ def setup_mcp_config(
         env_values,
     )
 
-    if top_level_key not in settings:
-        settings[top_level_key] = {}
-
-    settings[top_level_key]["evo-mcp"] = config_entry
-
     try:
-        with open(config_file, "w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2)
+        for config_file in config_files:
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            update_json_config_file(config_file, top_level_key, config_entry)
 
         server_exit_code = None
 
@@ -724,9 +806,11 @@ def setup_mcp_config(
         if client.client_type == "cursor":
             print("Restart Cursor or reload the window")
         elif client.client_type == "claude":
-            print("Restart Claude Desktop")
+            print("Stopping Claude Desktop so it reloads the new configuration...")
+            kill_claude_processes()
+            print_color("✓ Claude Desktop stopped. Open it again to use Evo MCP.", Colors.GREEN)
         else:
-            print("Restart VS Code or reload the window")
+            print(f"Restart {client.display_name} or reload the window")
 
         print()
         print("Note: This configuration uses the Python interpreter:")
@@ -757,7 +841,7 @@ def main():
         env_values = configure_env_settings(project_dir)
 
         print()
-        client = get_client_choice()
+        clients = get_client_choices()
 
         print()
         protocol, env_values = get_protocol_choice(env_values)
@@ -770,8 +854,14 @@ def main():
         if protocol == "http":
             start_server_now = get_start_server_choice()
 
-        print()
-        setup_mcp_config(client, protocol, env_values, start_server_now)
+        for index, client in enumerate(clients):
+            print()
+            if len(clients) > 1:
+                print_color(
+                    f"Configuring client {index + 1} of {len(clients)}: {client.display_name}",
+                    Colors.BLUE,
+                )
+            setup_mcp_config(client, protocol, env_values, start_server_now and index == 0)
     except KeyboardInterrupt:
         print()
         print_color("Setup cancelled by user", Colors.RED)
