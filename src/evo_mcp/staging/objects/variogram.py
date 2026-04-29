@@ -383,7 +383,7 @@ async def _create_search_neighborhood(payload: VariogramData, params: CreateSear
     )
     return {
         "name": params.object_name,
-        "configuration": data.to_dict(),
+        "configuration": data.model_dump(),
         "derivation": {
             "variogram_name": payload.name,
             "selected_structure_index": sel_idx,
