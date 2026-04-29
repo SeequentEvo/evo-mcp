@@ -10,7 +10,7 @@ Tools register objects by name after creation; downstream tools look them up by 
 ```
 session/
   models.py    RegistryEntry  (name, type, stage_id, status, summary)
-  resolver.py  ObjectResolver (case-insensitive + latest-wins matching)
+  resolver.py  ObjectResolver (case-insensitive matching) + DuplicateNameError
   registry.py  ObjectRegistry (module-level singleton)
 ```
 
@@ -34,7 +34,7 @@ flowchart TD
 ## Key API
 
 ```python
-# After staging:
+# After staging — raises DuplicateNameError if the name+type already exists:
 object_registry.register(name="CU variogram", object_type="variogram", stage_id=...)
 
 # In a downstream tool:
@@ -45,3 +45,19 @@ object_registry.mark_published(name="CU variogram", object_type="variogram", obj
 ```
 
 `object_registry` is a **module-level singleton** shared across all tool modules.
+
+---
+
+## Duplicate Name Handling
+
+`register()` rejects any name+type combination already present in the session.
+This applies to every creation path — local build, import, and dev fixture seeding.
+
+```python
+# Second import of the same object name raises immediately:
+# DuplicateNameError: An object named 'CU variogram' of type 'variogram' is already staged.
+#   Discard it first with staging_discard_object before registering a new one.
+```
+
+The caller must explicitly discard the existing object before registering a replacement.
+`DuplicateNameError` is a `ValueError` subclass and surfaces directly as a tool error.

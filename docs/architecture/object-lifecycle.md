@@ -23,10 +23,12 @@ flowchart LR
     A["staging_create_object\n(local build)"] --> S[StagingService]
     B["staging_import_object\n(from Evo UUID)"] --> S
     S --> R[ObjectRegistry\nname → stage_id]
+    R -->|name already exists| ERR["DuplicateNameError\n→ discard first"]
 ```
 
 - **Create:** Pydantic params validated → `StagedObjectType.create()` → staged locally
 - **Import:** SDK object fetched from Evo → `import_handler()` converts to typed data → staged
+- **Duplicate names:** If an object with the same name and type is already staged, both paths raise `DuplicateNameError`. Use `staging_discard_object` to remove the existing object first.
 
 ---
 
