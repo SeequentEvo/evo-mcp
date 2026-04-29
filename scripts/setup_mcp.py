@@ -73,10 +73,15 @@ def print_color(text: str, color: str = Colors.RESET):
 
 def is_confirmed(prompt: str = "Is this correct? [Y/n]: ", default_yes: bool = True) -> bool:
     """Prompt for yes/no confirmation with configurable default."""
-    choice = input(prompt).strip().lower()
-    if not choice:
-        return default_yes
-    return choice in ["y", "yes"]
+    while True:
+        choice = input(prompt).strip().lower()
+        if not choice:
+            return default_yes
+        if choice in ["y", "yes"]:
+            return True
+        if choice in ["n", "no"]:
+            return False
+        print_color("Invalid input. Please enter Y or N.", Colors.RED)
 
 
 def prompt_choice(
@@ -104,7 +109,7 @@ def prompt_for_env_value(
     print(description)
 
     if current_value and "Replace this" not in current_value:
-        print(f"Current value: {current_value}")
+        print_color(f"Current value: {current_value}", Colors.GREEN)
         if is_confirmed():
             return current_value
 
@@ -120,7 +125,7 @@ def prompt_for_env_value(
 
 def prompt_with_confirmation(label: str, current_value: str, default: str) -> str:
     """Prompt for a value, optionally accepting the current one."""
-    print(f"Current {label}: {current_value}")
+    print_color(f"Current {label}: {current_value}", Colors.GREEN)
     if is_confirmed():
         return current_value
     return input(f"Enter {label} (default: {default}): ").strip() or default
@@ -141,7 +146,7 @@ def prompt_auth_method(current_value: str | None) -> str:
 
     if current_value:
         label = AUTH_METHOD_LABELS.get(current_value, current_value)
-        print(f"Current value: {label}")
+        print_color(f"Current value: {label}", Colors.GREEN)
         if is_confirmed():
             return current_value
 
@@ -164,7 +169,7 @@ def prompt_tool_filter(current_value: str | None) -> str:
     print()
 
     if current_value:
-        print(f"Current value: {current_value}")
+        print_color(f"Current value: {current_value}", Colors.GREEN)
         if is_confirmed():
             return current_value
 
@@ -353,11 +358,13 @@ def start_http_server(python_exe: str, mcp_script: str, project_dir: Path) -> in
         return None
 
 
-def get_client_choice() -> ClientChoice:
+def get_client_choice(protocol: str) -> ClientChoice:
     """Ask user which client app to configure."""
     print("Which client app are you using?")
 
     ordered_choices = sorted(CLIENT_CHOICES.items(), key=lambda item: int(item[0]))
+    if protocol == "http":
+        ordered_choices = [(k, c) for k, c in ordered_choices if c.client_type != "claude"]
     for key, client in ordered_choices:
         print(f"{key}. {client.display_name}")
 
@@ -373,16 +380,20 @@ def get_client_choice() -> ClientChoice:
         print_color(f"Invalid choice. Please enter one of: {choice_list}.", Colors.RED)
 
 
-def get_client_choices() -> list[ClientChoice]:
+def get_client_choices(protocol: str) -> list[ClientChoice]:
     """Ask which client apps to configure in this run."""
     selected_clients: list[ClientChoice] = []
     selected_keys: set[str] = set()
 
+    available_choices = CLIENT_CHOICES
+    if protocol == "http":
+        available_choices = {k: c for k, c in CLIENT_CHOICES.items() if c.client_type != "claude"}
+
     while True:
         print()
-        client = get_client_choice()
+        client = get_client_choice(protocol)
 
-        matching_key = next(key for key, value in CLIENT_CHOICES.items() if value is client)
+        matching_key = next(key for key, value in available_choices.items() if value is client)
         if matching_key in selected_keys:
             print_color(f"{client.display_name} is already selected.", Colors.RED)
         else:
@@ -390,7 +401,7 @@ def get_client_choices() -> list[ClientChoice]:
             selected_keys.add(matching_key)
 
         remaining_clients = [
-            item for item in CLIENT_CHOICES.items() if item[0] not in selected_keys
+            item for item in available_choices.items() if item[0] not in selected_keys
         ]
         if not remaining_clients:
             return selected_clients
@@ -413,8 +424,10 @@ def get_protocol_choice(
     current_transport = env_values.get("MCP_TRANSPORT", "").lower()
     protocol = None
 
-    if current_transport in ["stdio", "http"]:
-        print(f"Current transport: {current_transport.upper()}")
+    TRANSPORT_LABELS = {"stdio": "STDIO", "http": "Streamable HTTP"}
+
+    if current_transport in TRANSPORT_LABELS:
+        print_color(f"Current transport: {TRANSPORT_LABELS[current_transport]}", Colors.GREEN)
         if is_confirmed():
             protocol = current_transport
 
@@ -445,18 +458,7 @@ def get_protocol_choice(
 def get_start_server_choice() -> bool:
     """Ask whether to start the Evo MCP server now."""
     print()
-    print("Would you like to start the Evo MCP server now?")
-    print("1. Yes (recommended)")
-    print("2. No")
-    print()
-
-    choice = prompt_choice(
-        "Enter your choice [1-2] (default: 1): ",
-        {"1", "2"},
-        "1",
-        "Invalid choice. Please enter 1 or 2.",
-    )
-    return choice == "1"
+    return is_confirmed("Would you like to start the Evo MCP server now? [Y/n]: ")
 
 
 def get_vscode_config_dir(variant: str) -> Path | None:
@@ -654,7 +656,7 @@ def resolve_python_executable(python_command: str) -> str | None:
 
 def choose_python_executable(default_python: str) -> str:
     """Allow the user to confirm or override the Python executable for MCP config."""
-    print(f"Current Python interpreter: {default_python}")
+    print_color(f"Current Python interpreter: {default_python}", Colors.GREEN)
 
     if is_virtual_environment_active():
         print_color("Detected active virtual environment.", Colors.GREEN)
@@ -806,9 +808,12 @@ def setup_mcp_config(
         if client.client_type == "cursor":
             print("Restart Cursor or reload the window")
         elif client.client_type == "claude":
-            print("Stopping Claude Desktop so it reloads the new configuration...")
-            kill_claude_processes()
-            print_color("✓ Claude Desktop stopped. Open it again to use Evo MCP.", Colors.GREEN)
+            if platform.system() == "Windows":
+                print("Stopping Claude Desktop so it reloads the new configuration...")
+                kill_claude_processes()
+                print_color("✓ Claude Desktop stopped. Open it again to use Evo MCP.", Colors.GREEN)
+            else:
+                print("Restart Claude Desktop to load the new configuration.")
         else:
             print(f"Restart {client.display_name} or reload the window")
 
@@ -841,10 +846,10 @@ def main():
         env_values = configure_env_settings(project_dir)
 
         print()
-        clients = get_client_choices()
+        protocol, env_values = get_protocol_choice(env_values)
 
         print()
-        protocol, env_values = get_protocol_choice(env_values)
+        clients = get_client_choices(protocol)
 
         write_env_file(project_dir, env_values)
         print()
