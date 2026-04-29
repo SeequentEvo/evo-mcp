@@ -400,9 +400,7 @@ def get_client_choices(protocol: str) -> list[ClientChoice]:
             selected_clients.append(client)
             selected_keys.add(matching_key)
 
-        remaining_clients = [
-            item for item in available_choices.items() if item[0] not in selected_keys
-        ]
+        remaining_clients = [item for item in available_choices.items() if item[0] not in selected_keys]
         if not remaining_clients:
             return selected_clients
 
