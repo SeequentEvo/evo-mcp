@@ -605,9 +605,6 @@ def get_config_dir(client: ClientChoice) -> Path | None:
     """Resolve client config directory based on chosen app."""
     if client.client_type == "vscode":
         return get_vscode_config_dir(client.variant)
-    if client.client_type == "claude":
-        config_dirs = get_claude_config_dirs()
-        return config_dirs[0] if config_dirs else None
     return get_cursor_config_dir(client.variant)
 
 
@@ -623,25 +620,20 @@ def update_json_config_file(config_file: Path, top_level_key: str, config_entry:
             else:
                 settings = {}
         except json.JSONDecodeError as e:
-            print_color(f"✗ Invalid JSON in existing config file: {e}", Colors.RED)
-            print(f"Please fix the syntax error in: {config_file}")
-            sys.exit(1)
+            raise ValueError(f"Invalid JSON in existing config file: {e}") from e
     else:
         settings = {}
 
     if not isinstance(settings, dict):
-        print_color(f"✗ Unexpected format in config file (expected a JSON object): {config_file}", Colors.RED)
-        sys.exit(1)
+        raise ValueError(f"Unexpected format in config file (expected a JSON object): {config_file}")
 
     if top_level_key not in settings:
         settings[top_level_key] = {}
 
     if not isinstance(settings[top_level_key], dict):
-        print_color(
-            f"✗ Unexpected format for key '{top_level_key}' in config file (expected a JSON object): {config_file}",
-            Colors.RED,
+        raise ValueError(
+            f"Unexpected format for key '{top_level_key}' in config file (expected a JSON object): {config_file}"
         )
-        sys.exit(1)
 
     settings[top_level_key]["evo-mcp"] = config_entry
 
@@ -813,7 +805,12 @@ def setup_mcp_config(
     try:
         for config_file in config_files:
             config_file.parent.mkdir(parents=True, exist_ok=True)
-            update_json_config_file(config_file, top_level_key, config_entry)
+            try:
+                update_json_config_file(config_file, top_level_key, config_entry)
+            except ValueError as e:
+                print_color(f"✗ {e}", Colors.RED)
+                print(f"Please fix the issue in: {config_file}")
+                sys.exit(1)
 
         server_exit_code = None
 

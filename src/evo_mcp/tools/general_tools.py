@@ -7,7 +7,6 @@ MCP tools for general operations (health checks, object CRUD, etc).
 """
 
 import logging
-from pathlib import Path
 from uuid import UUID
 
 from fastmcp import Context
@@ -15,17 +14,8 @@ from fastmcp import Context
 from evo_mcp.context import ensure_initialized, evo_context
 
 # Set up logging to file for debugging
-_log_dir = Path(__file__).resolve().parents[3] / "logs"
-try:
-    _log_dir.mkdir(exist_ok=True)
-    _log_file = str(_log_dir / "mcp_tools_debug.log")
-except OSError:
-    _log_file = None
-
 logging.basicConfig(
-    filename=_log_file,
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    filename="mcp_tools_debug.log", level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
