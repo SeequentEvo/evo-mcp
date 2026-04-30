@@ -6,7 +6,7 @@
 
 """
 Evo MCP Configuration Setup
-Cross-platform script to configure the Evo MCP server for VS Code or Cursor.
+Cross-platform script to configure the Evo MCP server for VS Code, Cursor, or Claude Desktop.
 """
 
 from __future__ import annotations
@@ -47,6 +47,7 @@ CLIENT_CHOICES = {
     "1": ClientChoice("VS Code", "vscode", "Code"),
     "2": ClientChoice("VS Code Insiders", "vscode", "Code - Insiders"),
     "3": ClientChoice("Cursor", "cursor", "Cursor"),
+    "4": ClientChoice("Claude Desktop", "claude", "Claude"),
 }
 
 DEFAULT_REDIRECT_URL = "http://localhost:3000/signin-callback"
@@ -72,10 +73,15 @@ def print_color(text: str, color: str = Colors.RESET):
 
 def is_confirmed(prompt: str = "Is this correct? [Y/n]: ", default_yes: bool = True) -> bool:
     """Prompt for yes/no confirmation with configurable default."""
-    choice = input(prompt).strip().lower()
-    if not choice:
-        return default_yes
-    return choice in ["y", "yes"]
+    while True:
+        choice = input(prompt).strip().lower()
+        if not choice:
+            return default_yes
+        if choice in ["y", "yes"]:
+            return True
+        if choice in ["n", "no"]:
+            return False
+        print_color("Invalid input. Please enter Y or N.", Colors.RED)
 
 
 def prompt_choice(
@@ -97,13 +103,17 @@ def prompt_for_env_value(
     current_value: str | None,
     description: str,
     default: str = "",
+    sensitive: bool = False,
 ) -> str:
     """Prompt user for an environment variable value."""
     print()
     print(description)
 
     if current_value and "Replace this" not in current_value:
-        print(f"Current value: {current_value}")
+        if sensitive:
+            print_color("Current value: (already configured)", Colors.GREEN)
+        else:
+            print_color(f"Current value: {current_value}", Colors.GREEN)
         if is_confirmed():
             return current_value
 
@@ -119,7 +129,7 @@ def prompt_for_env_value(
 
 def prompt_with_confirmation(label: str, current_value: str, default: str) -> str:
     """Prompt for a value, optionally accepting the current one."""
-    print(f"Current {label}: {current_value}")
+    print_color(f"Current {label}: {current_value}", Colors.GREEN)
     if is_confirmed():
         return current_value
     return input(f"Enter {label} (default: {default}): ").strip() or default
@@ -133,8 +143,14 @@ def prompt_auth_method(current_value: str | None) -> str:
     print("2. Service account — no user sign-in (for automation/CI)")
     print()
 
+    AUTH_METHOD_LABELS = {
+        "native_app": "Sign in with your browser",
+        "client_credentials": "Service account",
+    }
+
     if current_value:
-        print(f"Current value: {current_value}")
+        label = AUTH_METHOD_LABELS.get(current_value, current_value)
+        print_color(f"Current value: {label}", Colors.GREEN)
         if is_confirmed():
             return current_value
 
@@ -157,7 +173,7 @@ def prompt_tool_filter(current_value: str | None) -> str:
     print()
 
     if current_value:
-        print(f"Current value: {current_value}")
+        print_color(f"Current value: {current_value}", Colors.GREEN)
         if is_confirmed():
             return current_value
 
@@ -234,11 +250,25 @@ def write_env_file(project_dir: Path, values: dict[str, str]) -> None:
         if not stripped or stripped.startswith("#"):
             continue
 
-        if "=" in stripped:
-            key = stripped.split("=", 1)[0].strip()
+        key_line = stripped
+        if key_line.startswith("export "):
+            key_line = key_line[len("export ") :].strip()
+
+        if "=" in key_line:
+            key = key_line.split("=", 1)[0].strip()
             if key in values:
                 lines[i] = f"{key}={values[key]}\n"
                 updated_keys.add(key)
+            # Insert EVO_CLIENT_SECRET immediately after EVO_CLIENT_ID if it doesn't exist anywhere in the file
+            if key == "EVO_CLIENT_ID" and "EVO_CLIENT_SECRET" in values and "EVO_CLIENT_SECRET" not in updated_keys:
+                secret_exists_in_file = any(
+                    "=" in ln
+                    and ln.strip().removeprefix("export ").strip().split("=", 1)[0].strip() == "EVO_CLIENT_SECRET"
+                    for ln in lines
+                )
+                if not secret_exists_in_file:
+                    lines.insert(i + 1, f"EVO_CLIENT_SECRET={values['EVO_CLIENT_SECRET']}\n")
+                    updated_keys.add("EVO_CLIENT_SECRET")
 
     for key, value in values.items():
         if key not in updated_keys:
@@ -254,21 +284,29 @@ def configure_env_settings(project_dir: Path) -> dict[str, str]:
     ensure_env_file_exists(project_dir)
     current_values = load_env_file(project_dir)
 
-    new_values = {}
+    new_values: dict[str, str] = {}
+
+    # Carry forward transport-related keys so get_protocol_choice() can display current values
+    for key in ("MCP_TRANSPORT", "MCP_HTTP_HOST", "MCP_HTTP_PORT"):
+        if key in current_values:
+            new_values[key] = current_values[key]
 
     new_values["AUTH_METHOD"] = prompt_auth_method(current_values.get("AUTH_METHOD"))
 
+    client_id_current = current_values.get("EVO_CLIENT_ID")
     new_values["EVO_CLIENT_ID"] = prompt_for_env_value(
         "EVO_CLIENT_ID",
-        current_values.get("EVO_CLIENT_ID"),
+        client_id_current,
         "Your Evo application client ID from the iTwin Developer Portal.",
     )
+    client_id_changed = new_values["EVO_CLIENT_ID"] != client_id_current
 
     if new_values["AUTH_METHOD"] == "client_credentials":
         new_values["EVO_CLIENT_SECRET"] = prompt_for_env_value(
             "EVO_CLIENT_SECRET",
-            mask_value(current_values.get("EVO_CLIENT_SECRET")),
+            None if client_id_changed else current_values.get("EVO_CLIENT_SECRET"),
             "Your Evo application client secret from the iTwin Developer Portal.",
+            sensitive=True,
         )
     else:
         new_values["EVO_REDIRECT_URL"] = prompt_for_env_value(
@@ -346,27 +384,64 @@ def start_http_server(python_exe: str, mcp_script: str, project_dir: Path) -> in
         return None
 
 
-def get_client_choice() -> ClientChoice:
+def get_client_choice(protocol: str) -> ClientChoice | None:
     """Ask user which client app to configure."""
     print("Which client app are you using?")
 
     ordered_choices = sorted(CLIENT_CHOICES.items(), key=lambda item: int(item[0]))
+    if protocol == "http":
+        ordered_choices = [(k, c) for k, c in ordered_choices if c.client_type != "claude"]
     for key, client in ordered_choices:
-        suffix = " (recommended)" if key == "1" else ""
-        print(f"{key}. {client.display_name}{suffix}")
+        print(f"{key}. {client.display_name}")
 
+    skip_key = str(max(int(k) for k, _ in ordered_choices) + 1)
+    print(f"{skip_key}. Skip client configuration")
     print()
 
-    choice_keys = {key for key, _ in ordered_choices}
+    choice_keys = {key for key, _ in ordered_choices} | {skip_key}
     choice_list = ", ".join(sorted(choice_keys, key=int))
 
-    choice = prompt_choice(
-        "Enter your choice (default: 1): ",
-        choice_keys,
-        "1",
-        f"Invalid choice. Please enter one of: {choice_list}.",
-    )
-    return CLIENT_CHOICES[choice]
+    while True:
+        choice = input(f"Enter your choice [{choice_list}] (default: {skip_key}): ").strip()
+        if not choice:
+            return None
+        if choice == skip_key:
+            return None
+        if choice in choice_keys:
+            return CLIENT_CHOICES[choice]
+        print_color(f"Invalid choice. Please enter one of: {choice_list}.", Colors.RED)
+
+
+def get_client_choices(protocol: str) -> list[ClientChoice]:
+    """Ask which client apps to configure in this run."""
+    selected_clients: list[ClientChoice] = []
+    selected_keys: set[str] = set()
+
+    available_choices = CLIENT_CHOICES
+    if protocol == "http":
+        available_choices = {k: c for k, c in CLIENT_CHOICES.items() if c.client_type != "claude"}
+
+    while True:
+        print()
+        client = get_client_choice(protocol)
+
+        if client is None:
+            return selected_clients
+
+        matching_key = next(key for key, value in available_choices.items() if value is client)
+        if matching_key in selected_keys:
+            print_color(f"{client.display_name} is already selected.", Colors.RED)
+        else:
+            selected_clients.append(client)
+            selected_keys.add(matching_key)
+
+        remaining_clients = [item for item in available_choices.items() if item[0] not in selected_keys]
+        if not remaining_clients:
+            return selected_clients
+
+        print()
+        if not is_confirmed("Configure another client app? [y/N]: ", default_yes=False):
+            return selected_clients
 
 
 def get_protocol_choice(
@@ -375,15 +450,17 @@ def get_protocol_choice(
     """Ask user which MCP protocol to use and configure HTTP if needed."""
     print()
     print("Which MCP transport protocol are you using?")
-    print("1. STDIO (recommended for VS Code/Cursor)")
+    print("1. STDIO (recommended for VS Code/Cursor/Claude Desktop)")
     print("2. Streamable HTTP (for testing, remote access, Docker)")
     print()
 
     current_transport = env_values.get("MCP_TRANSPORT", "").lower()
     protocol = None
 
-    if current_transport in ["stdio", "http"]:
-        print(f"Current transport: {current_transport.upper()}")
+    TRANSPORT_LABELS = {"stdio": "STDIO", "http": "Streamable HTTP"}
+
+    if current_transport in TRANSPORT_LABELS:
+        print_color(f"Current transport: {TRANSPORT_LABELS[current_transport]}", Colors.GREEN)
         if is_confirmed():
             protocol = current_transport
 
@@ -414,18 +491,7 @@ def get_protocol_choice(
 def get_start_server_choice() -> bool:
     """Ask whether to start the Evo MCP server now."""
     print()
-    print("Would you like to start the Evo MCP server now?")
-    print("1. Yes (recommended)")
-    print("2. No")
-    print()
-
-    choice = prompt_choice(
-        "Enter your choice [1-2] (default: 1): ",
-        {"1", "2"},
-        "1",
-        "Invalid choice. Please enter 1 or 2.",
-    )
-    return choice == "1"
+    return is_confirmed("Would you like to start the Evo MCP server now? [Y/n]: ")
 
 
 def get_vscode_config_dir(variant: str) -> Path | None:
@@ -509,11 +575,81 @@ def get_cursor_config_dir(variant: str) -> Path | None:
     return None
 
 
+def get_claude_config_dirs() -> list[Path]:
+    """Get Claude Desktop configuration directories for the current platform."""
+    system = platform.system()
+
+    if system == "Windows":
+        config_dirs: list[Path] = []
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            config_dirs.append(Path(appdata) / "Claude")
+
+        local_appdata = os.environ.get("LOCALAPPDATA")
+        if local_appdata:
+            packages_dir = Path(local_appdata) / "Packages"
+            if packages_dir.exists():
+                for package_dir in packages_dir.glob("Claude*"):
+                    config_dirs.append(package_dir / "LocalCache" / "Roaming" / "Claude")
+
+        unique_dirs: list[Path] = []
+        seen_paths: set[Path] = set()
+        for config_dir in config_dirs:
+            resolved = config_dir.resolve(strict=False)
+            if resolved not in seen_paths:
+                seen_paths.add(resolved)
+                unique_dirs.append(config_dir)
+        return unique_dirs
+
+    if system == "Darwin":
+        config_dir = Path.home() / "Library" / "Application Support" / "Claude"
+        return [config_dir]
+
+    if system == "Linux":
+        config_dir = Path.home() / ".config" / "Claude"
+        return [config_dir]
+
+    return []
+
+
 def get_config_dir(client: ClientChoice) -> Path | None:
     """Resolve client config directory based on chosen app."""
     if client.client_type == "vscode":
         return get_vscode_config_dir(client.variant)
     return get_cursor_config_dir(client.variant)
+
+
+def update_json_config_file(config_file: Path, top_level_key: str, config_entry: dict) -> None:
+    """Load, update, and write a single JSON config file."""
+    if config_file.exists():
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                raw_config = f.read()
+
+            if raw_config.strip():
+                settings = json.loads(raw_config)
+            else:
+                settings = {}
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in existing config file: {e}") from e
+    else:
+        settings = {}
+
+    if not isinstance(settings, dict):
+        raise ValueError(f"Unexpected format in config file (expected a JSON object): {config_file}")
+
+    if top_level_key not in settings:
+        settings[top_level_key] = {}
+
+    if not isinstance(settings[top_level_key], dict):
+        raise ValueError(
+            f"Unexpected format for key '{top_level_key}' in config file (expected a JSON object): {config_file}"
+        )
+
+    settings[top_level_key]["evo-mcp"] = config_entry
+
+    with open(config_file, "w", encoding="utf-8") as f:
+        json.dump(settings, f, indent=2)
 
 
 def get_python_executable() -> str:
@@ -556,7 +692,7 @@ def resolve_python_executable(python_command: str) -> str | None:
 
 def choose_python_executable(default_python: str) -> str:
     """Allow the user to confirm or override the Python executable for MCP config."""
-    print(f"Current Python interpreter: {default_python}")
+    print_color(f"Current Python interpreter: {default_python}", Colors.GREEN)
 
     if is_virtual_environment_active():
         print_color("Detected active virtual environment.", Colors.GREEN)
@@ -585,7 +721,7 @@ def build_config_entry(
     env_values: dict[str, str],
 ) -> tuple[str, dict]:
     """Build client-specific MCP config entry and top-level key."""
-    if client.client_type == "cursor":
+    if client.client_type in ("cursor", "claude"):
         top_level_key = "mcpServers"
         if protocol == "http":
             host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
@@ -605,11 +741,23 @@ def build_config_entry(
     return top_level_key, entry
 
 
+def kill_claude_processes() -> None:
+    """Force-quit Claude Desktop on Windows so it reloads config on next launch."""
+    try:
+        subprocess.run(
+            ["taskkill", "/F", "/IM", "Claude.exe"],
+            capture_output=True,
+            check=False,
+        )
+    except (OSError, ValueError):
+        pass
+
+
 def setup_mcp_config(
     client: ClientChoice,
     protocol: str,
     env_values: dict[str, str],
-    start_server_now: bool,
+    python_exe: str,
 ):
     """Set up the MCP configuration for the selected client app."""
     print_color("MCP Client Configuration", Colors.BLUE)
@@ -619,36 +767,28 @@ def setup_mcp_config(
     script_dir = Path(__file__).parent.resolve()
     project_dir = script_dir.parent
 
-    config_dir = get_config_dir(client)
-    if not config_dir:
-        print_color(f"✗ Could not find {client.display_name} installation directory", Colors.RED)
+    config_dirs: list[Path]
+    if client.client_type == "claude":
+        config_dirs = get_claude_config_dirs()
+    else:
+        config_dir = get_config_dir(client)
+        config_dirs = [config_dir] if config_dir else []
+
+    if not config_dirs:
+        print_color(f"✗ Could not find {client.display_name} configuration directory", Colors.RED)
         sys.exit(1)
-    config_file = config_dir / "mcp.json"
+
+    config_files = [
+        config_dir / ("claude_desktop_config.json" if client.client_type == "claude" else "mcp.json")
+        for config_dir in config_dirs
+    ]
     print_color(f"Using user configuration for {client.display_name}", Colors.GREEN)
 
-    print(f"Configuration file: {config_file}")
+    for config_file in config_files:
+        print(f"Configuration file: {config_file}")
     print()
 
-    python_exe = choose_python_executable(get_python_executable())
     mcp_script = str(project_dir / "src" / "mcp_tools.py")
-
-    config_dir.mkdir(parents=True, exist_ok=True)
-
-    if config_file.exists():
-        try:
-            with open(config_file, "r", encoding="utf-8") as f:
-                raw_config = f.read()
-
-            if raw_config.strip():
-                settings = json.loads(raw_config)
-            else:
-                settings = {}
-        except json.JSONDecodeError as e:
-            print_color(f"✗ Invalid JSON in existing config file: {e}", Colors.RED)
-            print(f"Please fix the syntax error in: {config_file}")
-            sys.exit(1)
-    else:
-        settings = {}
 
     top_level_key, config_entry = build_config_entry(
         client,
@@ -658,16 +798,15 @@ def setup_mcp_config(
         env_values,
     )
 
-    if top_level_key not in settings:
-        settings[top_level_key] = {}
-
-    settings[top_level_key]["evo-mcp"] = config_entry
-
     try:
-        with open(config_file, "w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2)
-
-        server_exit_code = None
+        for config_file in config_files:
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                update_json_config_file(config_file, top_level_key, config_entry)
+            except ValueError as e:
+                print_color(f"✗ {e}", Colors.RED)
+                print(f"Please fix the issue in: {config_file}")
+                sys.exit(1)
 
         print_color("✓ Successfully added Evo MCP configuration", Colors.GREEN)
         print()
@@ -686,27 +825,27 @@ def setup_mcp_config(
             print(f"    - URL: {http_url}")
         print()
         print("Next steps:")
-        if protocol == "http" and not start_server_now:
+        if protocol == "http":
             print("Start Evo MCP server manually:")
             print(f"  {python_exe} {mcp_script}")
 
         if client.client_type == "cursor":
             print("Restart Cursor or reload the window")
+        elif client.client_type == "claude":
+            if platform.system() == "Windows":
+                print("Stopping Claude Desktop so it reloads the new configuration...")
+                kill_claude_processes()
+                print_color("✓ Claude Desktop stopped. Open it again to use Evo MCP.", Colors.GREEN)
+            else:
+                print("Restart Claude Desktop to load the new configuration.")
         else:
-            print("Restart VS Code or reload the window")
+            print(f"Restart {client.display_name} or reload the window")
 
         print()
         print("Note: This configuration uses the Python interpreter:")
         print(f"  {python_exe}")
         print("If you need to use a different Python environment, activate it")
         print("and run this setup script again.")
-
-        if protocol == "http" and start_server_now:
-            print()
-            print_color("Starting Evo MCP HTTP server in foreground (Ctrl+C to stop)...", Colors.BLUE)
-            server_exit_code = start_http_server(python_exe, mcp_script, project_dir)
-            if server_exit_code not in [0, 130, None]:
-                print_color(f"✗ HTTP server exited with code {server_exit_code}", Colors.RED)
     except (IOError, OSError) as e:
         print_color(f"✗ Failed to update configuration file: {e}", Colors.RED)
         sys.exit(1)
@@ -724,10 +863,10 @@ def main():
         env_values = configure_env_settings(project_dir)
 
         print()
-        client = get_client_choice()
+        protocol, env_values = get_protocol_choice(env_values)
 
         print()
-        protocol, env_values = get_protocol_choice(env_values)
+        clients = get_client_choices(protocol)
 
         write_env_file(project_dir, env_values)
         print()
@@ -737,8 +876,30 @@ def main():
         if protocol == "http":
             start_server_now = get_start_server_choice()
 
-        print()
-        setup_mcp_config(client, protocol, env_values, start_server_now)
+        if clients or start_server_now:
+            python_exe = choose_python_executable(get_python_executable())
+        else:
+            python_exe = get_python_executable()
+
+        if not clients:
+            print_color("No client apps configured. You can run this script again to configure a client.", Colors.BLUE)
+
+        for index, client in enumerate(clients):
+            print()
+            if len(clients) > 1:
+                print_color(
+                    f"Configuring client {index + 1} of {len(clients)}: {client.display_name}",
+                    Colors.BLUE,
+                )
+            setup_mcp_config(client, protocol, env_values, python_exe)
+
+        if start_server_now:
+            print()
+            print_color("Starting Evo MCP HTTP server in foreground (Ctrl+C to stop)...", Colors.BLUE)
+            mcp_script = str(project_dir / "src" / "mcp_tools.py")
+            server_exit_code = start_http_server(python_exe, mcp_script, project_dir)
+            if server_exit_code not in [0, 130, None]:
+                print_color(f"✗ HTTP server exited with code {server_exit_code}", Colors.RED)
     except KeyboardInterrupt:
         print()
         print_color("Setup cancelled by user", Colors.RED)
