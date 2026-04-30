@@ -746,6 +746,7 @@ def setup_mcp_config(
     client: ClientChoice,
     protocol: str,
     env_values: dict[str, str],
+    python_exe: str,
 ):
     """Set up the MCP configuration for the selected client app."""
     print_color("MCP Client Configuration", Colors.BLUE)
@@ -776,7 +777,6 @@ def setup_mcp_config(
         print(f"Configuration file: {config_file}")
     print()
 
-    python_exe = choose_python_executable(get_python_executable())
     mcp_script = str(project_dir / "src" / "mcp_tools.py")
 
     top_level_key, config_entry = build_config_entry(
@@ -865,6 +865,8 @@ def main():
         if protocol == "http":
             start_server_now = get_start_server_choice()
 
+        python_exe = choose_python_executable(get_python_executable())
+
         if not clients:
             print_color("No client apps configured. You can run this script again to configure a client.", Colors.BLUE)
 
@@ -875,14 +877,11 @@ def main():
                     f"Configuring client {index + 1} of {len(clients)}: {client.display_name}",
                     Colors.BLUE,
                 )
-            setup_mcp_config(client, protocol, env_values, start_server_now=False)
+            setup_mcp_config(client, protocol, env_values, python_exe)
 
         if start_server_now:
             print()
             print_color("Starting Evo MCP HTTP server in foreground (Ctrl+C to stop)...", Colors.BLUE)
-            script_dir = Path(__file__).parent.resolve()
-            project_dir = script_dir.parent
-            python_exe = get_python_executable()
             mcp_script = str(project_dir / "src" / "mcp_tools.py")
             server_exit_code = start_http_server(python_exe, mcp_script, project_dir)
             if server_exit_code not in [0, 130, None]:
