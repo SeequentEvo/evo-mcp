@@ -2,6 +2,17 @@
 
 Typed, in-memory payload store with TTL, size guards, and a **plugin system** for object types.
 
+> **Deployment constraint:** `StagingService` is an in-process, in-memory store.
+> It is only suitable for single-process local deployments. All staged objects are
+> lost on server restart, and concurrent processes each maintain their own isolated
+> store with no shared state. To support a hosted or multi-process deployment, the
+> `_envelopes` and `_payloads`` dicts in `service.py` must be replaced with a
+> durable shared backend.
+
+### Why a staging layer?
+
+Without staging, object state must be carried in the conversation context window — object names, non-Evo parameters (e.g. variogram model choices, column mappings), and intermediate results all consume tokens and risk being lost across long sessions. Staging also reduces API interaction: a common pattern is import once then run multiple compute jobs or local interactions against the same object; without a local store each would re-fetch from the API each time.
+
 ---
 
 ## Structure
