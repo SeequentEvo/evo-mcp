@@ -35,4 +35,5 @@ MCP tool groups.
 | File | Description |
 |---|---|
 | [compute-tools.md](tools/compute-tools.md) | Kriging build + run tools |
+| [dev-tools.md](tools/dev-tools.md) | Dev/eval tools (fixture seeding, reset) — enabled with `MCP_TOOL_FILTER=dev` |
 

@@ -11,7 +11,9 @@ Configuration:
     - "admin"   : Workspace management tools
     - "data"    : Object query, file operations, and management tools
     - "compute" : Compute and geostatistics tools
-    - "all"     : All tools (default)
+    - "dev"     : Dev tools for staging inspection and fixture management
+                  (staging_seed, staging_reset, staging_get_info, staging_gc)
+    - "all"     : All tools except dev tools (default)
 
     Set MCP_TRANSPORT environment variable to choose transport mode:
     - "stdio" (default): Standard input/output, used by VS Code, Cursor, Claude Desktop
@@ -38,6 +40,7 @@ from evo_mcp.staging.service import staging_service
 from evo_mcp.tools import (
     register_admin_tools,
     register_compute_tools,
+    register_dev_tools,
     register_file_tools,
     register_filesystem_tools,
     register_general_tools,
@@ -74,7 +77,7 @@ TOOL_FILTER = os.getenv(
         "all",
     ),
 ).lower()
-VALID_TOOL_FILTERS = ["admin", "data", "compute", "all"]
+VALID_TOOL_FILTERS = ["admin", "data", "compute", "dev", "all"]
 
 if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
@@ -108,12 +111,17 @@ def _get_objects_reference_content() -> str:
 # Always register general tools (workspace discovery, object queries, etc.)
 register_general_tools(mcp)
 
-if TOOL_FILTER in ["all", "admin"]:
+# Dev tools — only register when explicitly requested (not included in "all")
+if TOOL_FILTER == "dev":
+    register_dev_tools(mcp)
+    print("DEV MODE: Dev tools registered")
+
+if TOOL_FILTER in ["all", "dev", "admin"]:
     # Admin Agent: Workspace and instance management tools
     # Includes: workspace creation, snapshots, duplication, permissions management
     register_admin_tools(mcp)
     register_instance_users_admin_tools(mcp)
-if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
+if TOOL_FILTER in ["all", "dev", "data"]:  #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
@@ -123,7 +131,7 @@ if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
     else:
         print("Evo MCP Server configured - Data tools enabled")
 
-if TOOL_FILTER in ["all", "compute"]:
+if TOOL_FILTER in ["all", "dev", "compute"]:
     register_compute_tools(mcp)
     register_object_staging_tools(mcp)
     if TOOL_FILTER == "compute":

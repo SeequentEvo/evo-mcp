@@ -149,10 +149,11 @@ def prompt_tool_filter(current_value: str | None) -> str:
     """Prompt for MCP tool filter selection."""
     print()
     print("Select which tools to enable:")
-    print("1. all     - All tools (workspace management + data operations)")
+    print("1. all     - All tools except dev (workspace management + data operations)")
     print("2. admin   - Workspace/instance management and bulk operations")
     print("3. data    - Object import, download and query operations")
     print("4. compute - Compute and geostatistics tools")
+    print("5. dev     - Dev tools for staging inspection and fixture management")
     print()
 
     if current_value:
@@ -161,10 +162,10 @@ def prompt_tool_filter(current_value: str | None) -> str:
             return current_value
 
     choice = prompt_choice(
-        "Enter your choice [1-4] (default: 1): ",
+        "Enter your choice [1-5] (default: 1): ",
         set(TOOL_FILTER_CHOICES.keys()),
         "1",
-        "Invalid choice. Please enter 1, 2, 3, or 4.",
+        "Invalid choice. Please enter 1, 2, 3, 4, or 5.",
     )
     return TOOL_FILTER_CHOICES[choice]
 
