@@ -218,25 +218,21 @@ def register_object_staging_tools(mcp) -> None:
         except Exception as exc:
             raise ValueError(f"Could not resolve object '{object_id}' for import.") from exc
 
-        importable = [
-            t
-            for t in staged_object_type_registry.all()
-            if isinstance(t, EvoStagedObjectType) and t.evo_class is not None and isinstance(obj, t.evo_class)
-        ]
-        if len(importable) > 1:
-            raise ValueError(
-                f"Ambiguous import: multiple types match Evo class '{type(obj).__name__}': "
-                + ", ".join(t.object_type for t in importable)
-                + ". Register distinct evo_class values to disambiguate."
-            )
-        if not importable:
+        descriptor = next(
+            (
+                t
+                for t in staged_object_type_registry.all()
+                if isinstance(t, EvoStagedObjectType) and t.evo_class is not None and isinstance(obj, t.evo_class)
+            ),
+            None,
+        )
+        if descriptor is None:
             raise ValueError(
                 f"Object '{object_id}' has an unsupported type "
                 f"'{schema_label(obj)}'. Supported types: "
                 + ", ".join(d.display_name for d in staged_object_type_registry.all())
                 + "."
             )
-        descriptor = importable[0]
 
         source_ref: dict[str, Any] = {
             "object_id": str(obj.metadata.id),
