@@ -32,6 +32,7 @@ import os
 from pathlib import Path
 
 from fastmcp import FastMCP
+from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from fastmcp.utilities.logging import configure_logging
 
 from evo_mcp.session import object_registry
@@ -47,6 +48,7 @@ from evo_mcp.tools import (
     register_instance_users_admin_tools,
     register_object_builder_tools,
     register_object_staging_tools,
+    register_skills_sync_tools,
 )
 
 staging_runtime.configure(object_registry, staging_service)
@@ -87,6 +89,18 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
 mcp = FastMCP(server_name)
 
+# Resolve skills folder path relative to this file's location
+# __file__ is src/mcp_tools.py, so .parent.parent is the repo root
+skills_folder = Path(__file__).parent.parent / "skills"
+if skills_folder.exists():
+    try:
+        mcp.add_provider(SkillsDirectoryProvider(roots=[skills_folder]))
+        logging.info(f"Registered skill provider at: {skills_folder}")
+    except Exception as e:
+        logging.warning(f"Failed to register skill provider: {e}")
+else:
+    logging.warning(f"Skills folder not found at {skills_folder}")
+
 
 # Show more traceback frame for now, we may want to disabled the rich
 # traceback formatting entirely too.
@@ -110,6 +124,9 @@ def _get_objects_reference_content() -> str:
 
 # Always register general tools (workspace discovery, object queries, etc.)
 register_general_tools(mcp)
+
+# Skills sync — always available so chat users can install skills locally
+register_skills_sync_tools(mcp, skills_folder)
 
 # Dev tools — only register when explicitly requested (not included in "all")
 if TOOL_FILTER == "dev":
