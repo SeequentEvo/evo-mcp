@@ -80,8 +80,9 @@ logger = logging.getLogger(__name__)
 def _normalize_kriging_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Normalize payload shape for MCP round-trips.
 
-    - Canonicalize field names expected by `kriging_run`:
-      `search` -> `neighborhood`, `method` -> `kriging_method`.
+    The evo-objects SDK uses different field names compared to evo-compute for some kriging parameters.
+
+    - `search` -> `neighborhood`, `method` -> `kriging_method`.
     - SearchNeighborhood serialization emits `ellipsoid_ranges`, while
       Ellipsoid construction expects `ranges`.
     """
