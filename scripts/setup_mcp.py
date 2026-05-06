@@ -49,6 +49,7 @@ CLIENT_CHOICES = {
     "3": ClientChoice("Cursor", "cursor", "Cursor"),
     "4": ClientChoice("Claude Desktop", "claude", "Claude"),
     "5": ClientChoice("Copilot CLI", "copilot_cli", "Copilot"),
+    "6": ClientChoice("Claude Code CLI", "claude_cli", "Claude Code"),
 }
 
 DEFAULT_REDIRECT_URL = "http://localhost:3000/signin-callback"
@@ -884,6 +885,77 @@ def setup_copilot_cli_config(
     print()
 
 
+def setup_claude_cli_config(
+    protocol: str,
+    env_values: dict[str, str],
+    python_exe: str,
+):
+    """Set up the MCP configuration for Claude Code CLI using its built-in commands."""
+    print_color("MCP Client Configuration", Colors.BLUE)
+    print("=" * 30)
+    print()
+
+    claude_path = shutil.which("claude")
+    if not claude_path:
+        print_color("\u2717 Claude Code CLI not found.", Colors.RED)
+        print("Install it from: https://docs.anthropic.com/en/docs/claude-code")
+        sys.exit(1)
+
+    claude_config = Path.home() / ".claude" / "settings.json"
+    print_color(f"Using Claude Code configuration: {claude_config}", Colors.GREEN)
+    print()
+
+    script_dir = Path(__file__).parent.resolve()
+    project_dir = script_dir.parent
+    mcp_script = str(project_dir / "src" / "mcp_tools.py")
+
+    # Remove existing entries from all scopes to avoid conflicts
+    for scope in ("user", "local", "project"):
+        subprocess.run(
+            [claude_path, "mcp", "remove", "evo-mcp", "-s", scope],
+            capture_output=True,
+            check=False,
+        )
+
+    # Build the add command
+    if protocol == "http":
+        host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
+        port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
+        url = f"http://{host}:{port}/mcp"
+        cmd = [claude_path, "mcp", "add", "-s", "user", "--transport", "http", "evo-mcp", url]
+    else:
+        cmd = [claude_path, "mcp", "add", "-s", "user", "evo-mcp", "--", python_exe, mcp_script]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            error_msg = result.stderr.strip() or result.stdout.strip()
+            print_color(f"\u2717 Failed to add MCP server: {error_msg}", Colors.RED)
+            sys.exit(1)
+    except (OSError, ValueError) as e:
+        print_color(f"\u2717 Failed to run Claude Code CLI: {e}", Colors.RED)
+        sys.exit(1)
+
+    print_color("\u2713 Successfully added Evo MCP configuration to Claude Code", Colors.GREEN)
+    print()
+    print("Configuration details:")
+    print("  Client App: Claude Code CLI")
+    print(f"  Transport Protocol: {protocol.upper()}")
+    if protocol == "http":
+        host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
+        port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
+        print(f"  URL: http://{host}:{port}/mcp")
+    else:
+        print(f"  Command: {python_exe}")
+        print(f"  Script: {mcp_script}")
+    print()
+    print("Next steps:")
+    print("  Run `claude mcp list` to verify the configuration.")
+    if protocol == "http":
+        print(f"  Start the server: {python_exe} {mcp_script}")
+    print()
+
+
 def setup_mcp_config(
     client: ClientChoice,
     protocol: str,
@@ -893,6 +965,9 @@ def setup_mcp_config(
     """Set up the MCP configuration for the selected client app."""
     if client.client_type == "copilot_cli":
         setup_copilot_cli_config(protocol, env_values, python_exe)
+        return
+    if client.client_type == "claude_cli":
+        setup_claude_cli_config(protocol, env_values, python_exe)
         return
 
     print_color("MCP Client Configuration", Colors.BLUE)
