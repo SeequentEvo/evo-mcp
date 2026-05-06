@@ -11,6 +11,7 @@ flowchart TB
     subgraph MCP["MCP Tools Layer  (tools/)"]
         ST[object_staging_tools]
         CT[compute_tools]
+        DT[dev_tools 🔒]
     end
 
     subgraph Session["session/  — Name Registry"]
