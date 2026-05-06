@@ -5,7 +5,7 @@ Design documentation for the `evo-mcp` server.
 ## Scope
 
 These docs cover the **estimation workflow** additions introduced in the `kriging-workflows` branch:
-the session/staging infrastructure, and MCP tool groups for staging and compute.
+the session/staging infrastructure, MCP tool groups for staging and compute, the skills layer, and the eval harness.
 
 **Not yet covered here:** data ingestion tools (`build_and_create_*`), workspace/file management tools, user administration tools, the broader MCP server setup and configuration.
 
@@ -17,7 +17,7 @@ the session/staging infrastructure, and MCP tool groups for staging and compute.
 
 | File | Description |
 |---|---|
-| [estimation-workflow-design.md](estimation-workflow-design.md) | End-to-end design: how tools, session, staging, and Evo connect |
+| [estimation-workflow-design.md](estimation-workflow-design.md) | End-to-end design: how skills, tools, session, staging, and Evo connect |
 
 ### `architecture/`
 Deep-dives into each layer of the session-staging stack.
@@ -36,4 +36,12 @@ MCP tool groups.
 |---|---|
 | [compute-tools.md](tools/compute-tools.md) | Kriging build + run tools |
 | [dev-tools.md](tools/dev-tools.md) | Dev/eval tools (fixture seeding, reset) — enabled with `MCP_TOOL_FILTER=dev` |
+
+### `skills/`
+LLM skill guides and the eval harness.
+
+| File | Description |
+|---|---|
+| [skills.md](skills/skills.md) | Skill inventory, orchestrator/sub-skill model, composition diagrams |
+| [evals.md](skills/evals.md) | Eval harness, fixture modes, per-skill coverage |
 
