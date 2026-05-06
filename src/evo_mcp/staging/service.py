@@ -12,7 +12,6 @@ Combines what was previously split across ``StagingService`` and
 
 """
 
-import sys
 import uuid
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -22,7 +21,6 @@ from evo_mcp.staging.errors import (
     StageCapacityError,
     StageExpiredError,
     StageNotFoundError,
-    StageValidationError,
 )
 from evo_mcp.staging.models import ObjectType, StagedEnvelope, StageStatus
 from evo_mcp.staging.objects import staged_object_type_registry
@@ -35,7 +33,6 @@ __all__ = [
 
 _DEFAULT_TTL_SECONDS = 3600
 _DEFAULT_MAX_ACTIVE = 200
-_DEFAULT_MAX_PAYLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 def now_iso() -> str:
@@ -218,20 +215,6 @@ class StagingService:
     def _active_count(self) -> int:
         return sum(1 for e in self._envelopes.values() if e.status == "active")
 
-    def _estimate_payload_bytes(self, payload: Any) -> int:
-        if hasattr(payload, "locations") and hasattr(payload.locations, "memory_usage"):
-            return int(payload.locations.memory_usage(deep=True).sum())
-        if hasattr(payload, "__dict__"):
-            return sum(sys.getsizeof(v) for v in payload.__dict__.values())
-        return sys.getsizeof(payload)
-
-    def _check_payload_size(self, payload: Any) -> None:
-        estimated = self._estimate_payload_bytes(payload)
-        if estimated > _DEFAULT_MAX_PAYLOAD_BYTES:
-            raise StageValidationError(
-                f"Payload size (~{estimated:,} bytes) exceeds maximum of {_DEFAULT_MAX_PAYLOAD_BYTES:,} bytes."
-            )
-
     def _check_expiry(self, envelope: StagedEnvelope) -> StagedEnvelope:
         if envelope.status == "expired":
             raise StageExpiredError(envelope.stage_id)
@@ -245,7 +228,6 @@ class StagingService:
         return envelope
 
     def _put(self, envelope: StagedEnvelope, payload: Any) -> None:
-        self._check_payload_size(payload)
         if self._active_count() >= self._max_active:
             raise StageCapacityError(
                 f"Active stage limit ({self._max_active}) reached. Discard or publish existing stages first."
