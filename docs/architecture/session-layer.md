@@ -1,4 +1,4 @@
-# Session Layer — `evo_mcp/session/`
+# Session layer — `evo_mcp/session/`
 
 Maps **human-readable names** to internal staged objects.
 Tools register objects by name after creation; downstream tools look them up by name.
@@ -16,7 +16,7 @@ session/
 
 ---
 
-## Name Resolution
+## Name resolution
 
 ```mermaid
 flowchart TD
@@ -34,13 +34,13 @@ flowchart TD
 ## Key API
 
 ```python
-# After staging — raises DuplicateNameError if the name+type already exists:
+# After staging — raises DuplicateNameError if the name+type already exists
 object_registry.register(name="CU variogram", object_type="variogram", stage_id=...)
 
-# In a downstream tool:
+# In a downstream tool
 entry, payload = object_registry.get_payload("CU variogram")
 
-# After publishing to Evo:
+# After publishing to Evo
 object_registry.mark_published(name="CU variogram", object_type="variogram", object_id="<evo-uuid>")
 ```
 
@@ -48,7 +48,7 @@ object_registry.mark_published(name="CU variogram", object_type="variogram", obj
 
 ---
 
-## Duplicate Name Handling
+## Duplicate name handling
 
 `register()` rejects any name+type combination already present in the session.
 This applies to every creation path — local build, import, and dev fixture seeding.

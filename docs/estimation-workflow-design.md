@@ -1,10 +1,10 @@
-# Estimation Workflow Design
+# Estimation workflow design
 
 End-to-end design for how an estimation workflow (e.g. kriging) is orchestrated
 across **Skills → MCP Tools → Session → Staging → Evo**. Covers the key layers,
 their responsibilities, and the design decisions that connect them.
 
-## Workflow Stack
+## Workflow stack
 
 ```mermaid
 flowchart TB
@@ -42,7 +42,7 @@ flowchart TB
 
 ---
 
-## Core Principle
+## Core principle
 
 > Users and LLMs always work with **object names** — never internal IDs, stage IDs, or tool mechanics.
 
@@ -56,7 +56,7 @@ User: "inspect my CU variogram"
 
 ---
 
-## Key Design Decisions
+## Key design decisions
 
 | Decision | Why |
 |---|---|

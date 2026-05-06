@@ -1,4 +1,4 @@
-# Dev Tools — `tools/dev_tools.py`
+# Dev tools — `tools/dev_tools.py`
 
 Enabled with `MCP_TOOL_FILTER=dev`. Not exposed in production or when using `all`.
 
@@ -11,7 +11,7 @@ Enabled with `MCP_TOOL_FILTER=dev`. Not exposed in production or when using `all
 
 ---
 
-## Fixture Seeding
+## Fixture seeding
 
 ```mermaid
 flowchart LR

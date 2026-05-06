@@ -1,4 +1,4 @@
-# Skill Evaluations — `skills-dev/mcp-skill-eval/`
+# Skill evaluations — `skills-dev/mcp-skill-eval/`
 
 The eval harness validates that skills produce correct outputs against known fixtures.
 It lives in `skills-dev/` — not shipped with the server.
@@ -22,7 +22,7 @@ skills-dev/
 
 ---
 
-## How an Eval Run Works
+## How an eval run works
 
 ```mermaid
 flowchart TD
@@ -38,7 +38,7 @@ flowchart TD
 
 ---
 
-## Eval Definition
+## Eval definition
 
 Each entry in `evals.json` is a natural-language prompt + expected outcome:
 
@@ -60,7 +60,7 @@ Seed modes: `staged` (local only, fast), `workspace` (published to Evo), `both`.
 
 ---
 
-## Output Layout
+## Output layout
 
 ```
 skills-eval-workspace/
@@ -73,11 +73,11 @@ skills-eval-workspace/
         grading.json       ← per-eval pass/fail with evidence
 ```
 
-Prior iterations are kept — never deleted — to support regression tracking.
+Prior iterations are kept (never deleted) to support regression tracking.
 
 ---
 
-## Skills with Evals
+## Skills with evals
 
 | Skill | Has fixtures? | Eval categories |
 |---|---|---|

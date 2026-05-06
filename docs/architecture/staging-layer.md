@@ -1,4 +1,4 @@
-# Staging Layer — `evo_mcp/staging/`
+# Staging layer — `evo_mcp/staging/`
 
 Typed, in-memory payload store with TTL, size guards, and a **plugin system** for object types.
 
@@ -21,7 +21,7 @@ staging/
 
 ---
 
-## Plugin Object Type
+## Plugin object type
 
 Every object type is a self-registering subclass of `StagedObjectType`:
 
@@ -53,7 +53,7 @@ Adding a new object type = add one subclass file. No changes to tools needed.
 
 ---
 
-## Circular Import Prevention
+## Circular import prevention
 
 ```mermaid
 flowchart LR

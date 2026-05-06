@@ -1,4 +1,4 @@
-# Compute Tools — `tools/compute_tools.py`
+# Compute tools — `tools/compute_tools.py`
 
 Kriging is deliberately **two steps** so the LLM (or user) can inspect and adjust
 configuration before execution.
@@ -37,7 +37,7 @@ Returns per-scenario: target name, attribute created/updated, portal + viewer li
 
 ---
 
-## Why Two Steps?
+## Why two steps?
 
 - LLM can summarize inputs to the user for confirmation before execution
 - Multi-scenario runs: build N payloads, review, then run in one batch

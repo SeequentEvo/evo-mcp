@@ -1,6 +1,6 @@
-# evo-mcp Docs
+# Evo MCP docs
 
-Design documentation for the `evo-mcp` MCP server.
+Design documentation for the `evo-mcp` server.
 
 ## Scope
 
@@ -30,7 +30,7 @@ Deep-dives into each layer of the session-staging stack.
 | [object-lifecycle.md](architecture/object-lifecycle.md) | How objects are created, used, and published |
 
 ### `tools/`
-MCP tool groups introduced in this branch.
+MCP tool groups.
 
 | File | Description |
 |---|---|

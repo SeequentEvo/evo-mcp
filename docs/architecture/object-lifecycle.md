@@ -1,4 +1,4 @@
-# Object Staging Lifecycle
+# Object staging lifecycle
 
 ## States
 
@@ -16,7 +16,7 @@ stateDiagram-v2
 
 ---
 
-## Entry — Create or Import
+## Entry — create or import
 
 ```mermaid
 flowchart LR
@@ -32,7 +32,7 @@ flowchart LR
 
 ---
 
-## Use — Inspect / Validate
+## Use — inspect / validate
 
 ```mermaid
 flowchart LR
@@ -43,7 +43,7 @@ flowchart LR
 
 ---
 
-## Exit — Publish or Discard
+## Exit — publish or discard
 
 ```mermaid
 flowchart LR

@@ -1,4 +1,4 @@
-# The Two-Tool Interaction Pattern
+# The two-tool interaction pattern
 
 Instead of one MCP tool per capability per type, **all domain actions go through two generic tools**.
 
@@ -22,9 +22,9 @@ flowchart LR
 
 ---
 
-## Adding a New Capability
+## Adding a new capability
 
-**No new MCP tool needed.** Add one `Interaction` inside the object type module:
+**It's not necessary to create a new MCP tool.** Instead, add one `Interaction` inside the object type module:
 
 ```python
 self._register_interaction(Interaction(

@@ -1,12 +1,12 @@
 # Skills — `skills/`
 
-Skills are **Markdown guides** that tell an LLM how to use MCP tools to complete
+Skills are **markdown guides** that tell an LLM how to use MCP tools to complete
 end-to-end workflows. They encode domain knowledge and workflow logic separately
 from the tools themselves.
 
 ---
 
-## What a Skill Is
+## Defining a skill
 
 ```
 skills/<skill-name>/
@@ -22,11 +22,11 @@ the skill. Skills are loaded via FastMCP's `SkillsDirectoryProvider`.
 
 ---
 
-## Two Kinds of Skill
+## Two kinds of skill
 
 ```mermaid
 flowchart LR
-    subgraph ORCH["Orchestrator Skill"]
+    subgraph ORCH["Orchestrator skill"]
         direction TB
         O1["Defines the end-to-end workflow\nphases and decision points"]
         O2["Knows which sub-skill handles\neach phase"]
@@ -34,7 +34,7 @@ flowchart LR
         O1 --- O2 --- O3
     end
 
-    subgraph SUB["Sub-skill  (specialised)"]
+    subgraph SUB["Sub-skill (specialised)"]
         direction TB
         S1["Owns a single concern\ne.g. create object, validate, execute"]
         S2["Provides domain defaults\ne.g. typical ranges, recommended params"]
@@ -48,7 +48,7 @@ flowchart LR
 
 ---
 
-## How an Orchestrator Delegates
+## How an orchestrator delegates
 
 ```mermaid
 flowchart TD
@@ -70,7 +70,7 @@ flowchart TD
 
 ---
 
-## What a Sub-skill Contributes
+## What a sub-skill contributes
 
 ```mermaid
 flowchart LR
@@ -90,7 +90,7 @@ flowchart LR
 
 ---
 
-## Skill Inventory
+## Skill inventory
 
 | Skill | Type | Role |
 |---|---|---|
@@ -108,7 +108,7 @@ flowchart LR
 
 ---
 
-## Syncing Skills to Clients
+## Syncing skills to clients
 
 The `sync_skills` tool copies skills from `skills/` to the platform-specific
 skills directory (Copilot, Claude, Cursor, etc.) so chat clients can discover them.
