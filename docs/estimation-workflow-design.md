@@ -1,19 +1,13 @@
 # Estimation workflow design
 
 End-to-end design for how an estimation workflow (e.g. kriging) is orchestrated
-across **Skills → MCP Tools → Session → Staging → Evo**. Covers the key layers,
+across **MCP Tools → Session → Staging → Evo**. Covers the key layers,
 their responsibilities, and the design decisions that connect them.
 
 ## Workflow stack
 
 ```mermaid
 flowchart TB
-    subgraph Skills["Skills Layer  (skills/)"]
-        KW[Orchestrator skill\ne.g. kriging-workflow]
-        LS[Specialised skills\ne.g. manage-variogram\nevo-kriging-execute\nvalidate-crs ...]
-        KW -->|delegates to| LS
-    end
-
     subgraph MCP["MCP Tools Layer  (tools/)"]
         ST[object_staging_tools]
         CT[compute_tools]
@@ -34,7 +28,6 @@ flowchart TB
         COMP[Compute Service]
     end
 
-    Skills -->|calls| MCP
     ST -->|name-based| Session
     Session -->|stage_id| Staging
     CT & ST -->|SDK calls| Evo
@@ -63,5 +56,3 @@ User: "inspect my CU variogram"
 | Name-based registry over raw IDs | LLMs/users work in geoscience language, not UUIDs |
 | Plugin object types (self-registering) | Add a new type without touching tool code |
 | Two-tool interaction pattern | Capabilities are discoverable, not hard-coded |
-| Skills as LLM guides | Encode workflow knowledge separately from tool mechanics |
-| Eval harness | Validate skill behaviour regression-free |
