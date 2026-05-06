@@ -48,6 +48,7 @@ CLIENT_CHOICES = {
     "2": ClientChoice("VS Code Insiders", "vscode", "Code - Insiders"),
     "3": ClientChoice("Cursor", "cursor", "Cursor"),
     "4": ClientChoice("Claude Desktop", "claude", "Claude"),
+    "5": ClientChoice("Copilot CLI", "copilot_cli", "Copilot"),
 }
 
 DEFAULT_REDIRECT_URL = "http://localhost:3000/signin-callback"
@@ -389,17 +390,22 @@ def get_client_choice(protocol: str) -> ClientChoice | None:
     print("Which client app are you using?")
 
     ordered_choices = sorted(CLIENT_CHOICES.items(), key=lambda item: int(item[0]))
+    unavailable_keys: set[str] = set()
     if protocol == "http":
-        ordered_choices = [(k, c) for k, c in ordered_choices if c.client_type != "claude"]
+        unavailable_keys = {k for k, c in ordered_choices if c.client_type == "claude"}
+
     for key, client in ordered_choices:
-        print(f"{key}. {client.display_name}")
+        if key in unavailable_keys:
+            print(f"{key}. {client.display_name} (not available for HTTP)")
+        else:
+            print(f"{key}. {client.display_name}")
 
     skip_key = str(max(int(k) for k, _ in ordered_choices) + 1)
     print(f"{skip_key}. Skip client configuration")
     print()
 
-    choice_keys = {key for key, _ in ordered_choices} | {skip_key}
-    choice_list = ", ".join(sorted(choice_keys, key=int))
+    selectable_keys = {key for key, _ in ordered_choices if key not in unavailable_keys} | {skip_key}
+    choice_list = ", ".join(sorted(selectable_keys, key=int))
 
     while True:
         choice = input(f"Enter your choice [{choice_list}] (default: {skip_key}): ").strip()
@@ -407,7 +413,10 @@ def get_client_choice(protocol: str) -> ClientChoice | None:
             return None
         if choice == skip_key:
             return None
-        if choice in choice_keys:
+        if choice in unavailable_keys:
+            print_color(f"{CLIENT_CHOICES[choice].display_name} does not support HTTP transport.", Colors.RED)
+            continue
+        if choice in selectable_keys:
             return CLIENT_CHOICES[choice]
         print_color(f"Invalid choice. Please enter one of: {choice_list}.", Colors.RED)
 
@@ -418,8 +427,10 @@ def get_client_choices(protocol: str) -> list[ClientChoice]:
     selected_keys: set[str] = set()
 
     available_choices = CLIENT_CHOICES
+    unavailable_keys: set[str] = set()
     if protocol == "http":
-        available_choices = {k: c for k, c in CLIENT_CHOICES.items() if c.client_type != "claude"}
+        unavailable_keys = {k for k, c in CLIENT_CHOICES.items() if c.client_type == "claude"}
+        available_choices = {k: c for k, c in CLIENT_CHOICES.items() if k not in unavailable_keys}
 
     while True:
         print()
@@ -612,6 +623,55 @@ def get_claude_config_dirs() -> list[Path]:
     return []
 
 
+def find_copilot_cli() -> str | None:
+    """Find the Copilot CLI executable on the system."""
+    which = shutil.which("copilot")
+    if which:
+        return which
+
+    # Check common VS Code managed locations
+    system = platform.system()
+    candidates: list[Path] = []
+
+    if system == "Darwin":
+        app_support = Path.home() / "Library" / "Application Support"
+        for variant in ["Code", "Code - Insiders"]:
+            candidates.append(
+                app_support / variant / "User" / "globalStorage" / "github.copilot-chat" / "copilotCli" / "copilot"
+            )
+    elif system == "Windows":
+        appdata = os.environ.get("APPDATA", "")
+        if appdata:
+            for variant in ["Code", "Code - Insiders"]:
+                candidates.append(
+                    Path(appdata)
+                    / variant
+                    / "User"
+                    / "globalStorage"
+                    / "github.copilot-chat"
+                    / "copilotCli"
+                    / "copilot.exe"
+                )
+    elif system == "Linux":
+        for variant in ["Code", "Code - Insiders"]:
+            candidates.append(
+                Path.home()
+                / ".config"
+                / variant
+                / "User"
+                / "globalStorage"
+                / "github.copilot-chat"
+                / "copilotCli"
+                / "copilot"
+            )
+
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    return None
+
+
 def get_config_dir(client: ClientChoice) -> Path | None:
     """Resolve client config directory based on chosen app."""
     if client.client_type == "vscode":
@@ -753,6 +813,77 @@ def kill_claude_processes() -> None:
         pass
 
 
+def setup_copilot_cli_config(
+    protocol: str,
+    env_values: dict[str, str],
+    python_exe: str,
+):
+    """Set up the MCP configuration for Copilot CLI using its built-in commands."""
+    print_color("MCP Client Configuration", Colors.BLUE)
+    print("=" * 30)
+    print()
+
+    copilot_path = find_copilot_cli()
+    if not copilot_path:
+        print_color("✗ Copilot CLI not found.", Colors.RED)
+        print("Install it via VS Code (GitHub Copilot Chat extension) or see:")
+        print("  https://docs.github.com/copilot/how-tos/copilot-cli")
+        sys.exit(1)
+
+    copilot_config = Path.home() / ".copilot" / "mcp-config.json"
+    print_color(f"Using Copilot CLI configuration: {copilot_config}", Colors.GREEN)
+    print()
+
+    script_dir = Path(__file__).parent.resolve()
+    project_dir = script_dir.parent
+    mcp_script = str(project_dir / "src" / "mcp_tools.py")
+
+    # Remove existing entry first (ignore errors if it doesn't exist)
+    subprocess.run(
+        [copilot_path, "mcp", "remove", "evo-mcp"],
+        capture_output=True,
+        check=False,
+    )
+
+    # Build the add command
+    if protocol == "http":
+        host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
+        port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
+        url = f"http://{host}:{port}/mcp"
+        cmd = [copilot_path, "mcp", "add", "--transport", "http", "evo-mcp", url]
+    else:
+        cmd = [copilot_path, "mcp", "add", "--transport", "stdio", "evo-mcp", "--", python_exe, mcp_script]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            error_msg = result.stderr.strip() or result.stdout.strip()
+            print_color(f"✗ Failed to add MCP server: {error_msg}", Colors.RED)
+            sys.exit(1)
+    except (OSError, ValueError) as e:
+        print_color(f"✗ Failed to run Copilot CLI: {e}", Colors.RED)
+        sys.exit(1)
+
+    print_color("✓ Successfully added Evo MCP configuration to Copilot CLI", Colors.GREEN)
+    print()
+    print("Configuration details:")
+    print("  Client App: Copilot CLI")
+    print(f"  Transport Protocol: {protocol.upper()}")
+    if protocol == "http":
+        host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
+        port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
+        print(f"  URL: http://{host}:{port}/mcp")
+    else:
+        print(f"  Command: {python_exe}")
+        print(f"  Script: {mcp_script}")
+    print()
+    print("Next steps:")
+    print("  Run `copilot mcp list` to verify the configuration.")
+    if protocol == "http":
+        print(f"  Start the server: {python_exe} {mcp_script}")
+    print()
+
+
 def setup_mcp_config(
     client: ClientChoice,
     protocol: str,
@@ -760,6 +891,10 @@ def setup_mcp_config(
     python_exe: str,
 ):
     """Set up the MCP configuration for the selected client app."""
+    if client.client_type == "copilot_cli":
+        setup_copilot_cli_config(protocol, env_values, python_exe)
+        return
+
     print_color("MCP Client Configuration", Colors.BLUE)
     print("=" * 30)
     print()
