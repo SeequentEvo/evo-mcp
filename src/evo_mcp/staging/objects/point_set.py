@@ -176,10 +176,13 @@ async def _create(params: PointSetCreateParams) -> dict[str, Any]:
         stage_id=envelope.stage_id,
         summary=summary,
     )
+    message = "Point set created."
+    if invalid_count > 0:
+        message += f" Warning: {invalid_count} row(s) were dropped due to non-numeric or missing X/Y/Z coordinate values."
     return {
         "name": params.object_name,
         "summary": summary,
-        "message": "Point set created.",
+        "message": message,
     }
 
 
