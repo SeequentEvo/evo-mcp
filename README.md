@@ -523,6 +523,39 @@ To add new MCP tools:
 3. Tools are auto-registered based on their module (general/admin/data) on server startup
 4. Test using VS Code integration or the ADK agent
 
+### Linting
+
+This repository uses Ruff for linting and formatting checks.
+Linting also verifies that Python files include the required SPDX license header.
+
+Run lint checks:
+
+```bash
+make lint
+```
+
+Auto-fix lint and formatting issues:
+
+```bash
+make lint-fix
+```
+
+### Pre-commit
+
+Install pre-commit hooks:
+
+The local pre-commit hook will also auto-insert missing SPDX headers in Python files.
+
+```bash
+uv run --extra dev pre-commit install
+```
+
+Run hooks on all files:
+
+```bash
+uv run --extra dev pre-commit run --all-files
+```
+
 ## Contributing
 
 Thank you for your interest in contributing to Seequent software. Please have a look over our [contribution guide.](./CONTRIBUTING.md)
