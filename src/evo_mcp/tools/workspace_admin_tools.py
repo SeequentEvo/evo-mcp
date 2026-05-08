@@ -17,9 +17,11 @@ from evo.workspaces.endpoints.models import (
     AssignRoleRequest,
     BulkUserRoleAssignmentsRequest,
     RoleEnum,
-    UserRole as UserRoleModel,
     UserRoleAssignmentRequest,
     UserRoleViaEmail,
+)
+from evo.workspaces.endpoints.models import (
+    UserRole as UserRoleModel,
 )
 
 from evo_mcp.context import ensure_initialized, evo_context
@@ -84,10 +86,7 @@ def register_workspace_admin_tools(mcp):
             }
 
         role_names = [role.name for role in current_user.roles]
-        is_admin = any(
-            "admin" in name.lower() or "owner" in name.lower()
-            for name in role_names
-        )
+        is_admin = any("admin" in name.lower() or "owner" in name.lower() for name in role_names)
 
         result = {
             "user_id": str(current_user.user_id),
@@ -138,12 +137,14 @@ def register_workspace_admin_tools(mcp):
 
         users = []
         for user in response.results:
-            users.append({
-                "user_id": str(user.user_id),
-                "email": getattr(user, "email", None),
-                "full_name": getattr(user, "full_name", None),
-                "role": str(user.role) if hasattr(user, "role") else None,
-            })
+            users.append(
+                {
+                    "user_id": str(user.user_id),
+                    "email": getattr(user, "email", None),
+                    "full_name": getattr(user, "full_name", None),
+                    "role": str(user.role) if hasattr(user, "role") else None,
+                }
+            )
 
         return {
             "workspace_id": workspace_id,
@@ -182,13 +183,9 @@ def register_workspace_admin_tools(mcp):
         role_enum = RoleEnum(role.lower())
 
         if user_id:
-            assign_request = AssignRoleRequest(
-                root=UserRoleModel(user_id=UUID(user_id), role=role_enum)
-            )
+            assign_request = AssignRoleRequest(root=UserRoleModel(user_id=UUID(user_id), role=role_enum))
         elif user_email:
-            assign_request = AssignRoleRequest(
-                root=UserRoleViaEmail(email=user_email, role=role_enum)
-            )
+            assign_request = AssignRoleRequest(root=UserRoleViaEmail(email=user_email, role=role_enum))
         else:
             raise ValueError("Either user_id or user_email must be provided.")
 
@@ -266,9 +263,7 @@ def register_workspace_admin_tools(mcp):
         for assignment in assignments:
             role_str = assignment.get("role", "").lower()
             if role_str not in valid_roles:
-                raise ValueError(
-                    f"Invalid role '{role_str}' in assignment. Must be one of: {', '.join(valid_roles)}"
-                )
+                raise ValueError(f"Invalid role '{role_str}' in assignment. Must be one of: {', '.join(valid_roles)}")
             role_assignments.append(
                 UserRoleAssignmentRequest(
                     user_id=UUID(assignment["user_id"]),
@@ -315,13 +310,15 @@ def register_workspace_admin_tools(mcp):
 
         workspaces = []
         for ws in response.results:
-            workspaces.append({
-                "workspace_id": str(ws.id) if hasattr(ws, "id") else None,
-                "workspace_name": getattr(ws, "name", None),
-                "user_role": getattr(ws, "user_role", None),
-                "created_at": str(ws.created_at) if getattr(ws, "created_at", None) else None,
-                "updated_at": str(ws.updated_at) if getattr(ws, "updated_at", None) else None,
-            })
+            workspaces.append(
+                {
+                    "workspace_id": str(ws.id) if hasattr(ws, "id") else None,
+                    "workspace_name": getattr(ws, "name", None),
+                    "user_role": getattr(ws, "user_role", None),
+                    "created_at": str(ws.created_at) if getattr(ws, "created_at", None) else None,
+                    "updated_at": str(ws.updated_at) if getattr(ws, "updated_at", None) else None,
+                }
+            )
 
         return {
             "user_id": user_id,

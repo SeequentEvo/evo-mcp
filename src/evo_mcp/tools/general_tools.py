@@ -51,7 +51,9 @@ def register_general_tools(mcp):
         return results
 
     @mcp.tool()
-    async def list_workspaces(name: str = "", deleted: bool = False, limit: int = 50, as_admin: bool = False) -> list[dict]:
+    async def list_workspaces(
+        name: str = "", deleted: bool = False, limit: int = 50, as_admin: bool = False
+    ) -> list[dict]:
         """List workspaces with optional filtering by name or deleted status.
 
         By default, only lists workspaces where the current user has a role.
@@ -141,12 +143,16 @@ def register_general_tools(mcp):
                     "id": str(response.created_by.id),
                     "name": getattr(response.created_by, "name", None),
                     "email": getattr(response.created_by, "email", None),
-                } if getattr(response, "created_by", None) else None,
+                }
+                if getattr(response, "created_by", None)
+                else None,
                 "updated_by": {
                     "id": str(response.updated_by.id),
                     "name": getattr(response.updated_by, "name", None),
                     "email": getattr(response.updated_by, "email", None),
-                } if getattr(response, "updated_by", None) else None,
+                }
+                if getattr(response, "updated_by", None)
+                else None,
             }
 
         if workspace_id:

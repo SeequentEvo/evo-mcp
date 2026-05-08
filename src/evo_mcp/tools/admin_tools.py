@@ -205,10 +205,7 @@ async def _is_current_user_admin() -> tuple[bool, str]:
     for user in page.items():
         if str(user.user_id) == user_id:
             role_names = [role.name for role in user.roles]
-            is_admin = any(
-                "admin" in name.lower() or "owner" in name.lower()
-                for name in role_names
-            )
+            is_admin = any("admin" in name.lower() or "owner" in name.lower() for name in role_names)
             return is_admin, user_id
 
     return False, user_id
@@ -235,15 +232,15 @@ async def _admin_add_viewer_role(workspace_id: str, user_id: str) -> None:
     from evo.workspaces.endpoints.models import (
         AssignRoleRequest,
         RoleEnum,
+    )
+    from evo.workspaces.endpoints.models import (
         UserRole as UserRoleModel,
     )
 
     admin_api = _get_admin_api()
     org_id = str(evo_context.org_id)
 
-    assign_request = AssignRoleRequest(
-        root=UserRoleModel(user_id=UUID(user_id), role=RoleEnum("viewer"))
-    )
+    assign_request = AssignRoleRequest(root=UserRoleModel(user_id=UUID(user_id), role=RoleEnum("viewer")))
     await admin_api.assign_user_role_admin(
         org_id=org_id,
         workspace_id=workspace_id,
@@ -344,17 +341,18 @@ async def _preview_workspaces(*, as_admin: bool = False) -> list[dict[str, Any]]
         is_admin, user_id = await _is_current_user_admin()
         if not is_admin:
             raise ValueError(
-                "as_admin=True requires organization admin privileges. "
-                "Use get_my_instance_role to check your role."
+                "as_admin=True requires organization admin privileges. Use get_my_instance_role to check your role."
             )
         admin_ws_list = await _admin_list_all_workspaces()
         # Convert admin workspace objects to a uniform shape
         ws_list = []
         for ws in admin_ws_list:
-            ws_list.append(SimpleNamespace(
-                id=ws.id,
-                display_name=getattr(ws, "name", None) or getattr(ws, "display_name", None) or str(ws.id),
-            ))
+            ws_list.append(
+                SimpleNamespace(
+                    id=ws.id,
+                    display_name=getattr(ws, "name", None) or getattr(ws, "display_name", None) or str(ws.id),
+                )
+            )
     else:
         ws_list = await _list_all_pages(
             evo_context.workspace_client.list_workspaces,
@@ -381,12 +379,14 @@ async def _preview_workspaces(*, as_admin: bool = False) -> list[dict[str, Any]]
                     temporarily_added.append(ws_id)
                 except Exception as exc:
                     logger.warning("Failed to add self as Viewer to workspace %s: %s", ws_name, exc)
-                    results.append({
-                        "workspace_id": ws_id,
-                        "workspace_name": ws_name,
-                        "object_count": -1,
-                        "admin_access_note": f"Could not gain temporary access: {exc}",
-                    })
+                    results.append(
+                        {
+                            "workspace_id": ws_id,
+                            "workspace_name": ws_name,
+                            "object_count": -1,
+                            "admin_access_note": f"Could not gain temporary access: {exc}",
+                        }
+                    )
                     continue
 
         ws_env = Environment(hub_url=hub_url, org_id=org_id, workspace_id=workspace.id)
@@ -459,8 +459,7 @@ async def _run_duplicate_analysis(
         if not is_admin:
             return {
                 "error": (
-                    "as_admin=True requires organization admin privileges. "
-                    "Use get_my_instance_role to check your role."
+                    "as_admin=True requires organization admin privileges. Use get_my_instance_role to check your role."
                 )
             }
         admin_ws_list = await _admin_list_all_workspaces()
@@ -540,13 +539,19 @@ async def _run_duplicate_analysis(
                     temporarily_added.append(ws_id)
                 except Exception as exc:
                     logger.warning("Failed to add self as Viewer to workspace %s: %s", ws_name, exc)
-                    workspace_stats.append({
-                        "name": ws_name, "id": ws_id, "objects": 0,
-                        "error": f"Could not gain temporary access: {exc}",
-                    })
+                    workspace_stats.append(
+                        {
+                            "name": ws_name,
+                            "id": ws_id,
+                            "objects": 0,
+                            "error": f"Could not gain temporary access: {exc}",
+                        }
+                    )
                     processed_workspaces += 1
                     await _report_progress(
-                        ctx, processed_workspaces, total_workspace_count,
+                        ctx,
+                        processed_workspaces,
+                        total_workspace_count,
                         f"Skipped workspace {ws_name} (no access) — "
                         f"{processed_workspaces}/{total_workspace_count} workspaces done",
                     )
