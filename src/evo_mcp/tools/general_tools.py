@@ -125,6 +125,8 @@ def register_general_tools(mcp):
         if as_admin:
             if not workspace_id:
                 raise ValueError("workspace_id is required when using as_admin=True")
+            if workspace_name:
+                raise ValueError("workspace_name is not supported when using as_admin=True. Use workspace_id instead.")
             admin_api = evo_context.workspace_client._admin_api
             org_id = str(evo_context.org_id)
             response = await admin_api.get_workspace_admin(

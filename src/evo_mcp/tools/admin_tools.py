@@ -273,7 +273,10 @@ async def _admin_get_user_role(workspace_id: str, user_id: str) -> str | None:
         )
         for user in response.results:
             if str(user.user_id) == user_id:
-                return str(user.role) if hasattr(user, "role") else None
+                if hasattr(user, "role"):
+                    role = user.role
+                    return role.value if hasattr(role, "value") else str(role).lower()
+                return None
     except Exception as exc:
         logger.warning("Failed to check existing role in workspace %s: %s", workspace_id, exc)
     return None

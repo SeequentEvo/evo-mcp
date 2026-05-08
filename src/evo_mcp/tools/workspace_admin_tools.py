@@ -156,7 +156,9 @@ def register_workspace_admin_tools(mcp):
                     "user_id": str(user.user_id),
                     "email": getattr(user, "email", None),
                     "full_name": getattr(user, "full_name", None),
-                    "role": str(user.role) if hasattr(user, "role") else None,
+                    "role": (user.role.value if hasattr(user.role, "value") else str(user.role).lower())
+                    if hasattr(user, "role")
+                    else None,
                 }
             )
 
@@ -213,7 +215,9 @@ def register_workspace_admin_tools(mcp):
             "success": True,
             "workspace_id": workspace_id,
             "user_id": str(response.user_id) if hasattr(response, "user_id") else user_id or user_email,
-            "role": str(response.role) if hasattr(response, "role") else role,
+            "role": (response.role.value if hasattr(response.role, "value") else str(response.role).lower())
+            if hasattr(response, "role")
+            else role,
         }
 
     @mcp.tool()
