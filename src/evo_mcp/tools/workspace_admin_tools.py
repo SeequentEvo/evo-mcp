@@ -67,6 +67,14 @@ def register_workspace_admin_tools(mcp):
         current_user_id = claims.get("sub") or claims.get("oid")
         if not current_user_id:
             raise ValueError("Could not determine user ID from access token.")
+        # Validate that the user ID is UUID-shaped (required by admin APIs)
+        try:
+            UUID(current_user_id)
+        except (ValueError, AttributeError):
+            raise ValueError(
+                f"User ID '{current_user_id}' from access token is not a valid UUID. "
+                "Admin operations require a UUID-shaped user identifier."
+            )
 
         # Look up the user in instance users to get their roles
         workspace_client = evo_context.workspace_client
@@ -81,7 +89,10 @@ def register_workspace_admin_tools(mcp):
                     break
             if current_user is not None or page.is_last:
                 break
-            offset = page.next_offset
+            next_offset = page.next_offset
+            if next_offset == offset:
+                break
+            offset = next_offset
 
         if current_user is None:
             return {

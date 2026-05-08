@@ -190,6 +190,14 @@ async def _get_current_user_id() -> str:
     user_id = claims.get("sub") or claims.get("oid")
     if not user_id:
         raise ValueError("Could not determine user ID from access token.")
+    # Validate that the user ID is UUID-shaped (required by admin APIs)
+    try:
+        UUID(user_id)
+    except (ValueError, AttributeError):
+        raise ValueError(
+            f"User ID '{user_id}' from access token is not a valid UUID. "
+            "Admin operations require a UUID-shaped user identifier."
+        )
     return str(user_id)
 
 
@@ -214,7 +222,10 @@ async def _is_current_user_admin() -> tuple[bool, str]:
                 return is_admin, user_id
         if page.is_last:
             break
-        offset = page.next_offset
+        next_offset = page.next_offset
+        if next_offset == offset:
+            break
+        offset = next_offset
 
     return False, user_id
 
@@ -438,21 +449,30 @@ async def _preview_workspaces(*, as_admin: bool = False) -> list[dict[str, Any]]
                 )
                 continue
             if not has_access:
-                needs_temp_access = True
-                try:
-                    await _admin_add_viewer_role(ws_id, user_id)
-                    temporarily_added.append(ws_id)
-                except Exception as exc:
-                    logger.warning("Failed to add self as Viewer to workspace %s: %s", ws_name, exc)
-                    results.append(
-                        {
-                            "workspace_id": ws_id,
-                            "workspace_name": ws_name,
-                            "object_count": -1,
-                            "admin_access_note": f"Could not gain temporary access: {exc}",
-                        }
+                # Verify no pre-existing role before granting temp access
+                existing_role = await _admin_get_user_role(ws_id, user_id)
+                if existing_role:
+                    logger.info(
+                        "User already has '%s' role in workspace %s; skipping temp access",
+                        existing_role,
+                        ws_id,
                     )
-                    continue
+                else:
+                    needs_temp_access = True
+                    try:
+                        await _admin_add_viewer_role(ws_id, user_id)
+                        temporarily_added.append(ws_id)
+                    except Exception as exc:
+                        logger.warning("Failed to add self as Viewer to workspace %s: %s", ws_name, exc)
+                        results.append(
+                            {
+                                "workspace_id": ws_id,
+                                "workspace_name": ws_name,
+                                "object_count": -1,
+                                "admin_access_note": f"Could not gain temporary access: {exc}",
+                            }
+                        )
+                        continue
 
         ws_env = Environment(hub_url=hub_url, org_id=org_id, workspace_id=workspace.id)
         object_client = ObjectAPIClient(ws_env, evo_context.connector)
@@ -589,46 +609,23 @@ async def _run_duplicate_analysis(
 
     await _report_progress(ctx, 0, total_workspace_count, f"Scanning {total_workspace_count} workspace(s)...")
 
-    for workspace in ws_list:
-        ws_name = workspace.display_name or str(workspace.id)
-        ws_id = str(workspace.id)
+    try:
+        for workspace in ws_list:
+            ws_name = workspace.display_name or str(workspace.id)
+            ws_id = str(workspace.id)
 
-        # If admin mode, ensure we have access to this workspace
-        needs_temp_access = False
-        if as_admin:
-            has_access = await _user_has_workspace_access(ws_id)
-            if has_access is None:
-                # Unexpected error checking access — skip this workspace
-                workspace_stats.append(
-                    {
-                        "name": ws_name,
-                        "id": ws_id,
-                        "objects": 0,
-                        "error": "Skipped due to unexpected error checking workspace access",
-                    }
-                )
-                processed_workspaces += 1
-                await _report_progress(
-                    ctx,
-                    processed_workspaces,
-                    total_workspace_count,
-                    f"Skipped workspace {ws_name} (access check error) — "
-                    f"{processed_workspaces}/{total_workspace_count} workspaces done",
-                )
-                continue
-            if not has_access:
-                needs_temp_access = True
-                try:
-                    await _admin_add_viewer_role(ws_id, user_id)
-                    temporarily_added.append(ws_id)
-                except Exception as exc:
-                    logger.warning("Failed to add self as Viewer to workspace %s: %s", ws_name, exc)
+            # If admin mode, ensure we have access to this workspace
+            needs_temp_access = False
+            if as_admin:
+                has_access = await _user_has_workspace_access(ws_id)
+                if has_access is None:
+                    # Unexpected error checking access — skip this workspace
                     workspace_stats.append(
                         {
                             "name": ws_name,
                             "id": ws_id,
                             "objects": 0,
-                            "error": f"Could not gain temporary access: {exc}",
+                            "error": "Skipped due to unexpected error checking workspace access",
                         }
                     )
                     processed_workspaces += 1
@@ -636,118 +633,153 @@ async def _run_duplicate_analysis(
                         ctx,
                         processed_workspaces,
                         total_workspace_count,
-                        f"Skipped workspace {ws_name} (no access) — "
+                        f"Skipped workspace {ws_name} (access check error) — "
                         f"{processed_workspaces}/{total_workspace_count} workspaces done",
                     )
                     continue
+                if not has_access:
+                    # Verify no pre-existing role before granting temp access
+                    existing_role = await _admin_get_user_role(ws_id, user_id)
+                    if existing_role:
+                        logger.info(
+                            "User already has '%s' role in workspace %s; skipping temp access",
+                            existing_role,
+                            ws_id,
+                        )
+                    else:
+                        needs_temp_access = True
+                        try:
+                            await _admin_add_viewer_role(ws_id, user_id)
+                            temporarily_added.append(ws_id)
+                        except Exception as exc:
+                            logger.warning("Failed to add self as Viewer to workspace %s: %s", ws_name, exc)
+                            workspace_stats.append(
+                                {
+                                    "name": ws_name,
+                                    "id": ws_id,
+                                    "objects": 0,
+                                    "error": f"Could not gain temporary access: {exc}",
+                                }
+                            )
+                            processed_workspaces += 1
+                            await _report_progress(
+                                ctx,
+                                processed_workspaces,
+                                total_workspace_count,
+                                f"Skipped workspace {ws_name} (no access) — "
+                                f"{processed_workspaces}/{total_workspace_count} workspaces done",
+                            )
+                            continue
 
-        ws_env = Environment(hub_url=hub_url, org_id=org_id, workspace_id=workspace.id)
-        object_client = ObjectAPIClient(ws_env, evo_context.connector)
+            ws_env = Environment(hub_url=hub_url, org_id=org_id, workspace_id=workspace.id)
+            object_client = ObjectAPIClient(ws_env, evo_context.connector)
 
-        try:
-            objects = await _list_all_pages(
-                object_client.list_objects,
-                page_size=DEFAULT_OBJECT_PAGE_SIZE,
-                resource_name=f"objects in workspace {ws_name}",
+            try:
+                objects = await _list_all_pages(
+                    object_client.list_objects,
+                    page_size=DEFAULT_OBJECT_PAGE_SIZE,
+                    resource_name=f"objects in workspace {ws_name}",
+                )
+            except Exception as exc:
+                logger.warning("Failed to list objects in workspace %s: %s", ws_name, exc)
+                workspace_stats.append({"name": ws_name, "id": ws_id, "objects": 0, "error": str(exc)})
+                processed_workspaces += 1
+                await _report_progress(
+                    ctx,
+                    processed_workspaces,
+                    total_workspace_count,
+                    f"Failed to scan workspace {ws_name}: {exc} — "
+                    f"{processed_workspaces}/{total_workspace_count} workspaces done",
+                )
+                # Clean up temporary access even on failure
+                if needs_temp_access:
+                    try:
+                        await _admin_remove_self(ws_id, user_id)
+                        temporarily_added.remove(ws_id)
+                    except Exception as cleanup_exc:
+                        logger.warning("Failed to remove self from workspace %s: %s", ws_name, cleanup_exc)
+                continue
+
+            batch_size = max(1, max_concurrent)
+            scanned: list[dict[str, Any]] = []
+            for i in range(0, len(objects), batch_size):
+                batch = objects[i : i + batch_size]
+                batch_results = await asyncio.gather(
+                    *[
+                        _scan_object(
+                            object_client=object_client,
+                            workspace_id=workspace.id,
+                            workspace_name=ws_name,
+                            object_metadata=obj,
+                            semaphore=semaphore,
+                        )
+                        for obj in batch
+                    ]
+                )
+                scanned.extend(batch_results)
+
+            ws_object_count = len(scanned)
+            ws_error_count = sum(1 for result in scanned if result["scan_error"])
+            total_objects += ws_object_count
+            total_errors += ws_error_count
+            workspace_stats.append(
+                {"name": ws_name, "id": str(workspace.id), "objects": ws_object_count, "errors": ws_error_count}
             )
-        except Exception as exc:
-            logger.warning("Failed to list objects in workspace %s: %s", ws_name, exc)
-            workspace_stats.append({"name": ws_name, "id": ws_id, "objects": 0, "error": str(exc)})
+
             processed_workspaces += 1
             await _report_progress(
                 ctx,
                 processed_workspaces,
                 total_workspace_count,
-                f"Failed to scan workspace {ws_name}: {exc} \u2014 "
+                f"Scanned workspace {ws_name} ({ws_object_count} objects) — "
                 f"{processed_workspaces}/{total_workspace_count} workspaces done",
             )
-            # Clean up temporary access even on failure
+
+            for record in scanned:
+                obj_key = (record["workspace_id"], record["object_id"])
+                unique_blobs = set(record["blob_names"])
+                object_blob_counts[obj_key] = len(unique_blobs)
+
+                if record["scan_error"]:
+                    continue
+
+                if unique_blobs:
+                    objects_with_blobs += 1
+                else:
+                    objects_without_blobs += 1
+
+                for blob_hash in unique_blobs:
+                    ref = {
+                        "workspace_id": record["workspace_id"],
+                        "workspace_name": record["workspace_name"],
+                        "object_id": record["object_id"],
+                        "object_name": record["object_name"],
+                        "object_path": record["object_path"],
+                        "version_id": record["version_id"],
+                        "schema": record.get("schema"),
+                        "schema_id": record["schema_id"],
+                        "created_at": record["created_at"],
+                        "created_by": record["created_by"],
+                    }
+                    blob_index[blob_hash].append(ref)
+                    object_lookup[obj_key] = ref
+
+            # Clean up temporary access after scanning this workspace
             if needs_temp_access:
                 try:
                     await _admin_remove_self(ws_id, user_id)
                     temporarily_added.remove(ws_id)
-                except Exception as cleanup_exc:
-                    logger.warning("Failed to remove self from workspace %s: %s", ws_name, cleanup_exc)
-            continue
+                except Exception as exc:
+                    logger.warning("Failed to remove self from workspace %s after scan: %s", ws_name, exc)
 
-        batch_size = max(1, max_concurrent)
-        scanned: list[dict[str, Any]] = []
-        for i in range(0, len(objects), batch_size):
-            batch = objects[i : i + batch_size]
-            batch_results = await asyncio.gather(
-                *[
-                    _scan_object(
-                        object_client=object_client,
-                        workspace_id=workspace.id,
-                        workspace_name=ws_name,
-                        object_metadata=obj,
-                        semaphore=semaphore,
-                    )
-                    for obj in batch
-                ]
-            )
-            scanned.extend(batch_results)
-
-        ws_object_count = len(scanned)
-        ws_error_count = sum(1 for result in scanned if result["scan_error"])
-        total_objects += ws_object_count
-        total_errors += ws_error_count
-        workspace_stats.append(
-            {"name": ws_name, "id": str(workspace.id), "objects": ws_object_count, "errors": ws_error_count}
-        )
-
-        processed_workspaces += 1
-        await _report_progress(
-            ctx,
-            processed_workspaces,
-            total_workspace_count,
-            f"Scanned workspace {ws_name} ({ws_object_count} objects) — "
-            f"{processed_workspaces}/{total_workspace_count} workspaces done",
-        )
-
-        for record in scanned:
-            obj_key = (record["workspace_id"], record["object_id"])
-            unique_blobs = set(record["blob_names"])
-            object_blob_counts[obj_key] = len(unique_blobs)
-
-            if record["scan_error"]:
-                continue
-
-            if unique_blobs:
-                objects_with_blobs += 1
-            else:
-                objects_without_blobs += 1
-
-            for blob_hash in unique_blobs:
-                ref = {
-                    "workspace_id": record["workspace_id"],
-                    "workspace_name": record["workspace_name"],
-                    "object_id": record["object_id"],
-                    "object_name": record["object_name"],
-                    "object_path": record["object_path"],
-                    "version_id": record["version_id"],
-                    "schema": record.get("schema"),
-                    "schema_id": record["schema_id"],
-                    "created_at": record["created_at"],
-                    "created_by": record["created_by"],
-                }
-                blob_index[blob_hash].append(ref)
-                object_lookup[obj_key] = ref
-
-        # Clean up temporary access after scanning this workspace
-        if needs_temp_access:
-            try:
-                await _admin_remove_self(ws_id, user_id)
-                temporarily_added.remove(ws_id)
-            except Exception as exc:
-                logger.warning("Failed to remove self from workspace %s after scan: %s", ws_name, exc)
-
-    # Final safety cleanup: remove any remaining temporary access
-    for remaining_ws_id in list(temporarily_added):
-        try:
-            await _admin_remove_self(remaining_ws_id, user_id)
-        except Exception as exc:
-            logger.warning("Failed to clean up temporary access to workspace %s: %s", remaining_ws_id, exc)
+    finally:
+        # Final safety cleanup: remove any remaining temporary access
+        if as_admin and temporarily_added:
+            for remaining_ws_id in list(temporarily_added):
+                try:
+                    await _admin_remove_self(remaining_ws_id, user_id)
+                except Exception as exc:
+                    logger.warning("Failed to clean up temporary access to workspace %s: %s", remaining_ws_id, exc)
 
     pair_counts: defaultdict[tuple[tuple[str, str], tuple[str, str]], int] = defaultdict(int)
     for refs in blob_index.values():
