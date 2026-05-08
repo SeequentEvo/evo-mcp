@@ -196,17 +196,25 @@ async def _get_current_user_id() -> str:
 async def _is_current_user_admin() -> tuple[bool, str]:
     """Check if the current user has an admin role on the instance.
 
+    Pages through all instance users to find the current user.
+
     Returns:
         A tuple of (is_admin, user_id).
     """
     user_id = await _get_current_user_id()
 
-    page = await evo_context.workspace_client.list_instance_users(limit=100, offset=0)
-    for user in page.items():
-        if str(user.user_id) == user_id:
-            role_names = [role.name for role in user.roles]
-            is_admin = any("admin" in name.lower() or "owner" in name.lower() for name in role_names)
-            return is_admin, user_id
+    offset = 0
+    limit = 100
+    while True:
+        page = await evo_context.workspace_client.list_instance_users(limit=limit, offset=offset)
+        for user in page.items():
+            if str(user.user_id) == user_id:
+                role_names = [role.name for role in user.roles]
+                is_admin = any("admin" in name.lower() or "owner" in name.lower() for name in role_names)
+                return is_admin, user_id
+        if page.is_last:
+            break
+        offset = page.next_offset
 
     return False, user_id
 
@@ -218,13 +226,46 @@ def _get_admin_api():
     return evo_context.workspace_client._admin_api
 
 
-async def _user_has_workspace_access(workspace_id: str) -> bool:
-    """Check if the current user already has a role in the given workspace."""
+async def _user_has_workspace_access(workspace_id: str) -> bool | None:
+    """Check if the current user already has a role in the given workspace.
+
+    Returns:
+        True if user has access, False if access denied (403/404), None on
+        unexpected errors (callers should skip rather than grant temp access).
+    """
     try:
         await evo_context.workspace_client.get_workspace(UUID(workspace_id))
         return True
-    except Exception:
-        return False
+    except Exception as exc:
+        exc_str = str(exc).lower()
+        status = getattr(exc, "status", None) or getattr(exc, "status_code", None)
+        if (
+            status in (403, 404)
+            or "403" in exc_str
+            or "404" in exc_str
+            or "forbidden" in exc_str
+            or "not found" in exc_str
+        ):
+            return False
+        logger.warning("Unexpected error checking workspace access for %s: %s", workspace_id, exc)
+        return None
+
+
+async def _admin_get_user_role(workspace_id: str, user_id: str) -> str | None:
+    """Get the current role of a user in a workspace, or None if not a member."""
+    try:
+        admin_api = _get_admin_api()
+        org_id = str(evo_context.org_id)
+        response = await admin_api.list_user_roles_admin(
+            workspace_id=workspace_id,
+            org_id=org_id,
+        )
+        for user in response.results:
+            if str(user.user_id) == user_id:
+                return str(user.role) if hasattr(user, "role") else None
+    except Exception as exc:
+        logger.warning("Failed to check existing role in workspace %s: %s", workspace_id, exc)
+    return None
 
 
 async def _admin_add_viewer_role(workspace_id: str, user_id: str) -> None:
@@ -250,7 +291,20 @@ async def _admin_add_viewer_role(workspace_id: str, user_id: str) -> None:
 
 
 async def _admin_remove_self(workspace_id: str, user_id: str) -> None:
-    """Remove the current user from a workspace using admin API."""
+    """Remove the current user from a workspace using admin API.
+
+    Only removes if the user has no pre-existing role (i.e. we added them).
+    Checks the current role first to avoid revoking prior access.
+    """
+    existing_role = await _admin_get_user_role(workspace_id, user_id)
+    if existing_role and existing_role.lower() != "viewer":
+        logger.info(
+            "Skipping removal from workspace %s — user has pre-existing role '%s'",
+            workspace_id,
+            existing_role,
+        )
+        return
+
     admin_api = _get_admin_api()
     org_id = str(evo_context.org_id)
 
@@ -372,6 +426,17 @@ async def _preview_workspaces(*, as_admin: bool = False) -> list[dict[str, Any]]
         needs_temp_access = False
         if as_admin:
             has_access = await _user_has_workspace_access(ws_id)
+            if has_access is None:
+                # Unexpected error checking access — skip this workspace
+                results.append(
+                    {
+                        "workspace_id": ws_id,
+                        "workspace_name": ws_name,
+                        "object_count": -1,
+                        "admin_access_note": "Skipped due to unexpected error checking workspace access",
+                    }
+                )
+                continue
             if not has_access:
                 needs_temp_access = True
                 try:
@@ -532,6 +597,25 @@ async def _run_duplicate_analysis(
         needs_temp_access = False
         if as_admin:
             has_access = await _user_has_workspace_access(ws_id)
+            if has_access is None:
+                # Unexpected error checking access — skip this workspace
+                workspace_stats.append(
+                    {
+                        "name": ws_name,
+                        "id": ws_id,
+                        "objects": 0,
+                        "error": "Skipped due to unexpected error checking workspace access",
+                    }
+                )
+                processed_workspaces += 1
+                await _report_progress(
+                    ctx,
+                    processed_workspaces,
+                    total_workspace_count,
+                    f"Skipped workspace {ws_name} (access check error) — "
+                    f"{processed_workspaces}/{total_workspace_count} workspaces done",
+                )
+                continue
             if not has_access:
                 needs_temp_access = True
                 try:

@@ -82,7 +82,7 @@ def register_general_tools(mcp):
                     "id": str(ws.id),
                     "name": ws.name,
                     "description": getattr(ws, "description", None),
-                    "current_user_role": getattr(ws, "current_user_role", None),
+                    "user_role": getattr(ws, "current_user_role", None),
                     "created_at": str(ws.created_at) if getattr(ws, "created_at", None) else None,
                     "updated_at": str(ws.updated_at) if getattr(ws, "updated_at", None) else None,
                 }
@@ -113,8 +113,10 @@ def register_general_tools(mcp):
         the current user has no role (requires org admin privileges).
 
         Args:
-            workspace_id: Workspace UUID (provide either this or workspace_name)
-            workspace_name: Workspace name (provide either this or workspace_id)
+            workspace_id: Workspace UUID (provide either this or workspace_name).
+                Required when as_admin=True.
+            workspace_name: Workspace name (provide either this or workspace_id).
+                Not supported when as_admin=True.
             as_admin: If True, use admin API to access workspace regardless of user role.
                 Only works for organization admins. Use get_my_instance_role to check.
         """
@@ -133,7 +135,7 @@ def register_general_tools(mcp):
                 "id": str(response.id),
                 "name": response.name,
                 "description": getattr(response, "description", None),
-                "current_user_role": getattr(response, "current_user_role", None),
+                "user_role": getattr(response, "current_user_role", None),
                 "default_coordinate_system": getattr(response, "default_coordinate_system", None),
                 "created_at": str(response.created_at) if getattr(response, "created_at", None) else None,
                 "updated_at": str(response.updated_at) if getattr(response, "updated_at", None) else None,

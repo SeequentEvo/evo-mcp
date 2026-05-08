@@ -70,12 +70,18 @@ def register_workspace_admin_tools(mcp):
 
         # Look up the user in instance users to get their roles
         workspace_client = evo_context.workspace_client
-        page = await workspace_client.list_instance_users(limit=100, offset=0)
         current_user = None
-        for user in page.items():
-            if str(user.user_id) == str(current_user_id):
-                current_user = user
+        offset = 0
+        limit = 100
+        while current_user is None:
+            page = await workspace_client.list_instance_users(limit=limit, offset=offset)
+            for user in page.items():
+                if str(user.user_id) == str(current_user_id):
+                    current_user = user
+                    break
+            if current_user is not None or page.is_last:
                 break
+            offset = page.next_offset
 
         if current_user is None:
             return {
@@ -260,10 +266,16 @@ def register_workspace_admin_tools(mcp):
 
         valid_roles = {"owner", "editor", "viewer"}
         role_assignments = []
-        for assignment in assignments:
+        for i, assignment in enumerate(assignments):
+            if "user_id" not in assignment:
+                raise ValueError(f"Assignment at index {i} is missing required field 'user_id'.")
+            if "workspace_id" not in assignment:
+                raise ValueError(f"Assignment at index {i} is missing required field 'workspace_id'.")
             role_str = assignment.get("role", "").lower()
             if role_str not in valid_roles:
-                raise ValueError(f"Invalid role '{role_str}' in assignment. Must be one of: {', '.join(valid_roles)}")
+                raise ValueError(
+                    f"Invalid role '{role_str}' in assignment at index {i}. Must be one of: {', '.join(valid_roles)}"
+                )
             role_assignments.append(
                 UserRoleAssignmentRequest(
                     user_id=UUID(assignment["user_id"]),
