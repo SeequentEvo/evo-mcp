@@ -444,5 +444,271 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(0, result[1]["object_count"])
 
 
+class AdminDuplicateScanTests(unittest.IsolatedAsyncioTestCase):
+    """Tests for admin-mode duplicate scanning (as_admin=True)."""
+
+    async def test_admin_scan_rejects_non_admin_user(self) -> None:
+        """Non-admin users get an error when using as_admin=True."""
+        fake_context = SimpleNamespace(
+            workspace_client=_FakeWorkspaceClient([], max_limit=100),
+            org_id=UUID("00000000-0000-0000-0000-0000000000aa"),
+            hub_url="https://hub.example.invalid",
+            connector=None,
+        )
+
+        with (
+            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
+            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "_is_current_user_admin", AsyncMock(return_value=(False, "user-123"))),
+        ):
+            result = await admin_tools._run_duplicate_analysis(
+                workspace_ids=None,
+                workspace_names=None,
+                max_concurrent=4,
+                as_admin=True,
+            )
+
+        self.assertIn("error", result)
+        self.assertIn("admin privileges", result["error"])
+
+    async def test_admin_scan_adds_and_removes_viewer_for_inaccessible_workspaces(self) -> None:
+        """Admin scan temporarily adds Viewer role and removes it after scanning."""
+        workspace = SimpleNamespace(
+            id=UUID("00000000-0000-0000-0000-000000000001"),
+            name="Admin Workspace",
+        )
+        object_1 = _metadata(
+            object_id="00000000-0000-0000-0000-000000000101",
+            name="Object One",
+            path="/Object One.json",
+            version_id="v1",
+        )
+
+        _FakeObjectAPIClient.DATA = {
+            str(workspace.id): {
+                "objects": [object_1],
+                "responses": {
+                    str(object_1.id): _FakeDownloadedObject(
+                        schema="/objects/pointsets/1.0.0/pointsets.schema.json",
+                        blob_names=["blob-a"],
+                    ),
+                },
+            }
+        }
+        _FakeObjectAPIClient.LIST_CALLS = []
+        _FakeObjectAPIClient.OBJECT_TIMEOUTS = []
+
+        fake_admin_api = SimpleNamespace(
+            list_workspaces_admin=AsyncMock(return_value=SimpleNamespace(results=[workspace])),
+        )
+        fake_workspace_client = _FakeWorkspaceClient([], max_limit=100)
+        fake_workspace_client._admin_api = fake_admin_api
+
+        fake_context = SimpleNamespace(
+            workspace_client=fake_workspace_client,
+            org_id=UUID("00000000-0000-0000-0000-0000000000aa"),
+            hub_url="https://hub.example.invalid",
+            connector=None,
+        )
+
+        add_viewer_mock = AsyncMock()
+        remove_self_mock = AsyncMock()
+
+        with (
+            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
+            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
+            patch.object(admin_tools, "_is_current_user_admin", AsyncMock(return_value=(True, "admin-user-id"))),
+            patch.object(admin_tools, "_user_has_workspace_access", AsyncMock(return_value=False)),
+            patch.object(admin_tools, "_admin_add_viewer_role", add_viewer_mock),
+            patch.object(admin_tools, "_admin_remove_self", remove_self_mock),
+        ):
+            result = await admin_tools._run_duplicate_analysis(
+                workspace_ids=None,
+                workspace_names=None,
+                max_concurrent=4,
+                as_admin=True,
+                scan_all_workspaces=True,
+            )
+
+        self.assertNotIn("error", result)
+        self.assertEqual(1, result["summary"]["total_objects_scanned"])
+        self.assertTrue(result["summary"]["admin_scan"])
+
+        # Verify Viewer role was added and then removed
+        add_viewer_mock.assert_called_once_with(str(workspace.id), "admin-user-id")
+        remove_self_mock.assert_called_once_with(str(workspace.id), "admin-user-id")
+
+    async def test_admin_scan_skips_already_accessible_workspaces(self) -> None:
+        """Admin scan does not add/remove Viewer role for workspaces user already has access to."""
+        workspace = SimpleNamespace(
+            id=UUID("00000000-0000-0000-0000-000000000001"),
+            name="My Workspace",
+        )
+        object_1 = _metadata(
+            object_id="00000000-0000-0000-0000-000000000101",
+            name="Object One",
+            path="/Object One.json",
+            version_id="v1",
+        )
+
+        _FakeObjectAPIClient.DATA = {
+            str(workspace.id): {
+                "objects": [object_1],
+                "responses": {
+                    str(object_1.id): _FakeDownloadedObject(
+                        schema="/objects/pointsets/1.0.0/pointsets.schema.json",
+                        blob_names=["blob-a"],
+                    ),
+                },
+            }
+        }
+        _FakeObjectAPIClient.LIST_CALLS = []
+        _FakeObjectAPIClient.OBJECT_TIMEOUTS = []
+
+        fake_admin_api = SimpleNamespace(
+            list_workspaces_admin=AsyncMock(return_value=SimpleNamespace(results=[workspace])),
+        )
+        fake_workspace_client = _FakeWorkspaceClient([workspace], max_limit=100)
+        fake_workspace_client._admin_api = fake_admin_api
+
+        fake_context = SimpleNamespace(
+            workspace_client=fake_workspace_client,
+            org_id=UUID("00000000-0000-0000-0000-0000000000aa"),
+            hub_url="https://hub.example.invalid",
+            connector=None,
+        )
+
+        add_viewer_mock = AsyncMock()
+        remove_self_mock = AsyncMock()
+
+        with (
+            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
+            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
+            patch.object(admin_tools, "_is_current_user_admin", AsyncMock(return_value=(True, "admin-user-id"))),
+            patch.object(admin_tools, "_user_has_workspace_access", AsyncMock(return_value=True)),
+            patch.object(admin_tools, "_admin_add_viewer_role", add_viewer_mock),
+            patch.object(admin_tools, "_admin_remove_self", remove_self_mock),
+        ):
+            result = await admin_tools._run_duplicate_analysis(
+                workspace_ids=None,
+                workspace_names=None,
+                max_concurrent=4,
+                as_admin=True,
+                scan_all_workspaces=True,
+            )
+
+        self.assertNotIn("error", result)
+        self.assertEqual(1, result["summary"]["total_objects_scanned"])
+
+        # No Viewer role changes needed
+        add_viewer_mock.assert_not_called()
+        remove_self_mock.assert_not_called()
+
+    async def test_admin_scan_cleans_up_on_scan_failure(self) -> None:
+        """Admin removes Viewer role even if workspace scan fails."""
+        workspace = SimpleNamespace(
+            id=UUID("00000000-0000-0000-0000-000000000001"),
+            name="Failing Workspace",
+        )
+
+        # No data configured for this workspace — list_objects will raise KeyError
+        _FakeObjectAPIClient.DATA = {}
+        _FakeObjectAPIClient.LIST_CALLS = []
+        _FakeObjectAPIClient.OBJECT_TIMEOUTS = []
+
+        fake_admin_api = SimpleNamespace(
+            list_workspaces_admin=AsyncMock(return_value=SimpleNamespace(results=[workspace])),
+        )
+        fake_workspace_client = _FakeWorkspaceClient([], max_limit=100)
+        fake_workspace_client._admin_api = fake_admin_api
+
+        fake_context = SimpleNamespace(
+            workspace_client=fake_workspace_client,
+            org_id=UUID("00000000-0000-0000-0000-0000000000aa"),
+            hub_url="https://hub.example.invalid",
+            connector=None,
+        )
+
+        add_viewer_mock = AsyncMock()
+        remove_self_mock = AsyncMock()
+
+        with (
+            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
+            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
+            patch.object(admin_tools, "_is_current_user_admin", AsyncMock(return_value=(True, "admin-user-id"))),
+            patch.object(admin_tools, "_user_has_workspace_access", AsyncMock(return_value=False)),
+            patch.object(admin_tools, "_admin_add_viewer_role", add_viewer_mock),
+            patch.object(admin_tools, "_admin_remove_self", remove_self_mock),
+        ):
+            result = await admin_tools._run_duplicate_analysis(
+                workspace_ids=None,
+                workspace_names=None,
+                max_concurrent=4,
+                as_admin=True,
+                scan_all_workspaces=True,
+            )
+
+        # Scan should have an error for this workspace but not crash
+        self.assertEqual(1, result["summary"]["workspaces_scanned"])
+        ws_stat = result["workspaces"][0]
+        self.assertIn("error", ws_stat)
+
+        # Viewer role was added and then removed despite the scan failure
+        add_viewer_mock.assert_called_once_with(str(workspace.id), "admin-user-id")
+        remove_self_mock.assert_called_once_with(str(workspace.id), "admin-user-id")
+
+    async def test_admin_preview_adds_and_removes_viewer(self) -> None:
+        """Admin preview temporarily adds Viewer role and removes it after counting objects."""
+        workspace = SimpleNamespace(
+            id=UUID("00000000-0000-0000-0000-000000000001"),
+            name="Preview Workspace",
+        )
+
+        fake_admin_api = SimpleNamespace(
+            list_workspaces_admin=AsyncMock(return_value=SimpleNamespace(results=[workspace])),
+        )
+        fake_workspace_client = _FakeWorkspaceClient([], max_limit=100)
+        fake_workspace_client._admin_api = fake_admin_api
+
+        _FakeObjectAPIClient.DATA = {
+            str(workspace.id): {
+                "objects": [],
+                "responses": {},
+            }
+        }
+        _FakeObjectAPIClient.LIST_CALLS = []
+
+        fake_context = SimpleNamespace(
+            workspace_client=fake_workspace_client,
+            org_id=UUID("00000000-0000-0000-0000-0000000000aa"),
+            hub_url="https://hub.example.invalid",
+            connector=None,
+        )
+
+        add_viewer_mock = AsyncMock()
+        remove_self_mock = AsyncMock()
+
+        with (
+            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
+            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
+            patch.object(admin_tools, "_is_current_user_admin", AsyncMock(return_value=(True, "admin-user-id"))),
+            patch.object(admin_tools, "_user_has_workspace_access", AsyncMock(return_value=False)),
+            patch.object(admin_tools, "_admin_add_viewer_role", add_viewer_mock),
+            patch.object(admin_tools, "_admin_remove_self", remove_self_mock),
+        ):
+            result = await admin_tools._preview_workspaces(as_admin=True)
+
+        self.assertEqual(1, len(result))
+        self.assertEqual(str(workspace.id), result[0]["workspace_id"])
+        self.assertIn("admin_access_note", result[0])
+
+        add_viewer_mock.assert_called_once_with(str(workspace.id), "admin-user-id")
+        remove_self_mock.assert_called_once_with(str(workspace.id), "admin-user-id")
+
+
 if __name__ == "__main__":
     unittest.main()
