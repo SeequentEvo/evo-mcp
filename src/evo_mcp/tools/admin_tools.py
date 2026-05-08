@@ -304,8 +304,10 @@ async def _admin_add_viewer_role(workspace_id: str, user_id: str) -> None:
 async def _admin_remove_self(workspace_id: str, user_id: str) -> None:
     """Remove the current user from a workspace using admin API.
 
-    Only removes if the user has no pre-existing role (i.e. we added them).
-    Checks the current role first to avoid revoking prior access.
+    Callers are responsible for only invoking this for workspaces where
+    *we* added temporary access (tracked via `temporarily_added`).  As a
+    secondary safeguard, this checks the current role and skips removal
+    if the user holds a non-viewer role.
     """
     existing_role = await _admin_get_user_role(workspace_id, user_id)
     if existing_role and existing_role.lower() != "viewer":

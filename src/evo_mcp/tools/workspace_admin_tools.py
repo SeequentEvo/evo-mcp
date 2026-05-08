@@ -9,7 +9,6 @@ These tools use the Evo Workspaces Admin API endpoints, which allow organization
 admin users to access any workspace regardless of their role within it.
 """
 
-import logging
 from uuid import UUID
 
 from evo.workspaces.endpoints.api import AdminApi
@@ -25,8 +24,6 @@ from evo.workspaces.endpoints.models import (
 )
 
 from evo_mcp.context import ensure_initialized, evo_context
-
-logger = logging.getLogger(__name__)
 
 
 def register_workspace_admin_tools(mcp):
@@ -331,6 +328,7 @@ def register_workspace_admin_tools(mcp):
             offset=offset,
         )
 
+        effective_limit = min(limit, 100)
         workspaces = []
         for ws in response.results:
             workspaces.append(
@@ -347,7 +345,7 @@ def register_workspace_admin_tools(mcp):
             "user_id": user_id,
             "total": getattr(response.links, "total", len(workspaces)),
             "offset": offset,
-            "limit": limit,
+            "limit": effective_limit,
             "workspaces": workspaces,
         }
 
