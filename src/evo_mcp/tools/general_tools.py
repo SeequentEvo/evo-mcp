@@ -51,15 +51,43 @@ def register_general_tools(mcp):
         return results
 
     @mcp.tool()
-    async def list_workspaces(name: str = "", deleted: bool = False, limit: int = 50) -> list[dict]:
+    async def list_workspaces(
+        name: str = "", deleted: bool = False, limit: int = 50, as_admin: bool = False
+    ) -> list[dict]:
         """List workspaces with optional filtering by name or deleted status.
+
+        By default, only lists workspaces where the current user has a role.
+        Set as_admin=True to list ALL workspaces in the instance (requires org admin privileges).
 
         Args:
             name: Filter by workspace name (leave empty for no filter)
             deleted: Include deleted workspaces
             limit: Maximum number of results
+            as_admin: If True, use admin API to list all workspaces regardless of user role.
+                Only works for organization admins. Use get_my_instance_role to check.
         """
         await ensure_initialized()
+
+        if as_admin:
+            admin_api = evo_context.workspace_client._admin_api
+            org_id = str(evo_context.org_id)
+            response = await admin_api.list_workspaces_admin(
+                org_id=org_id,
+                name=name if name else None,
+                deleted=deleted,
+                limit=min(limit, 100),
+            )
+            return [
+                {
+                    "id": str(ws.id),
+                    "name": ws.name,
+                    "description": getattr(ws, "description", None),
+                    "user_role": getattr(ws, "current_user_role", None),
+                    "created_at": str(ws.created_at) if getattr(ws, "created_at", None) else None,
+                    "updated_at": str(ws.updated_at) if getattr(ws, "updated_at", None) else None,
+                }
+                for ws in response.results
+            ]
 
         workspaces = await evo_context.workspace_client.list_workspaces(
             name=name if name else None, deleted=deleted, limit=limit
@@ -78,14 +106,58 @@ def register_general_tools(mcp):
         ]
 
     @mcp.tool()
-    async def get_workspace(workspace_id: str = "", workspace_name: str = "") -> dict:
+    async def get_workspace(workspace_id: str = "", workspace_name: str = "", as_admin: bool = False) -> dict:
         """Get workspace details by ID or name.
 
+        Set as_admin=True to access any workspace in the instance, even ones where
+        the current user has no role (requires org admin privileges).
+
         Args:
-            workspace_id: Workspace UUID (provide either this or workspace_name)
-            workspace_name: Workspace name (provide either this or workspace_id)
+            workspace_id: Workspace UUID (provide either this or workspace_name).
+                Required when as_admin=True.
+            workspace_name: Workspace name (provide either this or workspace_id).
+                Not supported when as_admin=True.
+            as_admin: If True, use admin API to access workspace regardless of user role.
+                Only works for organization admins. Use get_my_instance_role to check.
         """
         await ensure_initialized()
+
+        if as_admin:
+            if not workspace_id:
+                raise ValueError("workspace_id is required when using as_admin=True")
+            if workspace_name:
+                raise ValueError("workspace_name is not supported when using as_admin=True. Use workspace_id instead.")
+            admin_api = evo_context.workspace_client._admin_api
+            org_id = str(evo_context.org_id)
+            response = await admin_api.get_workspace_admin(
+                org_id=org_id,
+                workspace_id=workspace_id,
+            )
+            return {
+                "id": str(response.id),
+                "name": response.name,
+                "description": getattr(response, "description", None),
+                "user_role": getattr(response, "current_user_role", None),
+                "default_coordinate_system": getattr(response, "default_coordinate_system", None),
+                "created_at": str(response.created_at) if getattr(response, "created_at", None) else None,
+                "updated_at": str(response.updated_at) if getattr(response, "updated_at", None) else None,
+                "ml_enabled": getattr(response, "ml_enabled", None),
+                "labels": getattr(response, "labels", []),
+                "created_by": {
+                    "id": str(response.created_by.id),
+                    "name": getattr(response.created_by, "name", None),
+                    "email": getattr(response.created_by, "email", None),
+                }
+                if getattr(response, "created_by", None)
+                else None,
+                "updated_by": {
+                    "id": str(response.updated_by.id),
+                    "name": getattr(response.updated_by, "name", None),
+                    "email": getattr(response.updated_by, "email", None),
+                }
+                if getattr(response, "updated_by", None)
+                else None,
+            }
 
         if workspace_id:
             workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
