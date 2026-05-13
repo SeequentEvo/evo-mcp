@@ -7,5 +7,6 @@
 *.log
 .cache/
 *.db
+.idea/
 .vscode
 src/evo_mcp.egg-info/
