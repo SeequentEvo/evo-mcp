@@ -20,6 +20,7 @@
 - [Connect to Evo MCP](#connect-to-evo-mcp)
   - [VS Code](#vs-code)
   - [Cursor](#cursor)
+  - [Claude Desktop](#claude-desktop)
   - [Additional tips](#additional-tips)
 - [Advanced](#advanced)
   - [Testing with curl](#testing-with-curl)
@@ -394,10 +395,73 @@ To verify that the Evo MCP server is correctly configured in Cursor:
   ![Cursor Verify Settings](images/cursor-verify-settings.png)
 
 
+### Claude Desktop
+
+#### Installation
+
+Claude Desktop is Anthropic's desktop application with built-in MCP support. [Download and install Claude Desktop](https://claude.ai/download) before proceeding.
+
+#### Configuration
+
+Run the supplied Python script to add the required settings. The script will ask you a series of questions in the console.
+
+**If you set up Python with `uv`:**
+```bash
+uv run python scripts/setup_mcp.py
+```
+
+**If you set up Python with `pip`:**
+```bash
+python scripts/setup_mcp.py
+```
+
+#### Manual method
+
+Claude Desktop reads MCP server configuration from a JSON file on disk.
+
+1. Open the Claude Desktop configuration file:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+   - **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+   If the file does not exist, create it.
+
+2. Add the Evo MCP server entry. Copy the settings found in `templates/claude-stdio-config.json` and update the paths to match your local installation:
+
+   **macOS/Linux:**
+   ```json
+   {
+     "mcpServers": {
+       "evo-mcp": {
+         "command": "/path/to/evo-mcp/.venv/bin/python",
+         "args": ["/path/to/evo-mcp/src/mcp_tools.py"]
+       }
+     }
+   }
+   ```
+
+   **Windows:**
+   ```json
+   {
+     "mcpServers": {
+       "evo-mcp": {
+         "command": "C:\\path\\to\\evo-mcp\\.venv\\Scripts\\python.exe",
+         "args": ["C:\\path\\to\\evo-mcp\\src\\mcp_tools.py"]
+       }
+     }
+   }
+   ```
+
+3. Save the file and restart Claude Desktop.
+
+#### Verifying the integration
+
+Once configured, Claude Desktop will show available MCP tools in the chat interface. Look for a hammer icon or "Tools" indicator — clicking it should list the Evo MCP tools. If the tools do not appear, check that the Python path and script path are correct and that your `.env` file is configured.
+
 ### Additional tips
 
 - **Use a separate workspace**: Create a new workspace that is separate to your clone of this repository. If your copilot/agent has access to the source files in this repository, it may decide to ignore the MCP server.
-- **STDIO mode starts on demand**: In `STDIO` mode, VS Code/Cursor will launch the MCP server when needed.
+- **STDIO mode starts on demand**: In `STDIO` mode, VS Code/Cursor/Claude Desktop will launch the MCP server when needed.
 - **HTTP mode needs a running server**: If you select `HTTP`, the server must already be running. The setup script can start it for you in the current terminal session so you can see live output.
 - **Check your environment variables**: Ensure `EVO_CLIENT_ID` and `EVO_REDIRECT_URL` are set in your `.env` file before connecting.
 - **Reload after changes**: If you edit settings or `.env` values, reload the window so the client picks up the new config.
