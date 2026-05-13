@@ -36,3 +36,10 @@ extend-select = ["I", "RUF022"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["evo_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "unit: isolated tests with no external services",
+    "integration: tests that may call live Evo APIs",
+]
