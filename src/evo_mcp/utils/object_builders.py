@@ -20,7 +20,6 @@ All builders follow the same pattern:
 4. Validate against the schema before returning
 """
 
-import logging
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Type, TypeVar, Union
 
@@ -71,9 +70,10 @@ from evo_schemas.objects.pointset import (
     Pointset_V1_3_0,
     Pointset_V1_3_0_Locations,
 )
+from fastmcp.utilities.logging import get_logger
 
 # Set up logging
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # Type variable for schema classes
