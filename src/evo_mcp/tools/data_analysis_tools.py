@@ -3,28 +3,45 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
+import json
 import logging
-from typing import Any, Optional
-from uuid import UUID
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from evo_mcp.utils import (
-    get_downhole_collection,
-    download_interval_data,
-    download_downhole_intervals_data,
-    get_object_type,
-    calculate_interval_statistics,
-    calculate_statistics_by_hole,
     analyze_gaps,
-    calculate_multi_grade_statistics,
+    download_downhole_intervals_data,
+    download_interval_data,
     generate_grade_histogram,
     generate_grade_violin,
     get_collection_info,
+    get_downhole_collection,
+    get_object_type,
 )
 
 logger = logging.getLogger(__name__)
+
+_EDA_DISCLAIMER = (
+    "For exploratory data analysis only. Not suitable for resource estimation "
+    "or financial reporting. Use export_interval_data to obtain auditable data."
+)
+
+
+def _build_provenance(obj, workspace_id: str, collection_name: str, row_count: int) -> dict:
+    """Build a provenance metadata block for audit traceability."""
+    return {
+        "object_id": str(obj.metadata.object_id),
+        "object_name": obj.metadata.name,
+        "version_id": str(obj.metadata.version_id),
+        "workspace_id": workspace_id,
+        "collection_name": collection_name,
+        "row_count": row_count,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "disclaimer": _EDA_DISCLAIMER,
+    }
 
 
 async def _get_interval_dataframe(obj, obj_dict: dict, collection_name: str) -> pd.DataFrame:
@@ -164,115 +181,6 @@ def register_data_analysis_tools(mcp):
         }
 
     @mcp.tool()
-    async def get_interval_statistics(
-        workspace_id: str,
-        object_id: str,
-        collection_name: str,
-        grade_column: str,
-        version: str = ""
-    ) -> dict:
-        """Calculate comprehensive interval statistics for a grade column.
-        
-        Computes:
-        - Length-weighted mean: Sum(grade * length) / Sum(length)
-        - Accumulation (grade-meters): Sum(grade * length)
-        - Total length: Sum of all interval lengths
-        - Simple statistics: min, max, mean, std, count
-        
-        Args:
-            workspace_id: Workspace UUID
-            object_id: DownholeCollection or DownholeIntervals object UUID
-            collection_name: Name of the interval collection (use 'intervals' for DownholeIntervals)
-            grade_column: Name of the grade/attribute column to analyze
-            version: Specific version ID (optional)
-            
-        Returns:
-            Dict with comprehensive statistics
-        """
-        try:
-            obj, obj_dict = await get_downhole_collection(workspace_id, object_id, version)
-            df = await _get_interval_dataframe(obj, obj_dict, collection_name)
-            stats = calculate_interval_statistics(df, grade_column)
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-        
-        return {
-            "status": "success",
-            "collection_name": collection_name,
-            "grade_column": grade_column,
-            "statistics": {
-                "length_weighted_mean": stats["length_weighted_mean"],
-                "accumulation_grade_meters": stats["accumulation_grade_meters"],
-                "total_length": stats["total_length"],
-                "simple_mean": stats["simple_mean"],
-                "min": stats["min"],
-                "max": stats["max"],
-                "std": stats["std"],
-                "count": stats["count"],
-                "null_count": stats["null_count"],
-            },
-            "data_quality": stats["data_quality"]
-        }
-
-    @mcp.tool()
-    async def get_statistics_by_hole(
-        workspace_id: str,
-        object_id: str,
-        collection_name: str,
-        grade_column: str,
-        version: str = ""
-    ) -> dict:
-        """Calculate grade statistics grouped by hole ID.
-        
-        For each hole, computes:
-        - Length-weighted mean
-        - Accumulation (grade-meters)
-        - Total sampled length
-        - Min, max, mean grade
-        - Sample count
-        
-        Args:
-            workspace_id: Workspace UUID
-            object_id: DownholeCollection or DownholeIntervals object UUID
-            collection_name: Name of the interval collection (use 'intervals' for DownholeIntervals)
-            grade_column: Name of the grade/attribute column to analyze
-            version: Specific version ID (optional)
-            
-        Returns:
-            Dict with per-hole statistics
-        """
-        try:
-            obj, obj_dict = await get_downhole_collection(workspace_id, object_id, version)
-            df = await _get_interval_dataframe(obj, obj_dict, collection_name)
-            hole_stats = calculate_statistics_by_hole(df, grade_column)
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-        
-        # Convert to records
-        records = hole_stats.to_dict(orient='records')
-        
-        # Round floats for cleaner output
-        for record in records:
-            for key in ['min_grade', 'max_grade', 'mean_grade', 'length_weighted_mean', 
-                        'total_length', 'accumulation']:
-                if key in record and record[key] is not None:
-                    record[key] = round(float(record[key]), 6)
-            record['sample_count'] = int(record['sample_count'])
-        
-        return {
-            "status": "success",
-            "collection_name": collection_name,
-            "grade_column": grade_column,
-            "hole_count": len(records),
-            "hole_statistics": records,
-            "summary": {
-                "best_hole_by_lwm": max(records, key=lambda x: x['length_weighted_mean'] or 0)['hole_id'],
-                "best_hole_by_max": max(records, key=lambda x: x['max_grade'] or 0)['hole_id'],
-                "most_sampled_hole": max(records, key=lambda x: x['total_length'])['hole_id'],
-            }
-        }
-
-    @mcp.tool()
     async def get_gap_analysis(
         workspace_id: str,
         object_id: str,
@@ -283,6 +191,9 @@ def register_data_analysis_tools(mcp):
         
         Identifies missing intervals (gaps) where the 'to' depth of one sample
         doesn't meet the 'from' depth of the next sample.
+        
+        For exploratory data analysis only. Not suitable for resource estimation
+        or financial reporting. Use export_interval_data to obtain auditable data.
         
         Args:
             workspace_id: Workspace UUID
@@ -299,6 +210,8 @@ def register_data_analysis_tools(mcp):
         except Exception as e:
             return {"status": "error", "error": str(e)}
         
+        provenance = _build_provenance(obj, workspace_id, collection_name, len(df))
+        
         # Analyze gaps
         gap_analysis = analyze_gaps(df)
         
@@ -311,7 +224,8 @@ def register_data_analysis_tools(mcp):
                 "total_gap_length": 0.0,
                 "holes_with_gaps": 0,
                 "holes_without_gaps": gap_analysis["holes_without_gaps"],
-                "gap_details": []
+                "gap_details": [],
+                "provenance": provenance,
             }
         
         # Get DataFrames from analysis
@@ -342,7 +256,8 @@ def register_data_analysis_tools(mcp):
             "holes_without_gaps": gap_analysis["holes_without_gaps"],
             "gap_statistics_by_hole": hole_records,
             "gap_details": gap_details,
-            "gap_details_truncated": len(gaps_df) > 100
+            "gap_details_truncated": len(gaps_df) > 100,
+            "provenance": provenance,
         }
 
     @mcp.tool()
@@ -408,51 +323,6 @@ def register_data_analysis_tools(mcp):
         }
 
     @mcp.tool()
-    async def get_multi_grade_statistics(
-        workspace_id: str,
-        object_id: str,
-        collection_name: str,
-        grade_columns: list[str],
-        version: str = ""
-    ) -> dict:
-        """Calculate statistics for multiple grade columns at once.
-        
-        Useful for multi-element assay analysis where you need stats for
-        multiple elements (Au, Cu, Ag, etc.) in a single call.
-        
-        Args:
-            workspace_id: Workspace UUID
-            object_id: DownholeCollection or DownholeIntervals object UUID
-            collection_name: Name of the interval collection (use 'intervals' for DownholeIntervals)
-            grade_columns: List of grade column names to analyze
-            version: Specific version ID (optional)
-            
-        Returns:
-            Dict with statistics for each grade column
-        """
-        try:
-            obj, obj_dict = await get_downhole_collection(workspace_id, object_id, version)
-            df = await _get_interval_dataframe(obj, obj_dict, collection_name)
-            result = calculate_multi_grade_statistics(df, grade_columns)
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
-        
-        # Round the statistics
-        for grade_col, stats in result["grade_statistics"].items():
-            if isinstance(stats, dict) and "error" not in stats:
-                for key in ['length_weighted_mean', 'accumulation', 'total_length', 'simple_mean', 'min', 'max', 'std']:
-                    if key in stats:
-                        stats[key] = round(stats[key], 6)
-        
-        return {
-            "status": "success" if not result["errors"] else "partial",
-            "collection_name": collection_name,
-            "grade_statistics": result["grade_statistics"],
-            "errors": result["errors"],
-            "available_columns": list(df.columns)
-        }
-
-    @mcp.tool()
     async def get_grade_histogram(
         workspace_id: str,
         object_id: str,
@@ -468,6 +338,9 @@ def register_data_analysis_tools(mcp):
         - Length-weighted distribution (secondary y-axis)
         
         The output can be directly used with Plotly visualization libraries.
+        
+        For exploratory data analysis only. Not suitable for resource estimation
+        or financial reporting. Use export_interval_data to obtain auditable data.
         
         Args:
             workspace_id: Workspace UUID
@@ -494,7 +367,8 @@ def register_data_analysis_tools(mcp):
             "status": "success",
             "collection_name": collection_name,
             "grade_column": grade_column,
-            "plotly": plotly_data
+            "plotly": plotly_data,
+            "provenance": _build_provenance(obj, workspace_id, collection_name, len(df)),
         }
 
     @mcp.tool()
@@ -516,6 +390,9 @@ def register_data_analysis_tools(mcp):
         
         Violin plots show the full distribution shape with quartiles and mean,
         making them ideal for comparing grade distributions across holes or zones.
+        
+        For exploratory data analysis only. Not suitable for resource estimation
+        or financial reporting. Use export_interval_data to obtain auditable data.
         
         Args:
             workspace_id: Workspace UUID
@@ -548,5 +425,97 @@ def register_data_analysis_tools(mcp):
             "collection_name": collection_name,
             "grade_column": grade_column,
             "group_by": group_by if group_by else None,
-            "plotly": plotly_data
+            "plotly": plotly_data,
+            "provenance": _build_provenance(obj, workspace_id, collection_name, len(df)),
         }
+
+    @mcp.tool()
+    async def export_interval_data(
+        workspace_id: str,
+        object_id: str,
+        collection_name: str,
+        output_directory: str,
+        version: str = ""
+    ) -> dict:
+        """Export full interval data to a local CSV file with provenance metadata.
+
+        Downloads all interval data from the specified collection and writes it
+        to a CSV file alongside a .metadata.json sidecar containing full
+        provenance (object_id, version_id, workspace_id, timestamp, row count,
+        and column descriptions).  Use this tool when you need auditable,
+        verifiable data — for example, before computing statistics that may
+        appear in a financial report.
+
+        Args:
+            workspace_id: Workspace UUID
+            object_id: DownholeCollection or DownholeIntervals object UUID
+            collection_name: Name of the interval collection (use 'intervals' for DownholeIntervals)
+            output_directory: Local directory where the CSV and metadata files will be written
+            version: Specific version ID (optional, defaults to latest)
+
+        Returns:
+            Dict with the exported file path, metadata file path, and provenance
+        """
+        # Validate output directory
+        out_dir = Path(output_directory)
+        if not out_dir.is_dir():
+            return {
+                "status": "error",
+                "error": f"Output directory does not exist: {output_directory}",
+            }
+
+        try:
+            obj, obj_dict = await get_downhole_collection(workspace_id, object_id, version)
+            df = await _get_interval_dataframe(obj, obj_dict, collection_name)
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+        # Build provenance
+        now = datetime.now(timezone.utc)
+        provenance = {
+            "object_id": str(obj.metadata.object_id),
+            "object_name": obj.metadata.name,
+            "version_id": str(obj.metadata.version_id),
+            "workspace_id": workspace_id,
+            "collection_name": collection_name,
+            "row_count": len(df),
+            "column_names": list(df.columns),
+            "unique_holes": int(df["hole_id"].nunique()),
+            "export_timestamp": now.isoformat(),
+        }
+
+        # Deterministic, descriptive filename
+        safe_name = "".join(
+            c if c.isalnum() or c in ("-", "_") else "_"
+            for c in (obj.metadata.name or "object")
+        )
+        version_short = str(obj.metadata.version_id)[:8]
+        ts = now.strftime("%Y%m%dT%H%M%SZ")
+        base_name = f"{safe_name}_{collection_name}_{version_short}_{ts}"
+
+        csv_path = out_dir / f"{base_name}.csv"
+        meta_path = out_dir / f"{base_name}.metadata.json"
+
+        # Write CSV
+        df.to_csv(csv_path, index=False)
+
+        # Write metadata sidecar
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(provenance, f, indent=2)
+
+        warning = None
+        if len(df) > 100_000:
+            warning = (
+                f"Large dataset exported ({len(df):,} rows). "
+                "Verify the file size is manageable before processing."
+            )
+
+        result: dict[str, Any] = {
+            "status": "success",
+            "csv_path": str(csv_path),
+            "metadata_path": str(meta_path),
+            "provenance": provenance,
+        }
+        if warning:
+            result["warning"] = warning
+        return result

@@ -20,13 +20,13 @@ Supports both:
 """
 
 import logging
-from typing import Any, Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
 import numpy as np
 import pandas as pd
 
-from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.context import ensure_initialized, evo_context
 
 logger = logging.getLogger(__name__)
 
@@ -130,14 +130,8 @@ async def download_interval_data(
     holes_jmespath = f"collections[{collection_idx}].holes"
     holes_table = await obj.download_table(holes_jmespath)
     holes_df = holes_table.to_pandas()
-    
-    # Download the hole ID lookup
-    hole_id_lookup_jmespath = "location.hole_id"
-    hole_id_table = await obj.download_category_table(hole_id_lookup_jmespath)
-    hole_id_df = hole_id_table.to_pandas()
-    
+        
     # Get the lookup table for hole IDs
-    location_hole_id = obj_dict['location']['hole_id']
     lookup_jmespath = "location.hole_id.table"
     lookup_table = await obj.download_table(lookup_jmespath)
     lookup_df = lookup_table.to_pandas()

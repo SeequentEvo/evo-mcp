@@ -21,7 +21,6 @@ import logging
 from pathlib import Path
 from typing import Optional, Union
 from uuid import UUID
-from typing import Optional
 
 import pandas as pd
 from evo.common.utils import Cache

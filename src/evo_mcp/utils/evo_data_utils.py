@@ -12,10 +12,10 @@ from evo.common import APIConnector
 from evo.common.io import ChunkedIOManager, HTTPSource, StorageDestination
 from evo.objects import ObjectAPIClient
 
-from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.context import ensure_initialized, evo_context
 from evo_mcp.utils.data_analysis_utils import (
-    get_downhole_collection,
     get_collection_info,
+    get_downhole_collection,
     get_object_type,
 )
 
