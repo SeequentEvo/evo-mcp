@@ -16,7 +16,7 @@ from .object_build_tools import register_object_builder_tools
 
 __all__ = [
     "register_admin_tools",
-    'register_data_analysis_tools',
+    "register_data_analysis_tools",
     "register_file_tools",
     "register_filesystem_tools",
     "register_general_tools",
