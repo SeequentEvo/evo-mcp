@@ -6,6 +6,7 @@
 A FastMCP server that provides tools for interacting with the Evo platform,
 including workspace management, object ops, and data transfer.
 
+
 Configuration:
     Set MCP_TOOL_FILTER environment variable to filter tools and prompts:
     - "admin"   : Workspace management tools
@@ -13,7 +14,8 @@ Configuration:
     - "compute" : Compute and geostatistics tools
     - "dev"     : Dev tools for staging inspection and fixture management
                   (staging_seed, staging_reset, staging_get_info, staging_gc)
-    - "all"     : All tools except dev tools (default)
+    - "skills"  : Skill sync tools for local AI tool integration
+    - "all"     : All tools except dev and skills tools (default)
 
     Set MCP_TRANSPORT environment variable to choose transport mode:
     - "stdio" (default): Standard input/output, used by VS Code, Cursor, Claude Desktop
@@ -79,7 +81,8 @@ TOOL_FILTER = os.getenv(
         "all",
     ),
 ).lower()
-VALID_TOOL_FILTERS = ["admin", "data", "compute", "dev", "all"]
+
+VALID_TOOL_FILTERS = ["admin", "data", "compute", "dev", "skills", "all"]
 
 if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
@@ -122,11 +125,18 @@ def _get_objects_reference_content() -> str:
 # Tools - Conditionally registered based on TOOL_FILTER
 # =============================================================================
 
+
 # Always register general tools (workspace discovery, object queries, etc.)
 register_general_tools(mcp)
 
-# Skills sync — always available so chat users can install skills locally
-register_skills_sync_tools(mcp, skills_folder)
+
+# Skills sync tools — register in 'all' and 'skills' modes
+if TOOL_FILTER in ["all", "skills"]:
+    register_skills_sync_tools(mcp, skills_folder)
+    if TOOL_FILTER == "skills":
+        print("Evo MCP Server configured for Skills Sync Tools")
+    else:
+        print("Evo MCP Server configured - Skills tools enabled")
 
 # Dev tools — only register when explicitly requested (not included in "all")
 if TOOL_FILTER == "dev":

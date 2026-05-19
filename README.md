@@ -282,9 +282,11 @@ When using HTTP mode, the MCP server must be running and reachable at the config
 ##### MCP tool filtering (optional)
 
 Set `MCP_TOOL_FILTER` environment variable in `.env` to filter available tools:
-- `admin` - Workspace/instance management and bulk data operations
-- `data` - Object import, download and query operations  
-- `all` - All tools (default)
+- `admin`   - Workspace/instance management and bulk data operations
+- `data`    - Object import, download and query operations
+- `compute` - Compute and geostatistics tools
+- `skills`  - Skill sync tools for local AI tool integration (for Copilot, Claude, Cursor, etc.)
+- `all`     - All tools except dev tools (default; includes skills tools)
 
 ```bash
 MCP_TOOL_FILTER=all
