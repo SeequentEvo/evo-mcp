@@ -363,10 +363,11 @@ if __name__ == "__main__":
     if TRANSPORT == "http":
         logger.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
         if CLIENT_DELEGATED_AUTH:
+            oidcproxy_redirect_path = os.getenv("OIDCPROXY_REDIRECT_PATH", "/signin-callback")
             logger.info(
-                "OAuth upstream callback URL: %s/auth/callback — "
-                "register this as an allowed redirect URI in your auth client.",
+                "OAuth upstream callback URL: %s%s — register this as an allowed redirect URI in your auth client.",
                 public_base_url.rstrip("/"),
+                oidcproxy_redirect_path,
             )
         middleware = [Middleware(AuthMetadataPatchMiddleware)] if CLIENT_DELEGATED_AUTH else []
         mcp.run(

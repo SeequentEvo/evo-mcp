@@ -275,9 +275,15 @@ Note: The service app must be explicitly granted access to your Evo instance and
 
 </details>
 
-##### Authentication and transport modes
+##### Client-delegated authentication for multi-session scenarios (optional)
+When the server is running in HTTP mode, you can choose to enable client-delegated authentication to support multiple sessions with different users/identities. In this mode, each client (VS Code, Cursor, etc.) authenticates separately via OIDCProxy and holds its own token. The server maintains separate Evo sessions per client token. This is suitable for multi-user shared server scenarios where each user needs to authenticate with their own Bentley account and access their own Evo workspaces.
 
-How authentication works is controlled by three settings: `MCP_TRANSPORT`, `AUTH_METHOD`, and `CLIENT_DELEGATED_AUTH`.
+
+**Definitions**
+- **Server-managed auth (default)**: The MCP server is the OAuth client. It handles authentication internally. All clients share the same Evo session and identity. Suitable for single-identity workflows where the server is only accessible to a single user or service account.
+- **Client-delegated auth**: Each MCP client (VS Code, Cursor, etc.) is an independent OAuth client. Each client authenticates separately via OIDCProxy and holds its own token. The server maintains separate Evo sessions per client token. Suitable for multi-user shared server scenarios where each user needs to authenticate with their own Bentley account and access their own Evo workspaces.
+
+The authentication flow (server-managed vs. client-delegated) is controlled by three settings: `MCP_TRANSPORT`, `AUTH_METHOD`, and `CLIENT_DELEGATED_AUTH`. The table below outlines the behaviour of the server under the valid combinations of these settings.
 
 | `MCP_TRANSPORT` | `CLIENT_DELEGATED_AUTH` | `AUTH_METHOD` | Behaviour | Client-delegated |
 |---|---|---|---|:-:|
@@ -287,11 +293,17 @@ How authentication works is controlled by three settings: `MCP_TRANSPORT`, `AUTH
 | `http` | `false` (default) | `client_credentials` | Server fetches a service token automatically. All HTTP clients share the same token. | ❌ |
 | `http` | `true` | `native_app` | Each MCP client authenticates independently via OAuth browser flow (OIDCProxy). `AUTH_METHOD` is not used. | ✅ |
 
-> **Server-managed auth** (`CLIENT_DELEGATED_AUTH=false`, default): The MCP server is the OAuth client — it authenticates with Bentley IMS on its own, either via a browser sign-in (`AUTH_METHOD=native_app`) or automatically (`AUTH_METHOD=client_credentials`). All connecting AI clients share a single Evo identity and session. The token is cached on disk between restarts.
 
-> **Client-delegated auth** (`CLIENT_DELEGATED_AUTH=true`, HTTP + `native_app` only): The MCP server acts as an OAuth authorization server. Each connecting AI client (VS Code, Cursor, etc.) is directed through its own browser-based sign-in via OIDCProxy. Every client holds its own Bearer token, passed in the `Authorization` header of each MCP request. The server maintains a separate Evo session per token — each user sees only the Evo instances and workspaces their own Bentley account has access to.
+**Redirect URL configuration:**
 
-> **Note**: `CLIENT_DELEGATED_AUTH=true` is only valid with `MCP_TRANSPORT=http` and `AUTH_METHOD=native_app`.
+  Based on the authentication mode, the redirect URL for OAuth will be configured differently. Ensure you set the correct redirect URL in your iTwin app registration and the correct environment variable in your `.env` file.
+
+  - **Server-managed auth**: ``EVO_REDIRECT_URL`` — used only in managed auth mode where the MCP server will manage the OAuth callback and token storage (e.g. ``http://localhost:3000/signin-callback``). In this mode, the hostname and port combination must be different to the ``MCP_HTTP_HOST:MCP_HTTP_PORT`` to avoid conflicts (e.g. if `MCP_HTTP_HOST=localhost` and `MCP_HTTP_PORT=5000`, use `EVO_REDIRECT_URL=http://localhost:3000/signin-callback`).
+
+  - **Client-delegated auth**: ``OIDCPROXY_REDIRECT_PATH`` — the path on *this* MCP server where IMS sends the OAuth callback in delegated auth mode. The full url will be `http://{MCP_PUBLIC_BASE_URL}/signin-callback` (e.g. `http://localhost:5000/signin-callback` or `http://my.evo.mcp.server.com/signin-callback`). 
+  
+  **Note**: MCP_PUBLIC_BASE_URL defaults to `http://{MCP_HTTP_HOST}:{MCP_HTTP_PORT}` if not set. The full redirect URL will be `http://{MCP_HTTP_HOST}:{MCP_HTTP_PORT}/signin-callback`. 
+
 
 ##### MCP transport mode (optional)
 
@@ -435,6 +447,8 @@ To verify that the Evo MCP server is correctly configured in Cursor:
 - **STDIO mode starts on demand**: In `STDIO` mode, VS Code/Cursor will launch the MCP server when needed.
 - **HTTP mode needs a running server**: If you select `HTTP`, the server must already be running. The setup script can start it for you in the current terminal session so you can see live output.
 - **Check your environment variables**: Ensure `EVO_CLIENT_ID` and `EVO_REDIRECT_URL` are set in your `.env` file before connecting.
+    
+- **`invalid_token` errors in delegated mode**: If you see `"error": "invalid_token"` after the server times out waiting for authentication, the client likely holds stale tokens from a previous registration. **Resolution:** Clear your MCP client's saved tokens/credentials for this server and reconnect — the client will re-register via DCR and obtain fresh tokens. Also verify that the redirect URI registered in your IMS application matches `{MCP_PUBLIC_BASE_URL}/signin-callback` (or your custom `OIDCPROXY_REDIRECT_PATH`).
 - **Reload after changes**: If you edit settings or `.env` values, reload the window so the client picks up the new config.
 
 ---

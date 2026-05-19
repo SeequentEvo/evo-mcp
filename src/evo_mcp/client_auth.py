@@ -20,12 +20,10 @@ def create_auth_provider(base_url: str):
     Dynamic Client Registration for MCP clients and proxies the OAuth
     authorization code flow to Bentley IMS.
 
-    In HTTP mode, the MCP server itself receives the OAuth callback from IMS.
-    The upstream callback URL is ``{base_url}/auth/callback`` — this must be
-    registered as an allowed redirect URI in the iTwin/IMS application.
-
-    Note: This is NOT the same as EVO_REDIRECT_URL, which is only used in
-    non-delegated mode where the evo SDK runs its own local callback server.
+    In delegated auth mode, the MCP server itself receives the OAuth callback from IMS.
+    The callback path defaults to ``/signin-callback`` and can be overridden via
+    the ``OIDCPROXY_REDIRECT_PATH`` env var.  The full redirect URI registered
+    in your Bentley IMS application must be ``{MCP_PUBLIC_BASE_URL}{path}``.
 
     Args:
         base_url: The public base URL of this server (e.g. "http://localhost:5001").
@@ -40,9 +38,9 @@ def create_auth_provider(base_url: str):
     issuer_url = os.getenv("ISSUER_URL", "https://ims.bentley.com")
     config_url = f"{issuer_url}/.well-known/openid-configuration"
 
-    # In HTTP mode the MCP server receives the OAuth callback — not the SDK's
-    # local server.  Use the OIDCProxy default path (/auth/callback) so the
-    # redirect URI is deterministic: {base_url}/auth/callback.
+    # Allow overriding the redirect path for environments where the default
+    # /signin-callback conflicts with other routes or IMS app registration.
+    redirect_path = os.getenv("OIDCPROXY_REDIRECT_PATH", "/signin-callback")
 
     # Bentley IMS native/SPA apps are public clients (no client secret).
     # The proxy authenticates upstream using PKCE only.
@@ -54,7 +52,8 @@ def create_auth_provider(base_url: str):
         client_secret="unused",
         token_endpoint_auth_method="none",
         base_url=base_url,
-        require_authorization_consent=False,
+        redirect_path=redirect_path,
+        require_authorization_consent="external",
         extra_authorize_params={"scope": evo_scopes},
         # MCP clients send an RFC 8707 resource indicator (the MCP server URL).
         # Do not forward it to Bentley IMS — IMS has its own resource model and

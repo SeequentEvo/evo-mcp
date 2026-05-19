@@ -147,7 +147,7 @@ sequenceDiagram
     Note over MCP: OIDCProxy strips RFC 8707<br/>"resource" parameter<br/>(forward_resource=False)
     MCP->>IMS: GET /authorize<br/>?client_id=EVO_CLIENT_ID&code_challenge=...
     IMS-->>IMS: User signs in via browser
-    IMS->>MCP: GET /auth/callback?code=AUTH_CODE
+    IMS->>MCP: GET /sigini-callback?code=AUTH_CODE
     MCP->>IMS: POST /token (exchange auth code + PKCE verifier)
     IMS-->>MCP: IMS access token (upstream)
 
@@ -185,7 +185,7 @@ sequenceDiagram
 |----------|-----------|
 | `forward_resource=False` | MCP clients send RFC 8707 `resource` parameter. Bentley IMS rejects unknown resource URLs with `invalid_target`. OIDCProxy strips it before forwarding to IMS. |
 | `token_endpoint_auth_method: "none"` | AI clients are public OAuth clients (no client secret). IMS native/SPA apps use PKCE only. |
-| Fixed `/auth/callback` path | In HTTP mode, the MCP server itself receives the IMS OAuth callback (not the evo SDK's local server). The redirect URI is `{MCP_PUBLIC_BASE_URL}/auth/callback`. |
+| Configurable redirect path | In CLIENT DELEGATED AUTH mode, the MCP server receives the IMS OAuth callback. The callback path defaults to `/signin-callback` and can be overridden via `OIDCPROXY_REDIRECT_PATH`. The full redirect URI registered in IMS must be `{MCP_PUBLIC_BASE_URL}{OIDCPROXY_REDIRECT_PATH}`. |
 | Composite session key | `sha256(user_sub + mcp-session-id)` prevents session-ID spoofing — even with a forged header, the `sub` claim from the JWT differs per user. |
 
 ## Session lifecycle (delegated mode)
@@ -233,6 +233,17 @@ If the `mcp-session-id` header is absent (fallback), the raw token is used inste
 | **TTL expiry** (default: 1 hour since last access) | Context evicted on next cache operation |
 | **Max size exceeded** (default: 1000 sessions) | Least-recently-used context evicted |
 | **Eviction hook** | `cleanup()` called → removes temp directory; matching `session_locks` entry removed |
+
+## Security: Authorization consent screen
+
+When `CLIENT_DELEGATED_AUTH=true`, the OIDCProxy is configured with `require_authorization_consent="external"`. This means the built-in consent screen is skipped because Bentley IMS handles user consent/login directly as the upstream identity provider.
+
+| Environment | Guidance |
+|-------------|----------|
+| **Local development** | No consent warning is shown — IMS handles consent upstream. |
+| **Production / shared deployment** | IMS already acts as the consent boundary. If you need an additional local consent gate, set `require_authorization_consent=True` in `create_auth_provider()` to protect against [confused deputy attacks](https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices#confused-deputy-problem). |
+
+> **Note:** Enabling the consent screen in production is a future deployment task and is not required for local testing.
 
 ## Current workarounds
 
