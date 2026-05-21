@@ -34,7 +34,7 @@ class EvoContextBase(ABC):
     """
 
     def __init__(self):
-        self.transport: Optional[AioTransport] = None
+        self._transport: Optional[AioTransport] = None
         self.cache_path: Optional[Path] = None
         self.connector: Optional[APIConnector] = None
         self.workspace_client: Optional[WorkspaceAPIClient] = None
@@ -76,13 +76,13 @@ class EvoContextBase(ABC):
 
     # -- Shared helpers -----------------------------------------------------
 
-    def get_transport(self) -> AioTransport:
-        if self.transport is not None:
-            return self.transport
-        from evo_mcp import __dist_name__, __version__
+    @property
+    def transport(self) -> AioTransport:
+        if self._transport is None:
+            from evo_mcp import __dist_name__, __version__
 
-        self.transport = AioTransport(user_agent=f"{__dist_name__}/{__version__}")
-        return self.transport
+            self._transport = AioTransport(user_agent=f"{__dist_name__}/{__version__}")
+        return self._transport
 
     async def discover_and_build(
         self,
@@ -96,9 +96,8 @@ class EvoContextBase(ABC):
         they are reused; otherwise the Discovery API is queried.
         """
         discovery_url = os.getenv("EVO_DISCOVERY_URL")
-        transport = self.get_transport()
         authorizer = await self.get_authorizer()
-        discovery_connector = APIConnector(discovery_url, transport, authorizer)
+        discovery_connector = APIConnector(discovery_url, self.transport, authorizer)
         self.discovery_client = DiscoveryAPIClient(discovery_connector)
 
         self.org_id = seed_org_id
@@ -121,13 +120,13 @@ class EvoContextBase(ABC):
                 )
             self.hub_url = org.hubs[0].url
 
-        self.connector = APIConnector(self.hub_url, transport, authorizer)
+        self.connector = APIConnector(self.hub_url, self.transport, authorizer)
         self.workspace_client = WorkspaceAPIClient(self.connector, self.org_id)
 
     async def switch_instance(self, org_id: UUID, hub_url: str) -> None:
         self.org_id = org_id
         self.hub_url = hub_url
-        self.connector = APIConnector(hub_url, self.get_transport(), await self.get_authorizer())
+        self.connector = APIConnector(hub_url, self.transport, await self.get_authorizer())
         self.workspace_client = WorkspaceAPIClient(self.connector, org_id)
 
     async def get_object_client(self, workspace_id: UUID) -> ObjectAPIClient:
