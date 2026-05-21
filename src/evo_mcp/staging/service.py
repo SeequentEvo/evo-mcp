@@ -2,14 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""Staging service: centralized facade used by all tool modules.
+"""Staging service: centralized facade for object staging.
 
-Combines what was previously split across ``StagingService`` and
-``MemoryStageStore`` into a single class. A module-level singleton
-``staging_service`` is provided for use by all tool modules::
-
-    from evo_mcp.staging.service import staging_service
-
+Each ``EvoContextBase`` instance owns its own ``StagingService`` so that
+staged objects are session-isolated in multi-user deployments.
 """
 
 import uuid
@@ -28,7 +24,6 @@ from evo_mcp.staging.objects import staged_object_type_registry
 __all__ = [
     "StagingService",
     "now_iso",
-    "staging_service",
 ]
 
 _DEFAULT_TTL_SECONDS = 3600
@@ -241,7 +236,3 @@ class StagingService:
             raise StageNotFoundError(stage_id)
         envelope = self._check_expiry(envelope)
         return envelope, self._payloads[stage_id]
-
-
-# Module-level singleton shared by all tool modules.
-staging_service = StagingService()

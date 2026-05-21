@@ -34,9 +34,6 @@ from fastmcp.utilities.logging import configure_logging
 from starlette.middleware import Middleware
 
 from evo_mcp.client_auth import AuthMetadataPatchMiddleware, create_auth_provider
-from evo_mcp.session import object_registry
-from evo_mcp.staging import runtime as staging_runtime
-from evo_mcp.staging.service import staging_service
 from evo_mcp.tools import (
     register_admin_tools,
     register_compute_tools,
@@ -47,9 +44,6 @@ from evo_mcp.tools import (
     register_object_builder_tools,
     register_object_staging_tools,
 )
-
-staging_runtime.configure(object_registry, staging_service)
-
 
 logger = logging.getLogger(__name__)
 OBJECTS_REFERENCE_UNAVAILABLE = "Objects reference information is currently unavailable."

@@ -18,6 +18,7 @@ from evo.common.typed import BoundingBox
 from evo.objects.typed import BlockModel, Point3, Size3d, Size3i
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from evo_mcp.context import get_evo_context
 from evo_mcp.staging.errors import StageValidationError
 from evo_mcp.staging.helpers import (
     Point3Schema,
@@ -30,7 +31,6 @@ from evo_mcp.staging.objects.base import (
     Interaction,
     staged_object_type_registry,
 )
-from evo_mcp.staging.runtime import get_registry, get_staging_service
 from evo_mcp.utils.tool_support import resolve_crs
 
 
@@ -162,11 +162,12 @@ async def _create(params: RegularBlockModelCreateParams) -> dict[str, Any]:
         block_size=block_size,
     )
 
-    envelope = get_staging_service().stage_local_build(
+    ctx = await get_evo_context()
+    envelope = ctx.object_staging.stage_local_build(
         object_type="regular_block_model",
         typed_payload=typed_data,
     )
-    get_registry().register(
+    ctx.object_registry.register(
         name=params.object_name,
         object_type="regular_block_model",
         stage_id=envelope.stage_id,
