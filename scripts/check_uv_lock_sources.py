@@ -43,9 +43,7 @@ _ALLOWED = re.compile(
 
 
 def _is_excluded_dir(name: str) -> bool:
-    if name in _EXCLUDED_DIR_NAMES:
-        return True
-    return name.startswith(".") and name not in {".", ".."}
+    return name in _EXCLUDED_DIR_NAMES or name.startswith(".")
 
 
 def find_uv_lock_files(root: Path) -> list[Path]:
