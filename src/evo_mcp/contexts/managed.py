@@ -100,9 +100,8 @@ class ManagedAuthContext(EvoContextBase):
         issuer_url = os.getenv("ISSUER_URL")
         if not client_id or not client_secret:
             raise ValueError("EVO_CLIENT_ID and EVO_CLIENT_SECRET are required for client_credentials auth")
-        transport = self.get_transport()
         oauth_connector = OAuthConnector(
-            transport=transport, client_id=client_id, client_secret=client_secret, base_uri=issuer_url
+            transport=self.transport, client_id=client_id, client_secret=client_secret, base_uri=issuer_url
         )
         authorizer = ClientCredentialsAuthorizer(oauth_connector, scopes=EvoScopes.all_evo)
         headers = await authorizer.get_default_headers()
@@ -119,8 +118,7 @@ class ManagedAuthContext(EvoContextBase):
             raise ValueError("EVO_CLIENT_ID environment variable is required")
 
         logger.info("Starting OAuth login flow...")
-        transport = self.get_transport()
-        oauth_connector = OAuthConnector(transport=transport, client_id=client_id, base_uri=issuer_url)
+        oauth_connector = OAuthConnector(transport=self.transport, client_id=client_id, base_uri=issuer_url)
         auth_code_authorizer = AuthorizationCodeAuthorizer(
             oauth_connector=oauth_connector,
             redirect_url=redirect_url,
