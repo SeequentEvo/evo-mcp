@@ -21,3 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/linting
+
+  run-tests:
+    uses: ./.github/workflows/run-all-tests.yaml

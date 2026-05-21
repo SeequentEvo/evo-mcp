@@ -1,0 +1,27 @@
+name: Run tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+  workflow_call:
+
+jobs:
+  run-tests:
+    name: Test (${{ matrix.os }}, py${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/testing
+        with:
+          PYTHON_VERSION: ${{ matrix.python-version }}
