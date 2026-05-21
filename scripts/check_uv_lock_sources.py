@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -57,21 +58,10 @@ def find_uv_lock_files(root: Path) -> list[Path]:
 
     root = root.resolve()
     matches: list[Path] = []
-
-    def walk(directory: Path) -> None:
-        try:
-            entries = list(directory.iterdir())
-        except (PermissionError, FileNotFoundError):
-            return
-        for entry in entries:
-            if entry.is_dir():
-                if _is_excluded_dir(entry.name):
-                    continue
-                walk(entry)
-            elif entry.is_file() and entry.name == "uv.lock":
-                matches.append(entry)
-
-    walk(root)
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if not _is_excluded_dir(d)]
+        if "uv.lock" in filenames:
+            matches.append(Path(dirpath) / "uv.lock")
     return sorted(matches)
 
 
