@@ -8,19 +8,19 @@ Wraps the staging service and provides name-based object tracking.
 Domain tools register objects after creation; downstream tools resolve
 objects by name.  Users never see stage_ids.
 
+Each ``EvoContextBase`` instance owns its own ``ObjectRegistry``.
+
 Usage::
 
-    from evo_mcp.session import object_registry
-
-    # Domain tool creates an object, then registers it
-    envelope = staging_service.stage_local_build(...)
-    entry = object_registry.register(
+    evo_context = await get_evo_context()
+    envelope = evo_context.object_staging.stage_local_build(...)
+    entry = evo_context.object_registry.register(
         name="CU variogram",
         object_type="variogram",
         stage_id=envelope.stage_id,
     )
     # Downstream tool resolves by name
-    entry, payload = object_registry.get_payload("CU variogram")
+    entry, payload = evo_context.object_registry.get_payload("CU variogram")
 """
 
 from dataclasses import replace
@@ -33,7 +33,6 @@ from evo_mcp.staging.service import StagingService, now_iso
 __all__ = [
     "ObjectRegistry",
     "ResolutionError",
-    "object_registry",
 ]
 
 
@@ -185,13 +184,3 @@ class ObjectRegistry:
 
     def __len__(self) -> int:
         return len(self._entries)
-
-
-# Module-level singleton shared by all tool modules.
-def _create_default_registry() -> ObjectRegistry:
-    from evo_mcp.staging.service import staging_service
-
-    return ObjectRegistry(staging_service)
-
-
-object_registry = _create_default_registry()

@@ -184,8 +184,7 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
-            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "get_evo_context", AsyncMock(return_value=fake_context)),
             patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
         ):
             result = await admin_tools._run_duplicate_analysis(
@@ -268,8 +267,7 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
-            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "get_evo_context", AsyncMock(return_value=fake_context)),
         ):
             result = await admin_tools._run_duplicate_analysis(
                 workspace_ids=None,
@@ -320,8 +318,7 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
-            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "get_evo_context", AsyncMock(return_value=fake_context)),
             patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
         ):
             result = await admin_tools._run_duplicate_analysis(
@@ -377,8 +374,7 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
-            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "get_evo_context", AsyncMock(return_value=fake_context)),
             patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
         ):
             result = await admin_tools._run_duplicate_analysis(
@@ -431,8 +427,7 @@ class DuplicateToolsTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch.object(admin_tools, "ensure_initialized", AsyncMock()),
-            patch.object(admin_tools, "evo_context", fake_context),
+            patch.object(admin_tools, "get_evo_context", AsyncMock(return_value=fake_context)),
             patch.object(admin_tools, "ObjectAPIClient", _FakeObjectAPIClient),
         ):
             result = await admin_tools._preview_workspaces()

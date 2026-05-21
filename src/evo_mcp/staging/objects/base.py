@@ -25,8 +25,8 @@ import abc
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
+from evo_mcp.context import get_evo_context
 from evo_mcp.staging.errors import StageValidationError
-from evo_mcp.staging.runtime import get_registry
 
 __all__ = [
     "EvoStagedObjectType",
@@ -159,7 +159,9 @@ class StagedObjectType(abc.ABC):
 
         The payload is fetched internally from the registry using ``object_name``.
         """
-        _, payload = get_registry().get_payload(name=object_name, object_type=self.object_type)
+        _, payload = (await get_evo_context()).object_registry.get_payload(
+            name=object_name, object_type=self.object_type
+        )
         return await self._dispatch(self.get_interaction(name), payload, params)
 
 

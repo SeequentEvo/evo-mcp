@@ -5,16 +5,17 @@
 """evo_mcp session sub-package.
 
 Provides the session-scoped object registry that maps user-facing
-names to internal staged objects.  This is the bridge between
-domain-language tools and the staging infrastructure.
+names to internal staged objects.  Each EvoContext owns its own
+ObjectRegistry instance for session isolation.
 
 Usage::
 
-    from evo_mcp.session import object_registry
+    evo_context = await get_evo_context()
+    evo_context.object_registry.register(name=..., ...)
 """
 
 from evo_mcp.session.models import RegistryEntry, RegistryStatus
-from evo_mcp.session.registry import ObjectRegistry, object_registry
+from evo_mcp.session.registry import ObjectRegistry
 from evo_mcp.session.resolver import DuplicateNameError, ObjectResolver, ResolutionError
 
 __all__ = [
@@ -24,5 +25,4 @@ __all__ = [
     "RegistryEntry",
     "RegistryStatus",
     "ResolutionError",
-    "object_registry",
 ]

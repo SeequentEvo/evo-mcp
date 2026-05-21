@@ -28,6 +28,9 @@ class EvoContextBase(ABC):
     Holds the Evo API clients and org metadata directly as instance attributes.
     Tools call ``get_evo_context()`` to obtain an initialized instance, then
     access attributes and helpers without knowing which auth mode is active.
+
+    Each context owns its own ``object_registry`` and ``object_staging`` instances
+    so that staged objects are session-isolated in multi-user (delegated auth) mode.
     """
 
     def __init__(self):
@@ -38,6 +41,28 @@ class EvoContextBase(ABC):
         self.discovery_client: Optional[DiscoveryAPIClient] = None
         self.org_id: Optional[UUID] = None
         self.hub_url: Optional[str] = None
+
+        # Session-scoped staging layer (lazy — created on first access)
+        self._object_staging = None
+        self._object_registry = None
+
+    @property
+    def object_staging(self):
+        """Per-session staging service, created on first access."""
+        if self._object_staging is None:
+            from evo_mcp.staging.service import StagingService
+
+            self._object_staging = StagingService()
+        return self._object_staging
+
+    @property
+    def object_registry(self):
+        """Per-session object registry, created on first access."""
+        if self._object_registry is None:
+            from evo_mcp.session.registry import ObjectRegistry
+
+            self._object_registry = ObjectRegistry(self.object_staging)
+        return self._object_registry
 
     # -- Abstract contract --------------------------------------------------
 

@@ -28,11 +28,11 @@ from typing import Any, Literal
 
 from evo.objects.typed import object_from_uuid
 
-from evo_mcp.session import ResolutionError, object_registry
+from evo_mcp.context import get_evo_context
+from evo_mcp.session import ResolutionError
 from evo_mcp.staging.errors import StageError
 from evo_mcp.staging.objects import staged_object_type_registry
 from evo_mcp.staging.objects.base import EvoStagedObjectType
-from evo_mcp.staging.service import staging_service
 from evo_mcp.utils.tool_support import (
     build_links_from_metadata,
     get_workspace_context,
@@ -108,8 +108,9 @@ def register_object_staging_tools(mcp) -> None:
                               to discover available names.
             params: Optional parameters for the interaction (depends on interaction).
         """
+        evo_context = await get_evo_context()
         try:
-            entry = object_registry.resolve(name=object_name)
+            entry = evo_context.object_registry.resolve(name=object_name)
         except ResolutionError as exc:
             raise ValueError(str(exc)) from exc
 
@@ -160,17 +161,18 @@ def register_object_staging_tools(mcp) -> None:
         Args:
             object_name: Name of the staged object to remove.
         """
+        evo_context = await get_evo_context()
         try:
-            entry = object_registry.resolve(name=object_name)
+            entry = evo_context.object_registry.resolve(name=object_name)
         except ResolutionError as exc:
             raise ValueError(str(exc)) from exc
 
         try:
-            staging_service.discard_stage(entry.stage_id)
+            evo_context.object_staging.discard_stage(entry.stage_id)
         except StageError as exc:
             raise ValueError(str(exc)) from exc
 
-        object_registry.deregister(entry.name, entry.object_type)
+        evo_context.object_registry.deregister(entry.name, entry.object_type)
         return {
             "object_name": entry.name,
             "object_type": entry.object_type,
@@ -188,7 +190,8 @@ def register_object_staging_tools(mcp) -> None:
         limit: int = 100,
     ) -> dict[str, Any]:
         """List active or filtered stages. Optionally filter by object_type, workspace_id, or status."""
-        envelopes = staging_service.list_stages(
+        evo_context = await get_evo_context()
+        envelopes = evo_context.object_staging.list_stages(
             object_type=object_type,
             workspace_id=workspace_id,
             status=status,
@@ -243,13 +246,14 @@ def register_object_staging_tools(mcp) -> None:
         data, source_ref_extras, message = await descriptor.import_handler(obj, context)
         source_ref.update(source_ref_extras)
 
-        envelope = staging_service.stage_imported_object(
+        evo_context = await get_evo_context()
+        envelope = evo_context.object_staging.stage_imported_object(
             object_type=descriptor.object_type,
             typed_payload=data,
             workspace_id=workspace_id,
             source_ref=source_ref,
         )
-        object_registry.register(
+        evo_context.object_registry.register(
             name=data.name,
             object_type=descriptor.object_type,
             stage_id=envelope.stage_id,
@@ -286,13 +290,14 @@ def register_object_staging_tools(mcp) -> None:
         if mode == "new_version" and not object_id:
             raise ValueError("object_id is required when mode='new_version'.")
 
+        evo_context = await get_evo_context()
         try:
-            entry = object_registry.resolve(name=object_name)
+            entry = evo_context.object_registry.resolve(name=object_name)
         except ResolutionError as exc:
             raise ValueError(str(exc)) from exc
 
         try:
-            _, data = staging_service.get_stage_payload(entry.stage_id)
+            _, data = evo_context.object_staging.get_stage_payload(entry.stage_id)
         except StageError as exc:
             raise ValueError(str(exc)) from exc
 
@@ -337,10 +342,10 @@ def register_object_staging_tools(mcp) -> None:
             except Exception as exc:
                 raise ValueError(f"Failed to publish {descriptor.display_name} as a new version: {exc}") from exc
 
-        staging_service.publish_stage(entry.stage_id)
+        evo_context.object_staging.publish_stage(entry.stage_id)
         environment = await get_workspace_environment(workspace_id)
         metadata = published.metadata
-        object_registry.mark_published(
+        evo_context.object_registry.mark_published(
             name=object_name,
             object_type=entry.object_type,
             workspace_id=workspace_id,
