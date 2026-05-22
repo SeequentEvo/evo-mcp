@@ -147,7 +147,7 @@ sequenceDiagram
     Note over MCP: OIDCProxy strips RFC 8707<br/>"resource" parameter<br/>(forward_resource=False)
     MCP->>IMS: GET /authorize<br/>?client_id=EVO_CLIENT_ID&code_challenge=...
     IMS-->>IMS: User signs in via browser
-    IMS->>MCP: GET /sigini-callback?code=AUTH_CODE
+    IMS->>MCP: GET /siginin-callback?code=AUTH_CODE
     MCP->>IMS: POST /token (exchange auth code + PKCE verifier)
     IMS-->>MCP: IMS access token (upstream)
 
