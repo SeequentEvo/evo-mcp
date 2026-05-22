@@ -54,23 +54,22 @@ class _CleanupTTLCache(TTLCache):
                 logger.exception("Failed to clean up context for session %s", key)
         self._locks.pop(key, None)
 
+    def expire(self, time=None):
+        """Override to call cleanup() on TTL-expired items.
+
+        The base ``TTLCache.expire()`` uses ``Cache.__delitem__`` directly,
+        bypassing our ``__delitem__`` override.  We intercept here to ensure
+        cleanup is called for each expired context.
+        """
+        expired = super().expire(time)
+        for key, value in expired:
+            self._cleanup_value(key, value)
+        return expired
+
     def __delitem__(self, key):
         value = self[key]
         super().__delitem__(key)
         self._cleanup_value(key, value)
-
-    def pop(self, key, *args):
-        if key in self:
-            value = self[key]
-            result = super().pop(key)
-            self._cleanup_value(key, value)
-            return result
-        return super().pop(key, *args)
-
-    def popitem(self):
-        key, value = super().popitem()
-        self._cleanup_value(key, value)
-        return key, value
 
     def clear(self):
         items = list(self.items())
