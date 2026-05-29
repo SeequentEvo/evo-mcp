@@ -12,10 +12,10 @@ from evo.common import APIConnector
 from evo.common.io import ChunkedIOManager, HTTPSource, StorageDestination
 from evo.objects import ObjectAPIClient
 
-from evo_mcp.context import evo_context, ensure_initialized
+from evo_mcp.context import ensure_initialized, evo_context
 from evo_mcp.utils.data_analysis_utils import (
-    get_downhole_collection,
     get_collection_info,
+    get_downhole_collection,
     get_object_type,
 )
 
@@ -109,7 +109,9 @@ async def discover_objects(
     return result
 
 
-async def load_downhole_object(workspace_id: str, object_id: str, version: str = "") -> tuple[object, dict, str, str, list[dict]]:
+async def load_downhole_object(
+    workspace_id: str, object_id: str, version: str = ""
+) -> tuple[object, dict, str, str, list[dict]]:
     """Download an Evo downhole object and inspect its collections.
 
     Args:
@@ -122,7 +124,7 @@ async def load_downhole_object(workspace_id: str, object_id: str, version: str =
     """
     obj, obj_dict = await get_downhole_collection(workspace_id, object_id, version)
 
-    object_name = obj_dict.get('name', 'Unknown')
+    object_name = obj_dict.get("name", "Unknown")
     object_type_str = get_object_type(obj_dict)
     collections_info = get_collection_info(obj_dict)
 

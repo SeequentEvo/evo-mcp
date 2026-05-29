@@ -33,12 +33,12 @@ from fastmcp.utilities.logging import configure_logging
 
 from evo_mcp.tools import (
     register_admin_tools,
+    register_data_analysis_tools,
     register_file_tools,
     register_filesystem_tools,
     # register_data_tools,
     register_general_tools,
     register_instance_users_admin_tools,
-    register_data_analysis_tools,
     register_object_builder_tools,
 )
 

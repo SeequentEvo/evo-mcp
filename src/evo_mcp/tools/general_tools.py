@@ -6,6 +6,7 @@
 MCP tools for general operations (health checks, object CRUD, etc).
 """
 
+import logging
 from uuid import UUID
 
 from fastmcp import Context
