@@ -4,11 +4,24 @@
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
 
 PYPI = "https://pypi.org/simple"
+
+_EXCLUDED_DIR_NAMES = frozenset(
+    {
+        ".git",
+        ".tox",
+        "__pycache__",
+        "build",
+        "dist",
+        "node_modules",
+        "venv",
+    }
+)
 
 _SOURCE = re.compile(
     r"""
@@ -29,6 +42,27 @@ _ALLOWED = re.compile(
 )
 
 
+def _is_excluded_dir(name: str) -> bool:
+    return name in _EXCLUDED_DIR_NAMES or name.startswith(".")
+
+
+def find_uv_lock_files(root: Path) -> list[Path]:
+    """Return all ``uv.lock`` files under ``root``, excluding noise directories.
+
+    Excluded directory names: anything in ``_EXCLUDED_DIR_NAMES`` plus any
+    directory whose name starts with ``.`` (e.g. ``.venv``, ``.git``, ``.tox``).
+    Results are sorted for deterministic ordering.
+    """
+
+    root = root.resolve()
+    matches: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if not _is_excluded_dir(d)]
+        if "uv.lock" in filenames:
+            matches.append(Path(dirpath) / "uv.lock")
+    return sorted(matches)
+
+
 def validate_lock_file(lockfile: Path) -> bool:
     for line in lockfile.read_text(encoding="utf-8").splitlines():
         match = _SOURCE.match(line)
@@ -43,7 +77,7 @@ def validate_lock_file(lockfile: Path) -> bool:
 
 
 def main() -> int:
-    lockfiles = sorted(Path.cwd().rglob("uv.lock"))
+    lockfiles = find_uv_lock_files(Path.cwd())
     bad_files = [f for f in lockfiles if not validate_lock_file(f)]
     if bad_files:
         print("uv.lock validation failed:", file=sys.stderr)
