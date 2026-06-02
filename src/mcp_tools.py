@@ -6,12 +6,16 @@
 A FastMCP server that provides tools for interacting with the Evo platform,
 including workspace management, object ops, and data transfer.
 
+
 Configuration:
     Set MCP_TOOL_FILTER environment variable to filter tools and prompts:
     - "admin"   : Workspace management tools
     - "data"    : Object query, file operations, and management tools
     - "compute" : Compute and geostatistics tools
-    - "all"     : All tools (default)
+    - "dev"     : Dev tools for staging inspection and fixture management
+                  (staging_seed, staging_reset, staging_get_info, staging_gc)
+    - "skills"  : Skill sync tools for local AI tool integration
+    - "all"     : All tools except dev and skills tools (default)
 
     Set MCP_TRANSPORT environment variable to choose transport mode:
     - "stdio" (default): Standard input/output, used by VS Code, Cursor, Claude Desktop
@@ -30,6 +34,7 @@ import os
 from pathlib import Path
 
 from fastmcp import FastMCP
+from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from fastmcp.utilities.logging import configure_logging
 from starlette.middleware import Middleware
 
@@ -37,12 +42,14 @@ from evo_mcp.client_auth import AuthMetadataPatchMiddleware, create_auth_provide
 from evo_mcp.tools import (
     register_admin_tools,
     register_compute_tools,
+    register_dev_tools,
     register_file_tools,
     register_filesystem_tools,
     register_general_tools,
     register_instance_users_admin_tools,
     register_object_builder_tools,
     register_object_staging_tools,
+    register_skills_sync_tools,
 )
 
 logger = logging.getLogger(__name__)
@@ -94,7 +101,8 @@ TOOL_FILTER = os.getenv(
         "all",
     ),
 ).lower()
-VALID_TOOL_FILTERS = ["admin", "data", "compute", "all"]
+
+VALID_TOOL_FILTERS = ["admin", "data", "compute", "dev", "skills", "all"]
 
 if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
@@ -108,6 +116,18 @@ server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({T
 public_base_url = os.getenv("MCP_PUBLIC_BASE_URL", f"http://{HTTP_HOST}:{HTTP_PORT}")
 auth_provider = create_auth_provider(public_base_url) if CLIENT_DELEGATED_AUTH else None
 mcp = FastMCP(server_name, auth=auth_provider)
+
+# Resolve skills folder path relative to this file's location
+# __file__ is src/mcp_tools.py, so .parent.parent is the repo root
+skills_folder = Path(__file__).parent.parent / "skills"
+if skills_folder.exists():
+    try:
+        mcp.add_provider(SkillsDirectoryProvider(roots=[skills_folder]))
+        logging.info(f"Registered skill provider at: {skills_folder}")
+    except Exception as e:
+        logging.warning(f"Failed to register skill provider: {e}")
+else:
+    logging.warning(f"Skills folder not found at {skills_folder}")
 
 
 # Show more traceback frame for now, we may want to disabled the rich
@@ -130,15 +150,30 @@ def _get_objects_reference_content() -> str:
 # Tools - Conditionally registered based on TOOL_FILTER
 # =============================================================================
 
+
 # Always register general tools (workspace discovery, object queries, etc.)
 register_general_tools(mcp)
 
-if TOOL_FILTER in ["all", "admin"]:
+
+# Skills sync tools — register in 'all' and 'skills' modes
+if TOOL_FILTER in ["all", "skills"]:
+    register_skills_sync_tools(mcp, skills_folder)
+    if TOOL_FILTER == "skills":
+        print("Evo MCP Server configured for Skills Sync Tools")
+    else:
+        print("Evo MCP Server configured - Skills tools enabled")
+
+# Dev tools — only register when explicitly requested (not included in "all")
+if TOOL_FILTER == "dev":
+    register_dev_tools(mcp)
+    print("DEV MODE: Dev tools registered")
+
+if TOOL_FILTER in ["all", "dev", "admin"]:
     # Admin Agent: Workspace and instance management tools
     # Includes: workspace creation, snapshots, duplication, permissions management
     register_admin_tools(mcp)
     register_instance_users_admin_tools(mcp)
-if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
+if TOOL_FILTER in ["all", "dev", "data"]:  #  "data_agent"
     # register_data_tools(mcp)
     register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
@@ -148,7 +183,7 @@ if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
     else:
         print("Evo MCP Server configured - Data tools enabled")
 
-if TOOL_FILTER in ["all", "compute"]:
+if TOOL_FILTER in ["all", "dev", "compute"]:
     register_compute_tools(mcp)
     register_object_staging_tools(mcp)
     if TOOL_FILTER == "compute":

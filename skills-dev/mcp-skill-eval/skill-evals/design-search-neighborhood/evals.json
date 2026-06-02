@@ -1,0 +1,53 @@
+{
+  "skill_name": "design-search-neighborhood",
+  "setup": {
+    "steps": [
+      {"step": 0, "tool": "staging_reset", "args": {}},
+      {"step": 1, "tool": "staging_seed", "args": {"fixture_files": ["skills-dev/mcp-skill-eval/skill-evals/manage-search-neighborhood/fixtures.json"], "fixture_names": ["dsn_standard_variogram"]}}
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Design a search neighborhood with explicit ranges: major=400, semi_major=300, minor=200, max_samples=20, min_samples=4, rotation dip_azimuth=45, dip=15, pitch=0.",
+      "expected_output": "Neighborhood ellipsoid ranges are major=400, semi_major=300, minor=200. max_samples=20, min_samples=4. Rotation is dip_azimuth=45, dip=15, pitch=0. Derivation mode is user-specified.",
+      "category": "explicit-ranges-happy-path"
+    },
+    {
+      "id": 2,
+      "prompt": "Design a search neighborhood with explicit ranges major=500, semi_major=400, minor=300, max_samples=30. Do not specify rotation or min_samples.",
+      "expected_output": "Neighborhood has ellipsoid ranges 500/400/300, max_samples=30, no min_samples. Rotation defaults to all zeros. Derivation mode is user-specified.",
+      "category": "explicit-ranges-defaults"
+    },
+    {
+      "id": 3,
+      "prompt": "Use the 'DSN Test Variogram' as the variogram source. Derive a search neighborhood from it with scale factor 2.0, max samples 20, min samples 4.",
+      "expected_output": "Search neighborhood has major=400, semi_major=300, minor=200, max_samples=20, min_samples=4, rotation all zeros. Derivation indicates it was scaled from the variogram source.",
+      "category": "variogram-derived-neighborhood"
+    },
+    {
+      "id": 4,
+      "prompt": "Design a search neighborhood specifying only major=400 and max_samples=10.",
+      "expected_output": "The request fails with a validation error indicating that all three ellipsoid ranges (major, semi_major, minor) must be provided.",
+      "category": "error-handling-incomplete-ranges"
+    },
+    {
+      "id": 5,
+      "prompt": "Design a search neighborhood with explicit ranges major=400, semi_major=300, minor=200 but set max_samples to 0.",
+      "expected_output": "The request fails with a validation error indicating that max_samples must be at least 1.",
+      "category": "error-handling-invalid-max-samples"
+    },
+    {
+      "id": 6,
+      "prompt": "Design a search neighborhood with max_samples=50.",
+      "expected_output": "The request fails with a validation error indicating that either explicit ranges or a variogram source must be provided.",
+      "category": "error-handling-no-source"
+    },
+    {
+      "id": 7,
+      "prompt": "Use the 'DSN Test Variogram' and derive a search neighborhood using the moderate preset (2x scaling), max samples 20.",
+      "expected_output": "Neighborhood derived from Standard Spherical Variogram with 2x scaling, resulting in major=400, semi_major=300, minor=200.",
+      "category": "variogram-derived-preset"
+    }
+  ]
+}
