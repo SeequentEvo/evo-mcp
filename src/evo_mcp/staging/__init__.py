@@ -6,7 +6,7 @@
 
 Public surface re-exported for convenience::
 
-    from evo_mcp.staging import staging_service
+    from evo_mcp.staging import StagingService
     from evo_mcp.staging import StagedEnvelope, StageError
 
 Object types (interactions, registry) are accessed via
@@ -16,7 +16,7 @@ to avoid a circular import with ``evo_mcp.session``.
 
 from evo_mcp.staging.errors import StageError
 from evo_mcp.staging.models import ObjectType, StagedEnvelope, StageStatus
-from evo_mcp.staging.service import StagingService, staging_service
+from evo_mcp.staging.service import StagingService
 
 __all__ = [
     "ObjectType",
@@ -24,5 +24,4 @@ __all__ = [
     "StageStatus",
     "StagedEnvelope",
     "StagingService",
-    "staging_service",
 ]

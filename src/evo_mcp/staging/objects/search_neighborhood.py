@@ -24,12 +24,12 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from evo_mcp.context import get_evo_context
 from evo_mcp.staging.objects.base import (
     Interaction,
     StagedObjectType,
     staged_object_type_registry,
 )
-from evo_mcp.staging.runtime import get_registry, get_staging_service
 
 
 class SearchNeighborhoodData(BaseModel):
@@ -93,11 +93,12 @@ async def _create_from_ranges(params: CreateFromRangesParams) -> dict[str, Any]:
         dip=params.dip,
         pitch=params.pitch,
     )
-    envelope = get_staging_service().stage_local_build(
+    ctx = await get_evo_context()
+    envelope = ctx.object_staging.stage_local_build(
         object_type="search_neighborhood",
         typed_payload=data,
     )
-    get_registry().register(
+    ctx.object_registry.register(
         name=params.object_name,
         object_type="search_neighborhood",
         stage_id=envelope.stage_id,

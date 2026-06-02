@@ -15,7 +15,7 @@ from evo.widgets import get_portal_url, get_viewer_url
 from fastmcp import Context
 from pydantic import Field
 
-from evo_mcp.context import ensure_initialized, evo_context
+from evo_mcp.context import get_evo_context
 
 VariogramObjectId = Annotated[
     str,
@@ -93,7 +93,7 @@ def schema_label(obj: Any) -> str | None:
 
 
 async def get_workspace_environment(workspace_id: str) -> Any:
-    await ensure_initialized()
+    evo_context = await get_evo_context()
 
     workspace_uuid = UUID(workspace_id)
     workspace = await evo_context.workspace_client.get_workspace(workspace_uuid)
@@ -101,6 +101,7 @@ async def get_workspace_environment(workspace_id: str) -> Any:
 
 
 async def get_workspace_context(workspace_id: str) -> StaticContext:
+    evo_context = await get_evo_context()
     environment = await get_workspace_environment(workspace_id)
     return StaticContext.from_environment(
         environment,

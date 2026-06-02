@@ -31,10 +31,9 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import configure_logging
+from starlette.middleware import Middleware
 
-from evo_mcp.session import object_registry
-from evo_mcp.staging import runtime as staging_runtime
-from evo_mcp.staging.service import staging_service
+from evo_mcp.client_auth import AuthMetadataPatchMiddleware, create_auth_provider
 from evo_mcp.tools import (
     register_admin_tools,
     register_compute_tools,
@@ -45,9 +44,6 @@ from evo_mcp.tools import (
     register_object_builder_tools,
     register_object_staging_tools,
 )
-
-staging_runtime.configure(object_registry, staging_service)
-
 
 logger = logging.getLogger(__name__)
 OBJECTS_REFERENCE_UNAVAILABLE = "Objects reference information is currently unavailable."
@@ -61,9 +57,33 @@ if TRANSPORT not in VALID_TRANSPORTS:
     TRANSPORT = "stdio"
 
 # Get HTTP configuration if using HTTP transport
-if TRANSPORT == "http":
-    HTTP_HOST = os.getenv("MCP_HTTP_HOST", "localhost")
-    HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
+HTTP_HOST = os.getenv("MCP_HTTP_HOST", "localhost")
+HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
+
+# Whether to enable OAuth authentication for HTTP transport.
+# When enabled, the server acts as an OIDC proxy: MCP clients authenticate
+# via an OAuth browser flow (Dynamic Client Registration + Authorization Code), and the
+# server validates each request's token before forwarding it to Evo APIs.
+# This enables client-delegated auth — each connected client authenticates
+# independently and sees only the instances/workspaces their account has access to.
+#
+# Disable if:
+#   - The server is behind a reverse proxy that already enforces auth
+#   - You are doing local development and don't want to deal with OAuth
+#   - You want server-managed auth (set AUTH_METHOD=client_credentials or
+#     native_app and let the server handle authentication)
+#
+# Defaults to False. Set to true only when MCP_TRANSPORT=http.
+
+CLIENT_DELEGATED_AUTH = os.getenv("CLIENT_DELEGATED_AUTH", "").lower() in ("1", "true")
+
+if CLIENT_DELEGATED_AUTH and TRANSPORT != "http":
+    logging.warning(
+        "CLIENT_DELEGATED_AUTH=true has no effect with MCP_TRANSPORT='%s' — "
+        "OAuth authentication is only supported with HTTP transport. Ignoring.",
+        TRANSPORT,
+    )
+    CLIENT_DELEGATED_AUTH = False
 
 # Get agent type from environment variable
 # This can either be set via MCP inputs, or the .env file used by the agent example
@@ -80,9 +100,14 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
     TOOL_FILTER = "all"
 
+
 # Initialize FastMCP server with agent type in name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
-mcp = FastMCP(server_name)
+# MCP_PUBLIC_BASE_URL supports reverse proxy / TLS deployments where the
+# bind address differs from the public URL clients use for OAuth callbacks.
+public_base_url = os.getenv("MCP_PUBLIC_BASE_URL", f"http://{HTTP_HOST}:{HTTP_PORT}")
+auth_provider = create_auth_provider(public_base_url) if CLIENT_DELEGATED_AUTH else None
+mcp = FastMCP(server_name, auth=auth_provider)
 
 
 # Show more traceback frame for now, we may want to disabled the rich
@@ -356,24 +381,36 @@ if TOOL_FILTER in ["all", "compute"]:
 
 
 # Note: Evo context initialization happens lazily on first tool call
-# via ensure_initialized() because OAuth requires browser interaction
+# via get_evo_context() because OAuth requires browser interaction
 # =============================================================================
 # Main Entry Point
 # =============================================================================
 
 if __name__ == "__main__":
     # Log startup information
-    logger = logging.getLogger(__name__)
+    from fastmcp.utilities.logging import get_logger
+
+    logger = get_logger(__name__)
     logger.info("Starting Evo MCP Server in %s mode", TRANSPORT.upper())
 
     # Run the server with selected transport mode
     if TRANSPORT == "http":
         logger.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
+        if CLIENT_DELEGATED_AUTH:
+            oidcproxy_redirect_path = os.getenv("OIDCPROXY_REDIRECT_PATH", "/signin-callback")
+            logger.info(
+                "OAuth upstream callback URL: %s%s — register this as an allowed redirect URI in your auth client.",
+                public_base_url.rstrip("/"),
+                oidcproxy_redirect_path,
+            )
+        middleware = [Middleware(AuthMetadataPatchMiddleware)] if CLIENT_DELEGATED_AUTH else []
         mcp.run(
             transport="http",
             host=HTTP_HOST,
             port=HTTP_PORT,
+            middleware=middleware,
         )
+
     else:
         # Default STDIO mode
         mcp.run()

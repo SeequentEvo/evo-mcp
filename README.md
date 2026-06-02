@@ -60,14 +60,20 @@ The server comes packaged with many tools written by Seequent, but it is fully e
 ```mermaid
 flowchart LR
     Clients["🖥️ MCP Clients<br/>VS Code · Cursor<br/>Claude Desktop · ADK"]
-    Clients -- stdio / streamable HTTP --> Server
+    Clients -- "stdio / streamable HTTP" --> Server
     Server -- HTTPS --> APIs
 
-    subgraph Server[Evo MCP Server]
-        Tools[Tool Modules<br/>General · Admin<br/>Data · Filesystem]
+    subgraph Server["Evo MCP Server (FastMCP)"]
+        Tools["Tool Modules<br/>General · Admin<br/>Data · Filesystem"]
         Filter[MCP_TOOL_FILTER]
-        Context[EvoContext<br/>OAuth · Tokens]
+        Context[EvoContext<br/>per-session or shared]
+        Proxy["OIDCProxy<br/>(delegated auth only)"]
         Tools --> Filter --> Context
+        Proxy -. "upstream token" .-> Context
+    end
+
+    subgraph IMS["Bentley IMS"]
+        OIDC[OAuth 2.0 / OIDC]
     end
 
     subgraph APIs[Evo APIs]
@@ -75,7 +81,12 @@ flowchart LR
         Workspace[Workspace]
         Object[Object]
     end
+
+    Proxy -- "Proxied OAuth<br/>(delegated)" --> OIDC
+    Context -. "Direct OAuth<br/>(managed)" .-> OIDC
 ```
+
+> See [docs/authentication.md](docs/authentication.md) for detailed sequence diagrams and session lifecycle.
 
 ### Key components
 
@@ -200,11 +211,11 @@ Configure your client (VS Code, Cursor, etc.) to start the MCP server process. T
 
 ##### Streamable HTTP transport
 
-**Recommended for**: Testing, remote access, programmatic access via FastMCP CLI/scripts, and containerised deployments (Docker)
+**Recommended for**: Testing, remote access, programmatic access via FastMCP CLI/scripts, containerised deployments (Docker), and client-delegated shared deployments
 
 HTTP transport turns your MCP server into a web service accessible via a URL. This transport uses the Streamable HTTP protocol, which allows clients to connect over the network. Unlike STDIO where each client gets its own process, an HTTP server can handle multiple clients simultaneously.
 
-The Streamable HTTP protocol provides full bidirectional communication between client and server, supporting all MCP operations including streaming responses. This makes it the recommended choice for network-based deployments.
+The Streamable HTTP protocol provides full bidirectional communication between client and server, supporting all MCP operations including streaming responses. Combined with `CLIENT_DELEGATED_AUTH=true`, HTTP transport supports multiple concurrent user sessions each authenticating with their own Bentley account.
 
 **Advantages**
 - Can be accessed via FastMCP CLI, programming languages, or HTTP clients
@@ -213,6 +224,7 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 - Simplifies integration with custom tools and scripts
 - Ideal for containerised deployments (Docker, Kubernetes)
 - Works well in cloud environments and microservices architectures
+- Supports concurrent user sessions when `CLIENT_DELEGATED_AUTH=true`
 
 **Limitations**
 - Requires separate server process management
@@ -220,14 +232,16 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 
 ##### Common use cases
 
-| Use case | Recommended mode |
-|----------|-----------------|
-| Using VS Code with Copilot | STDIO |
-| Using Cursor with AI | STDIO |
-| Using Claude Desktop | STDIO |
-| Testing tools with FastMCP CLI | Streamable HTTP |
-| Remote server access | Streamable HTTP |
-| Custom script integration | Streamable HTTP |
+| Use case | Recommended transport | `CLIENT_DELEGATED_AUTH` |
+|----------|----------------------|-------------------|
+| Using VS Code with Copilot | STDIO | `false` |
+| Using Cursor with AI | STDIO | `false` |
+| Using Claude Desktop | STDIO | `false` |
+| Testing tools with FastMCP CLI | HTTP | `false` |
+| Remote server access | HTTP | `false` |
+| Custom script integration | HTTP | `false` |
+| Client-delegated shared server | HTTP | `true` |
+| Containerised / Docker deployment | HTTP | `true` (recommended) |
 
 
 #### 5. Configure your environment
@@ -246,7 +260,8 @@ EVO_REDIRECT_URL=your-redirect-url
 
 When you first use the server it will open your browser so you can sign in with your Bentley account. This gives the server access to any Evo instance and workspace your account has access to.
 
-##### Alternative: Service authentication (for automation/CI)
+<details>
+<summary><strong>Alternative: Service authentication (for automation/CI)</strong></summary>
 
 If you need to run the server without interactive sign-in (e.g. automation, CI/CD, or background services), you can use a **service app** instead. Create a service app in the iTwin Developer Portal and set the following in your `.env` file:
 
@@ -258,21 +273,53 @@ EVO_CLIENT_SECRET=your-service-client-secret
 
 Note: The service app must be explicitly granted access to your Evo instance and workspaces.
 
+</details>
+
+##### Client-delegated authentication for multi-session scenarios (optional)
+When the server is running in HTTP mode, you can choose to enable client-delegated authentication to support multiple sessions with different users/identities. In this mode, each client (VS Code, Cursor, etc.) authenticates separately via OIDCProxy and holds its own token. The server maintains separate Evo sessions per client token. This is suitable for multi-user shared server scenarios where each user needs to authenticate with their own Bentley account and access their own Evo workspaces.
+
+
+**Definitions**
+- **Server-managed auth (default)**: The MCP server is the OAuth client. It handles authentication internally. All clients share the same Evo session and identity. Suitable for single-identity workflows where the server is only accessible to a single user or service account.
+- **Client-delegated auth**: Each MCP client (VS Code, Cursor, etc.) is an independent OAuth client. Each client authenticates separately via OIDCProxy and holds its own token. The server maintains separate Evo sessions per client token. Suitable for multi-user shared server scenarios where each user needs to authenticate with their own Bentley account and access their own Evo workspaces.
+
+The authentication flow (server-managed vs. client-delegated) is controlled by three settings: `MCP_TRANSPORT`, `AUTH_METHOD`, and `CLIENT_DELEGATED_AUTH`. The table below outlines the behaviour of the server under the valid combinations of these settings.
+
+| `MCP_TRANSPORT` | `CLIENT_DELEGATED_AUTH` | `AUTH_METHOD` | Behaviour | Client-delegated |
+|---|---|---|---|:-:|
+| `stdio` | ignored | `native_app` | Server opens a browser for sign-in on first use. Token cached per process. | ❌ |
+| `stdio` | ignored | `client_credentials` | Server fetches a service token automatically. No browser interaction. | ❌ |
+| `http` | `false` (default) | `native_app` | Server opens a browser for sign-in on first use. All HTTP clients share the same token. | ❌ |
+| `http` | `false` (default) | `client_credentials` | Server fetches a service token automatically. All HTTP clients share the same token. | ❌ |
+| `http` | `true` | `native_app` | Each MCP client authenticates independently via OAuth browser flow (OIDCProxy). `AUTH_METHOD` is not used. | ✅ |
+
+
+**Redirect URL configuration:**
+
+  Based on the authentication mode, the redirect URL for OAuth will be configured differently. Ensure you set the correct redirect URL in your iTwin app registration and the correct environment variable in your `.env` file.
+
+  - **Server-managed auth**: ``EVO_REDIRECT_URL`` — used only in managed auth mode where the MCP server will manage the OAuth callback and token storage (e.g. ``http://localhost:3000/signin-callback``). In this mode, the hostname and port combination must be different to the ``MCP_HTTP_HOST:MCP_HTTP_PORT`` to avoid conflicts (e.g. if `MCP_HTTP_HOST=localhost` and `MCP_HTTP_PORT=5000`, use `EVO_REDIRECT_URL=http://localhost:3000/signin-callback`).
+
+  - **Client-delegated auth**: ``OIDCPROXY_REDIRECT_PATH`` — the path on *this* MCP server where IMS sends the OAuth callback in delegated auth mode. The full url will be `http://{MCP_PUBLIC_BASE_URL}/signin-callback` (e.g. `http://localhost:5000/signin-callback` or `http://my.evo.mcp.server.com/signin-callback`). 
+  
+  **Note**: MCP_PUBLIC_BASE_URL defaults to `http://{MCP_HTTP_HOST}:{MCP_HTTP_PORT}` if not set. The full redirect URL will be `http://{MCP_HTTP_HOST}:{MCP_HTTP_PORT}/signin-callback`. 
+
+
 ##### MCP transport mode (optional)
 
 The Evo MCP server supports two transport modes: **STDIO** and **streamable HTTP**. By default, the server runs in **STDIO** mode which is recommended for local development.
 
 Set `MCP_TRANSPORT` environment variable in `.env` to choose the transport mode:
-- `STDIO` - Standard input/output (default)
-- `HTTP` - Streamable HTTP
+- `stdio` - Standard input/output (default)
+- `http` - Streamable HTTP
 
 ```bash
-MCP_TRANSPORT=STDIO
+MCP_TRANSPORT=stdio
 ```
 
 If using HTTP mode, also configure the host and port:
 ```bash
-MCP_TRANSPORT=HTTP
+MCP_TRANSPORT=http
 MCP_HTTP_HOST=localhost
 MCP_HTTP_PORT=5000
 ```
@@ -400,6 +447,8 @@ To verify that the Evo MCP server is correctly configured in Cursor:
 - **STDIO mode starts on demand**: In `STDIO` mode, VS Code/Cursor will launch the MCP server when needed.
 - **HTTP mode needs a running server**: If you select `HTTP`, the server must already be running. The setup script can start it for you in the current terminal session so you can see live output.
 - **Check your environment variables**: Ensure `EVO_CLIENT_ID` and `EVO_REDIRECT_URL` are set in your `.env` file before connecting.
+    
+- **`invalid_token` errors in delegated mode**: If you see `"error": "invalid_token"` after the server times out waiting for authentication, the client likely holds stale tokens from a previous registration. **Resolution:** Clear your MCP client's saved tokens/credentials for this server and reconnect — the client will re-register via DCR and obtain fresh tokens. Also verify that the redirect URI registered in your IMS application matches `{MCP_PUBLIC_BASE_URL}/signin-callback` (or your custom `OIDCPROXY_REDIRECT_PATH`). Another possible cause is the Oauth provider is temporarily unavailable or there is a network issue. If the problem persists, check  [Bentley Status Page](https://status.bentley.com/) for more details or contact support.
 - **Reload after changes**: If you edit settings or `.env` values, reload the window so the client picks up the new config.
 
 ---

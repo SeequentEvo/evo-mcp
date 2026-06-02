@@ -17,13 +17,13 @@ import pandas as pd
 from evo.objects.typed import EpsgCode, PointSet, PointSetData
 from pydantic import BaseModel, ConfigDict, Field
 
+from evo_mcp.context import get_evo_context
 from evo_mcp.staging.errors import StageValidationError
 from evo_mcp.staging.objects.base import (
     EvoStagedObjectType,
     Interaction,
     staged_object_type_registry,
 )
-from evo_mcp.staging.runtime import get_registry, get_staging_service
 from evo_mcp.utils.tool_support import extract_crs, format_crs, resolve_crs
 
 
@@ -166,11 +166,12 @@ async def _create(params: PointSetCreateParams) -> dict[str, Any]:
     summary["source_rows"] = int(len(df))
     summary["dropped_invalid_coordinate_rows"] = invalid_count
 
-    envelope = get_staging_service().stage_local_build(
+    ctx = await get_evo_context()
+    envelope = ctx.object_staging.stage_local_build(
         object_type="point_set",
         typed_payload=point_set_data,
     )
-    get_registry().register(
+    ctx.object_registry.register(
         name=params.object_name,
         object_type="point_set",
         stage_id=envelope.stage_id,

@@ -27,7 +27,7 @@ from evo.widgets import format_task_result_with_target
 from fastmcp import Context
 from pydantic import BaseModel, ConfigDict, Field
 
-from evo_mcp.context import evo_context
+from evo_mcp.context import get_evo_context
 from evo_mcp.utils.tool_support import (
     MCPFeedback,
     VariogramObjectId,
@@ -134,6 +134,7 @@ def register_compute_tools(mcp) -> None:
                 "Specify the name of the attribute to create on the target block model (e.g. 'OK_estimate')."
             )
         environment = await get_workspace_environment(workspace_id)
+        evo_context = await get_evo_context()
         context = StaticContext.from_environment(environment, evo_context.connector)
         source_object, target_object, variogram_object = await asyncio.gather(
             object_from_uuid(context, params.point_set_object_id),
@@ -207,6 +208,7 @@ def register_compute_tools(mcp) -> None:
             raise ValueError("Must specify at least one scenario.")
 
         environment = await get_workspace_environment(workspace_id)
+        evo_context = await get_evo_context()
         context = StaticContext.from_environment(environment, evo_context.connector)
 
         results = await run_compute(context, scenarios, preview=True, fb=MCPFeedback(ctx))
