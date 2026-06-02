@@ -46,6 +46,17 @@ class EvoContextBase(ABC):
         self._object_staging = None
         self._object_registry = None
 
+    # -- Abstract contract --------------------------------------------------
+
+    @abstractmethod
+    async def initialize(self) -> None:
+        """Ensure the context is ready for API calls."""
+
+    @abstractmethod
+    async def get_authorizer(self) -> AccessTokenAuthorizer:
+        """Get the access token authorizer to be used for API calls."""
+
+    # -- Class properties --------------------------------------------------
     @property
     def object_staging(self):
         """Per-session staging service, created on first access."""
@@ -64,18 +75,6 @@ class EvoContextBase(ABC):
             self._object_registry = ObjectRegistry(self.object_staging)
         return self._object_registry
 
-    # -- Abstract contract --------------------------------------------------
-
-    @abstractmethod
-    async def initialize(self) -> None:
-        """Ensure the context is ready for API calls."""
-
-    @abstractmethod
-    async def get_authorizer(self) -> AccessTokenAuthorizer:
-        """Get the access token authorizer to be used for API calls."""
-
-    # -- Shared helpers -----------------------------------------------------
-
     @property
     def transport(self) -> AioTransport:
         if self._transport is None:
@@ -83,6 +82,8 @@ class EvoContextBase(ABC):
 
             self._transport = AioTransport(user_agent=f"{__dist_name__}/{__version__}")
         return self._transport
+
+    # -- Class methods -----------------------------------------------------
 
     async def discover_and_build(
         self,
