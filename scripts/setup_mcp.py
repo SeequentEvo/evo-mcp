@@ -1092,16 +1092,6 @@ def setup_mcp_config(
         print(f"  {python_exe}")
         print("If you need to use a different Python environment, activate it")
         print("and run this setup script again.")
-
-        if protocol == "http" and start_server_now:
-            print()
-            print_color(
-                "Starting Evo MCP HTTP server in foreground (Ctrl+C to stop)...",
-                Colors.BLUE,
-            )
-            server_exit_code = start_http_server(python_exe, mcp_script, project_dir)
-            if server_exit_code not in [0, 130, None]:
-                print_color(f"✗ HTTP server exited with code {server_exit_code}", Colors.RED)
     except (IOError, OSError) as e:
         print_color(f"✗ Failed to update configuration file: {e}", Colors.RED)
         sys.exit(1)
@@ -1130,6 +1120,8 @@ def main():
         write_env_file(project_dir, env_values)
         print()
         print_color("✓ Environment configuration saved to .env", Colors.GREEN)
+
+        clients = get_client_choices(protocol)
 
         start_server_now = False
         if protocol == "http":
