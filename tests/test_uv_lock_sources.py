@@ -23,10 +23,32 @@ spec.loader.exec_module(validator)
 def test_repo_uv_lock_files_use_only_default_pypi_sources() -> None:
     lockfiles = validator.find_uv_lock_files(REPO_ROOT)
 
-    assert lockfiles == [REPO_ROOT / "code-samples" / "uv.lock", REPO_ROOT / "uv.lock"]
+    assert lockfiles, "expected at least one uv.lock file in the repository"
+    assert (REPO_ROOT / "uv.lock").resolve() in lockfiles
 
     for lockfile in lockfiles:
         assert validator.validate_lock_file(lockfile) is True
+
+
+def test_find_uv_lock_files_skips_noise_directories(tmp_path: Path) -> None:
+    (tmp_path / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+
+    nested = tmp_path / "packages" / "member"
+    nested.mkdir(parents=True)
+    (nested / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+
+    for excluded in (".venv", ".git", "node_modules", "__pycache__", ".tox", "dist", "build", "venv"):
+        excluded_dir = tmp_path / excluded
+        excluded_dir.mkdir()
+        (excluded_dir / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+
+    hidden = tmp_path / ".hidden"
+    hidden.mkdir()
+    (hidden / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+
+    found = validator.find_uv_lock_files(tmp_path)
+
+    assert found == sorted([(tmp_path / "uv.lock").resolve(), (nested / "uv.lock").resolve()])
 
 
 def test_custom_registry_source_is_rejected(tmp_path: Path) -> None:

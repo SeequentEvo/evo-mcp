@@ -119,7 +119,7 @@ class CompareEvoObjectsDetailedTests(unittest.IsolatedAsyncioTestCase):
             patch("evo_mcp.tools.admin_tools.APIConnector", return_value=object()),
             patch("evo_mcp.tools.admin_tools.ObjectAPIClient", return_value=fake_object_client),
             patch("evo_mcp.tools.admin_tools._inspect_data_link", side_effect=fake_inspect_data_link),
-            patch("evo_mcp.tools.admin_tools.evo_context", fake_evo_context),
+            patch("evo_mcp.tools.admin_tools.get_evo_context", AsyncMock(return_value=fake_evo_context)),
         ):
             result = await _resolve_object_side(
                 side_name="left",
@@ -204,7 +204,7 @@ class CompareEvoObjectsDetailedTests(unittest.IsolatedAsyncioTestCase):
             patch("evo_mcp.tools.admin_tools.APIConnector", return_value=object()),
             patch("evo_mcp.tools.admin_tools.ObjectAPIClient", return_value=fake_object_client),
             patch("evo_mcp.tools.admin_tools._inspect_data_link", side_effect=fake_inspect_data_link),
-            patch("evo_mcp.tools.admin_tools.evo_context", fake_evo_context),
+            patch("evo_mcp.tools.admin_tools.get_evo_context", AsyncMock(return_value=fake_evo_context)),
             patch("evo_mcp.tools.admin_tools.PARQUET_INSPECTION_MAX_CONCURRENCY", 2),
         ):
             result = await _resolve_object_side(

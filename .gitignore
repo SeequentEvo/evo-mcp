@@ -10,3 +10,5 @@
 .idea/
 .vscode
 src/evo_mcp.egg-info/
+skills-eval-workspace/
+.DS_Store
