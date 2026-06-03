@@ -29,7 +29,7 @@ from evo_schemas.objects.downhole_intervals import DownholeIntervals_V1_3_0
 from evo_schemas.objects.line_segments import LineSegments_V2_2_0
 from evo_schemas.objects.pointset import Pointset_V1_3_0
 
-from evo_mcp.context import ensure_initialized, evo_context
+from evo_mcp.context import get_evo_context
 from evo_mcp.utils.object_builders import (
     DownholeCollectionBuilder,
     DownholeIntervalsBuilder,
@@ -153,7 +153,7 @@ def register_object_builder_tools(mcp):
             }
 
         # Create the object
-        await ensure_initialized()
+        evo_context = await get_evo_context()
 
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -342,7 +342,7 @@ def register_object_builder_tools(mcp):
             }
 
         # Create the object
-        await ensure_initialized()
+        evo_context = await get_evo_context()
 
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -593,7 +593,7 @@ def register_object_builder_tools(mcp):
             }
 
         # Create the object
-        await ensure_initialized()
+        evo_context = await get_evo_context()
 
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))
@@ -806,7 +806,7 @@ def register_object_builder_tools(mcp):
             }
 
         # Create the object
-        await ensure_initialized()
+        evo_context = await get_evo_context()
 
         try:
             object_client = await evo_context.get_object_client(UUID(workspace_id))

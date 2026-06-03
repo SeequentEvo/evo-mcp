@@ -8,9 +8,10 @@ including workspace management, object ops, and data transfer.
 
 Configuration:
     Set MCP_TOOL_FILTER environment variable to filter tools and prompts:
-    - "admin" : Workspace management tools
-    - "data"  : Object query, file operations, and management tools
-    - "all"   : All tools (default)
+    - "admin"   : Workspace management tools
+    - "data"    : Object query, file operations, and management tools
+    - "compute" : Compute and geostatistics tools
+    - "all"     : All tools (default)
 
     Set MCP_TRANSPORT environment variable to choose transport mode:
     - "stdio" (default): Standard input/output, used by VS Code, Cursor, Claude Desktop
@@ -30,16 +31,22 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import configure_logging
+from starlette.middleware import Middleware
 
+from evo_mcp.client_auth import AuthMetadataPatchMiddleware, create_auth_provider
 from evo_mcp.tools import (
     register_admin_tools,
+    register_compute_tools,
     register_file_tools,
     register_filesystem_tools,
-    # register_data_tools,
     register_general_tools,
     register_instance_users_admin_tools,
     register_object_builder_tools,
+    register_object_staging_tools,
 )
+
+logger = logging.getLogger(__name__)
+OBJECTS_REFERENCE_UNAVAILABLE = "Objects reference information is currently unavailable."
 
 # Get transport mode from environment variable
 TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio").lower()
@@ -50,9 +57,33 @@ if TRANSPORT not in VALID_TRANSPORTS:
     TRANSPORT = "stdio"
 
 # Get HTTP configuration if using HTTP transport
-if TRANSPORT == "http":
-    HTTP_HOST = os.getenv("MCP_HTTP_HOST", "localhost")
-    HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
+HTTP_HOST = os.getenv("MCP_HTTP_HOST", "localhost")
+HTTP_PORT = int(os.getenv("MCP_HTTP_PORT", "5000"))
+
+# Whether to enable OAuth authentication for HTTP transport.
+# When enabled, the server acts as an OIDC proxy: MCP clients authenticate
+# via an OAuth browser flow (Dynamic Client Registration + Authorization Code), and the
+# server validates each request's token before forwarding it to Evo APIs.
+# This enables client-delegated auth — each connected client authenticates
+# independently and sees only the instances/workspaces their account has access to.
+#
+# Disable if:
+#   - The server is behind a reverse proxy that already enforces auth
+#   - You are doing local development and don't want to deal with OAuth
+#   - You want server-managed auth (set AUTH_METHOD=client_credentials or
+#     native_app and let the server handle authentication)
+#
+# Defaults to False. Set to true only when MCP_TRANSPORT=http.
+
+CLIENT_DELEGATED_AUTH = os.getenv("CLIENT_DELEGATED_AUTH", "").lower() in ("1", "true")
+
+if CLIENT_DELEGATED_AUTH and TRANSPORT != "http":
+    logging.warning(
+        "CLIENT_DELEGATED_AUTH=true has no effect with MCP_TRANSPORT='%s' — "
+        "OAuth authentication is only supported with HTTP transport. Ignoring.",
+        TRANSPORT,
+    )
+    CLIENT_DELEGATED_AUTH = False
 
 # Get agent type from environment variable
 # This can either be set via MCP inputs, or the .env file used by the agent example
@@ -63,15 +94,21 @@ TOOL_FILTER = os.getenv(
         "all",
     ),
 ).lower()
-VALID_TOOL_FILTERS = ["admin", "data", "all"]
+VALID_TOOL_FILTERS = ["admin", "data", "compute", "all"]
 
 if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
     TOOL_FILTER = "all"
 
+
 # Initialize FastMCP server with agent type in name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
-mcp = FastMCP(server_name)
+# MCP_PUBLIC_BASE_URL supports reverse proxy / TLS deployments where the
+# bind address differs from the public URL clients use for OAuth callbacks.
+public_base_url = os.getenv("MCP_PUBLIC_BASE_URL", f"http://{HTTP_HOST}:{HTTP_PORT}")
+auth_provider = create_auth_provider(public_base_url) if CLIENT_DELEGATED_AUTH else None
+mcp = FastMCP(server_name, auth=auth_provider)
+
 
 # Show more traceback frame for now, we may want to disabled the rich
 # traceback formatting entirely too.
@@ -85,8 +122,8 @@ def _get_objects_reference_content() -> str:
         with open(reference_path, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        logging.error("Objects reference file not found at %s", reference_path)
-        return "Objects reference information is currently unavailable."
+        logging.error("Reference file not found at %s", reference_path)
+        return OBJECTS_REFERENCE_UNAVAILABLE
 
 
 # =============================================================================
@@ -110,6 +147,14 @@ if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
         print("Evo MCP Server configured for Data Agent")
     else:
         print("Evo MCP Server configured - Data tools enabled")
+
+if TOOL_FILTER in ["all", "compute"]:
+    register_compute_tools(mcp)
+    register_object_staging_tools(mcp)
+    if TOOL_FILTER == "compute":
+        print("Evo MCP Server configured for Compute Agent")
+    else:
+        print("Evo MCP Server configured - Compute tools enabled")
 
 # =============================================================================
 # Resources (not currently supported in ADK)
@@ -167,7 +212,6 @@ if TOOL_FILTER == "all":
 
         When working with objects, always verify workspace_id and object_id.
         Use the Object Information reference below to understand object schemas and required properties.
-
         Use the powerful bulk operation capabilities carefully. Always confirm the scope of operations with users.
         Available tools:
 
@@ -315,25 +359,58 @@ if TOOL_FILTER in ["all", "data"]:
         """
 
 
+if TOOL_FILTER in ["all", "compute"]:
+
+    @mcp.prompt(name="compute_prompt")
+    def compute_prompt() -> str:
+        """Prompt for geostatistics and compute operations."""
+        return """\
+        You are a compute assistant for the Evo platform created by Seequent.
+
+        You can help users with:
+        - Setting the active workspace for compute workflows
+        - Discovering source and target objects for compute tasks
+        - Building variograms and search neighborhoods
+        - Running kriging workflows and scenario comparisons
+        - Retrieving and summarizing output attributes
+
+        Always confirm workspace context before running compute operations.
+        Validate object IDs and attribute names before execution.
+        If an error occurs when calling a tool, return the full error message.
+        """
+
+
 # Note: Evo context initialization happens lazily on first tool call
-# via ensure_initialized() because OAuth requires browser interaction
+# via get_evo_context() because OAuth requires browser interaction
 # =============================================================================
 # Main Entry Point
 # =============================================================================
 
 if __name__ == "__main__":
     # Log startup information
-    logger = logging.getLogger(__name__)
+    from fastmcp.utilities.logging import get_logger
+
+    logger = get_logger(__name__)
     logger.info("Starting Evo MCP Server in %s mode", TRANSPORT.upper())
 
     # Run the server with selected transport mode
     if TRANSPORT == "http":
         logger.info("HTTP server will listen on %s:%s", HTTP_HOST, HTTP_PORT)
+        if CLIENT_DELEGATED_AUTH:
+            oidcproxy_redirect_path = os.getenv("OIDCPROXY_REDIRECT_PATH", "/signin-callback")
+            logger.info(
+                "OAuth upstream callback URL: %s%s — register this as an allowed redirect URI in your auth client.",
+                public_base_url.rstrip("/"),
+                oidcproxy_redirect_path,
+            )
+        middleware = [Middleware(AuthMetadataPatchMiddleware)] if CLIENT_DELEGATED_AUTH else []
         mcp.run(
             transport="http",
             host=HTTP_HOST,
             port=HTTP_PORT,
+            middleware=middleware,
         )
+
     else:
         # Default STDIO mode
         mcp.run()
