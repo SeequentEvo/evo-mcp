@@ -55,6 +55,11 @@ DEFAULT_HTTP_HOST = "localhost"
 DEFAULT_HTTP_PORT = "5000"
 TOOL_FILTER_CHOICES = {"1": "all", "2": "admin", "3": "data", "4": "compute"}
 AUTH_METHOD_CHOICES = {"1": "native_app", "2": "client_credentials"}
+AUTH_METHOD_LABELS = {
+    "native_app": "Sign in with your browser",
+    "client_credentials": "Service account",
+}
+TRANSPORT_LABELS = {"stdio": "STDIO", "http": "Streamable HTTP"}
 
 
 def mask_value(value: str, visible: int = 3) -> str:
@@ -142,11 +147,6 @@ def prompt_auth_method(current_value: str | None) -> str:
     print("1. Sign in with your browser (recommended)")
     print("2. Service account — no user sign-in (for automation/CI)")
     print()
-
-    AUTH_METHOD_LABELS = {
-        "native_app": "Sign in with your browser",
-        "client_credentials": "Service account",
-    }
 
     if current_value:
         label = AUTH_METHOD_LABELS.get(current_value, current_value)
@@ -498,8 +498,6 @@ def get_protocol_choice(
 
     current_transport = env_values.get("MCP_TRANSPORT", "").lower()
     protocol = None
-
-    TRANSPORT_LABELS = {"stdio": "STDIO", "http": "Streamable HTTP"}
 
     if current_transport in TRANSPORT_LABELS:
         print_color(f"Current transport: {TRANSPORT_LABELS[current_transport]}", Colors.GREEN)
@@ -874,6 +872,8 @@ def setup_copilot_cli_config(
     script_dir = Path(__file__).parent.resolve()
     project_dir = script_dir.parent
     mcp_script = str(project_dir / "src" / "mcp_tools.py")
+    host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
+    port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
 
     # Remove existing entry first (ignore errors if it doesn't exist)
     subprocess.run(
@@ -884,8 +884,6 @@ def setup_copilot_cli_config(
 
     # Build the add command
     if protocol == "http":
-        host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
-        port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
         url = f"http://{host}:{port}/mcp"
         cmd = [copilot_path, "mcp", "add", "--transport", "http", "evo-mcp", url]
     else:
@@ -907,8 +905,6 @@ def setup_copilot_cli_config(
     print("  Client App: Copilot CLI")
     print(f"  Transport Protocol: {protocol.upper()}")
     if protocol == "http":
-        host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
-        port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
         print(f"  URL: http://{host}:{port}/mcp")
     else:
         print(f"  Command: {python_exe}")
@@ -933,7 +929,7 @@ def setup_claude_cli_config(
 
     claude_path = shutil.which("claude")
     if not claude_path:
-        print_color("\u2717 Claude Code CLI not found.", Colors.RED)
+        print_color("✗ Claude Code CLI not found.", Colors.RED)
         print("Install it from: https://docs.anthropic.com/en/docs/claude-code")
         sys.exit(1)
 
@@ -944,6 +940,8 @@ def setup_claude_cli_config(
     script_dir = Path(__file__).parent.resolve()
     project_dir = script_dir.parent
     mcp_script = str(project_dir / "src" / "mcp_tools.py")
+    host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
+    port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
 
     # Remove existing entries from all scopes to avoid conflicts
     for scope in ("user", "local", "project"):
@@ -955,8 +953,6 @@ def setup_claude_cli_config(
 
     # Build the add command
     if protocol == "http":
-        host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
-        port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
         url = f"http://{host}:{port}/mcp"
         cmd = [claude_path, "mcp", "add", "-s", "user", "--transport", "http", "evo-mcp", url]
     else:
@@ -966,20 +962,18 @@ def setup_claude_cli_config(
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if result.returncode != 0:
             error_msg = result.stderr.strip() or result.stdout.strip()
-            print_color(f"\u2717 Failed to add MCP server: {error_msg}", Colors.RED)
+            print_color(f"✗ Failed to add MCP server: {error_msg}", Colors.RED)
             sys.exit(1)
     except (OSError, ValueError) as e:
-        print_color(f"\u2717 Failed to run Claude Code CLI: {e}", Colors.RED)
+        print_color(f"✗ Failed to run Claude Code CLI: {e}", Colors.RED)
         sys.exit(1)
 
-    print_color("\u2713 Successfully added Evo MCP configuration to Claude Code", Colors.GREEN)
+    print_color("✓ Successfully added Evo MCP configuration to Claude Code", Colors.GREEN)
     print()
     print("Configuration details:")
     print("  Client App: Claude Code CLI")
     print(f"  Transport Protocol: {protocol.upper()}")
     if protocol == "http":
-        host = env_values.get("MCP_HTTP_HOST", DEFAULT_HTTP_HOST)
-        port = env_values.get("MCP_HTTP_PORT", DEFAULT_HTTP_PORT)
         print(f"  URL: http://{host}:{port}/mcp")
     else:
         print(f"  Command: {python_exe}")
