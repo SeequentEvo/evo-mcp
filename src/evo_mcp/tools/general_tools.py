@@ -7,7 +7,11 @@ MCP tools for general operations (health checks, object CRUD, etc).
 """
 
 import asyncio
+import hashlib
+import hmac
 import logging
+import os
+import time
 from uuid import UUID
 
 from evo.objects.typed import object_from_uuid
@@ -23,12 +27,86 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+_DELETE_TOKEN_TTL_SECONDS = 300  # 5 minutes
+_DELETE_TOKEN_SECRET = os.environ.get("EVO_MCP_DELETE_SECRET", os.urandom(32).hex())
 
-_pending_deletions: set[str] = set()
+
+def _create_deletion_token(workspace_id: str) -> str:
+    """Create an HMAC-signed deletion token embedding workspace ID and expiry."""
+    expires_at = int(time.time()) + _DELETE_TOKEN_TTL_SECONDS
+    payload = f"{workspace_id}:{expires_at}"
+    signature = hmac.new(
+        _DELETE_TOKEN_SECRET.encode() if isinstance(_DELETE_TOKEN_SECRET, str) else _DELETE_TOKEN_SECRET,
+        payload.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{payload}:{signature}"
+
+
+def _verify_deletion_token(token: str, workspace_id: str) -> None:
+    """Verify an HMAC-signed deletion token. Raises ValueError on failure."""
+    parts = token.split(":")
+    if len(parts) != 3:
+        raise ValueError("Invalid confirmation token format.")
+
+    token_ws_id, expires_at_str, provided_sig = parts
+
+    if token_ws_id != workspace_id:
+        raise ValueError(
+            "Confirmation token does not match the requested workspace. "
+            "Call delete_workspace with confirm=False first to get a new token."
+        )
+
+    expected_payload = f"{token_ws_id}:{expires_at_str}"
+    expected_sig = hmac.new(
+        _DELETE_TOKEN_SECRET.encode() if isinstance(_DELETE_TOKEN_SECRET, str) else _DELETE_TOKEN_SECRET,
+        expected_payload.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(provided_sig, expected_sig):
+        raise ValueError("Invalid confirmation token.")
+
+    if int(expires_at_str) < int(time.time()):
+        raise ValueError(
+            "Confirmation token has expired. "
+            "Call delete_workspace with confirm=False to get a new token."
+        )
 
 
 def register_general_tools(mcp):
     """Register all general tools with the FastMCP server."""
+
+    async def _resolve_workspace(
+        workspace_id: str = "", workspace_name: str = "", *, deleted: bool = False
+    ):
+        """Resolve a workspace from an ID or name.
+
+        Args:
+            workspace_id: Workspace UUID string.
+            workspace_name: Workspace display name.
+            deleted: If True, search among deleted workspaces.
+
+        Returns:
+            A tuple of (evo_context, workspace).
+
+        Raises:
+            ValueError: If neither argument is provided or the workspace is not found.
+        """
+        evo_context = await get_evo_context()
+        if workspace_id:
+            workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
+            return evo_context, workspace
+        if workspace_name:
+            workspaces = await evo_context.workspace_client.list_workspaces(
+                name=workspace_name, deleted=deleted
+            )
+            matching = [ws for ws in workspaces.items() if ws.display_name == workspace_name]
+            if not matching:
+                status = "Deleted workspace" if deleted else "Workspace"
+                raise ValueError(f"{status} '{workspace_name}' not found")
+            return evo_context, matching[0]
+        raise ValueError("Either workspace_id or workspace_name must be provided")
 
     @mcp.tool()
     async def workspace_health_check(workspace_id: str = "") -> dict:
@@ -92,18 +170,7 @@ def register_general_tools(mcp):
             workspace_id: Workspace UUID (provide either this or workspace_name)
             workspace_name: Workspace name (provide either this or workspace_id)
         """
-        evo_context = await get_evo_context()
-
-        if workspace_id:
-            workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
-        elif workspace_name:
-            workspaces = await evo_context.workspace_client.list_workspaces(name=workspace_name)
-            matching = [ws for ws in workspaces.items() if ws.display_name == workspace_name]
-            if not matching:
-                raise ValueError(f"Workspace '{workspace_name}' not found")
-            workspace = matching[0]
-        else:
-            raise ValueError("Either workspace_id or workspace_name must be provided")
+        evo_context, workspace = await _resolve_workspace(workspace_id, workspace_name)
 
         return {
             "id": str(workspace.id),
@@ -118,29 +185,35 @@ def register_general_tools(mcp):
         }
 
     @mcp.tool()
-    async def delete_workspace(workspace_id: str = "", workspace_name: str = "", confirm: bool = False) -> dict:
-        """Delete a workspace by ID or name.
+    async def delete_workspace(
+        workspace_id: str = "",
+        workspace_name: str = "",
+        confirm: bool = False,
+        confirmation_token: str = "",
+    ) -> dict:
+        """Delete a workspace by ID or name. This is a destructive two-step operation.
 
-        When called without confirm=True, returns workspace details for the user
-        to review. Call again with confirm=True to proceed with deletion.
+        IMPORTANT: You MUST call this tool twice. Do NOT set confirm=True on the first call.
+
+        Step 1: Call with confirm=False (the default) to preview the workspace
+        details and receive a confirmation_token. Show the preview to the user
+        and ask for explicit confirmation before proceeding.
+
+        Step 2: Only after the user has explicitly confirmed, call again with
+        confirm=True and the confirmation_token returned from Step 1.
+
+        Never skip Step 1. Never set confirm=True without a valid confirmation_token
+        obtained from a prior preview call. The token expires after 5 minutes.
 
         Args:
             workspace_id: Workspace UUID (provide either this or workspace_name)
             workspace_name: Workspace name (provide either this or workspace_id)
-            confirm: Set to True to confirm deletion. Defaults to False.
+            confirm: MUST be False on the first call. Set to True only on the second
+                call after the user has reviewed and explicitly confirmed deletion.
+            confirmation_token: Token returned from the Step 1 preview call.
+                Required when confirm=True. Do not fabricate this value.
         """
-        await ensure_initialized()
-
-        if workspace_id:
-            workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
-        elif workspace_name:
-            workspaces = await evo_context.workspace_client.list_workspaces(name=workspace_name)
-            matching = [ws for ws in workspaces.items() if ws.display_name == workspace_name]
-            if not matching:
-                raise ValueError(f"Workspace '{workspace_name}' not found")
-            workspace = matching[0]
-        else:
-            raise ValueError("Either workspace_id or workspace_name must be provided")
+        evo_context, workspace = await _resolve_workspace(workspace_id, workspace_name)
 
         if workspace.user_role is None or workspace.user_role.name not in ("owner",):
             role_name = workspace.user_role.name if workspace.user_role else "unknown"
@@ -152,25 +225,28 @@ def register_general_tools(mcp):
         ws_id_str = str(workspace.id)
 
         if not confirm:
-            _pending_deletions.add(ws_id_str)
+            token = _create_deletion_token(ws_id_str)
             return {
                 "id": ws_id_str,
                 "name": workspace.display_name,
                 "description": workspace.description,
                 "user_role": workspace.user_role.name if workspace.user_role else None,
+                "confirmation_token": token,
                 "message": (
                     f"Are you sure you want to delete workspace '{workspace.display_name}' "
-                    f"(ID: {workspace.id})? Call delete_workspace again with confirm=True to proceed."
+                    f"(ID: {workspace.id})? Call delete_workspace again with confirm=True "
+                    f"and the returned confirmation_token to proceed. Token expires in 5 minutes."
                 ),
             }
 
-        if ws_id_str not in _pending_deletions:
+        if not confirmation_token:
             raise ValueError(
-                f"Workspace '{workspace.display_name}' has not been previewed for deletion. "
-                "Call delete_workspace with confirm=False first to review before deleting."
+                "A confirmation_token is required when confirm=True. "
+                "Call delete_workspace with confirm=False first to get a token."
             )
 
-        _pending_deletions.discard(ws_id_str)
+        _verify_deletion_token(confirmation_token, ws_id_str)
+
         await evo_context.workspace_client.delete_workspace(workspace.id)
         return {
             "id": ws_id_str,
@@ -186,19 +262,10 @@ def register_general_tools(mcp):
             workspace_id: Workspace UUID (provide either this or workspace_name)
             workspace_name: Workspace name (provide either this or workspace_id)
         """
-        await ensure_initialized()
+        evo_context, workspace = await _resolve_workspace(workspace_id, workspace_name, deleted=True)
+        ws_id = workspace.id
 
-        if workspace_id:
-            ws_id = UUID(workspace_id)
-        elif workspace_name:
-            workspaces = await evo_context.workspace_client.list_workspaces(name=workspace_name, deleted=True)
-            matching = [ws for ws in workspaces.items() if ws.display_name == workspace_name]
-            if not matching:
-                raise ValueError(f"Deleted workspace '{workspace_name}' not found")
-            ws_id = matching[0].id
-        else:
-            raise ValueError("Either workspace_id or workspace_name must be provided")
-
+        # TODO: Replace with a public SDK method when available.
         await evo_context.workspace_client._workspaces_api.restore_soft_deleted_workspace(
             workspace_id=str(ws_id),
             org_id=str(evo_context.org_id),
