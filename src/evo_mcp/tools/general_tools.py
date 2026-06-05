@@ -28,7 +28,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 _DELETE_TOKEN_TTL_SECONDS = 300  # 5 minutes
-_DELETE_TOKEN_SECRET = os.environ.get("EVO_MCP_DELETE_SECRET", os.urandom(32).hex())
+_DELETE_TOKEN_SECRET = os.environ.get("EVO_MCP_DELETE_SECRET")
+if not _DELETE_TOKEN_SECRET:
+    _DELETE_TOKEN_SECRET = os.urandom(32).hex()
+    logger.warning(
+        "EVO_MCP_DELETE_SECRET is not set. Using a random per-process secret for deletion tokens. "
+        "Tokens will not survive restarts or work across multiple workers/replicas. "
+        "Set EVO_MCP_DELETE_SECRET to a stable secret in production."
+    )
 
 
 def _create_deletion_token(workspace_id: str) -> str:
@@ -68,18 +75,13 @@ def _verify_deletion_token(token: str, workspace_id: str) -> None:
         raise ValueError("Invalid confirmation token.")
 
     if int(expires_at_str) < int(time.time()):
-        raise ValueError(
-            "Confirmation token has expired. "
-            "Call delete_workspace with confirm=False to get a new token."
-        )
+        raise ValueError("Confirmation token has expired. Call delete_workspace with confirm=False to get a new token.")
 
 
 def register_general_tools(mcp):
     """Register all general tools with the FastMCP server."""
 
-    async def _resolve_workspace(
-        workspace_id: str = "", workspace_name: str = "", *, deleted: bool = False
-    ):
+    async def _resolve_workspace(workspace_id: str = "", workspace_name: str = "", *, deleted: bool = False):
         """Resolve a workspace from an ID or name.
 
         Args:
@@ -91,22 +93,33 @@ def register_general_tools(mcp):
             A tuple of (evo_context, workspace).
 
         Raises:
-            ValueError: If neither argument is provided or the workspace is not found.
+            ValueError: If neither argument is provided, both are provided,
+                or the workspace is not found.
         """
+        if workspace_id and workspace_name:
+            raise ValueError("Provide either workspace_id or workspace_name, not both.")
+        if not workspace_id and not workspace_name:
+            raise ValueError("Either workspace_id or workspace_name must be provided")
+
         evo_context = await get_evo_context()
         if workspace_id:
+            if deleted:
+                # get_workspace() may not return soft-deleted workspaces,
+                # so search by ID among deleted workspaces instead.
+                workspaces = await evo_context.workspace_client.list_workspaces(deleted=True)
+                matching = [ws for ws in workspaces.items() if str(ws.id) == workspace_id]
+                if not matching:
+                    raise ValueError(f"Deleted workspace '{workspace_id}' not found")
+                return evo_context, matching[0]
             workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
             return evo_context, workspace
-        if workspace_name:
-            workspaces = await evo_context.workspace_client.list_workspaces(
-                name=workspace_name, deleted=deleted
-            )
-            matching = [ws for ws in workspaces.items() if ws.display_name == workspace_name]
-            if not matching:
-                status = "Deleted workspace" if deleted else "Workspace"
-                raise ValueError(f"{status} '{workspace_name}' not found")
-            return evo_context, matching[0]
-        raise ValueError("Either workspace_id or workspace_name must be provided")
+        # workspace_name path
+        workspaces = await evo_context.workspace_client.list_workspaces(name=workspace_name, deleted=deleted)
+        matching = [ws for ws in workspaces.items() if ws.display_name == workspace_name]
+        if not matching:
+            status = "Deleted workspace" if deleted else "Workspace"
+            raise ValueError(f"{status} '{workspace_name}' not found")
+        return evo_context, matching[0]
 
     @mcp.tool()
     async def workspace_health_check(workspace_id: str = "") -> dict:
@@ -266,7 +279,13 @@ def register_general_tools(mcp):
         ws_id = workspace.id
 
         # TODO: Replace with a public SDK method when available.
-        await evo_context.workspace_client._workspaces_api.restore_soft_deleted_workspace(
+        workspaces_api = getattr(evo_context.workspace_client, "_workspaces_api", None)
+        if workspaces_api is None or not hasattr(workspaces_api, "restore_soft_deleted_workspace"):
+            raise NotImplementedError(
+                "Workspace restore is not supported by the current version of the Evo SDK. "
+                "The internal API '_workspaces_api.restore_soft_deleted_workspace' is unavailable."
+            )
+        await workspaces_api.restore_soft_deleted_workspace(
             workspace_id=str(ws_id),
             org_id=str(evo_context.org_id),
             deleted="false",
