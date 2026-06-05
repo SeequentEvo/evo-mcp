@@ -30,6 +30,13 @@ logger = logging.getLogger(__name__)
 _DELETE_TOKEN_TTL_SECONDS = 300  # 5 minutes
 _DELETE_TOKEN_SECRET = os.environ.get("EVO_MCP_DELETE_SECRET")
 if not _DELETE_TOKEN_SECRET:
+    # In HTTP/multi-worker mode, tokens must be consistent across workers and restarts.
+    # Require an explicit secret to avoid silent token validation failures.
+    if os.environ.get("MCP_TRANSPORT", "stdio").lower() != "stdio":
+        raise RuntimeError(
+            "EVO_MCP_DELETE_SECRET must be set when running in HTTP transport mode. "
+            "Deletion tokens will not work reliably across multiple workers or restarts without it."
+        )
     _DELETE_TOKEN_SECRET = os.urandom(32).hex()
     logger.warning(
         "EVO_MCP_DELETE_SECRET is not set. Using a random per-process secret for deletion tokens. "
@@ -106,11 +113,23 @@ def register_general_tools(mcp):
             if deleted:
                 # get_workspace() may not return soft-deleted workspaces,
                 # so search by ID among deleted workspaces instead.
-                workspaces = await evo_context.workspace_client.list_workspaces(deleted=True)
-                matching = [ws for ws in workspaces.items() if str(ws.id) == workspace_id]
-                if not matching:
-                    raise ValueError(f"Deleted workspace '{workspace_id}' not found")
-                return evo_context, matching[0]
+                # Use pagination to ensure we don't miss the target workspace.
+                offset = 0
+                page_size = 100
+                while True:
+                    workspaces = await evo_context.workspace_client.list_workspaces(
+                        deleted=True, offset=offset, limit=page_size
+                    )
+                    matching = [ws for ws in workspaces.items() if str(ws.id) == workspace_id]
+                    if matching:
+                        return evo_context, matching[0]
+                    if workspaces.is_last:
+                        break
+                    next_offset = workspaces.next_offset
+                    if next_offset <= offset:
+                        break
+                    offset = next_offset
+                raise ValueError(f"Deleted workspace '{workspace_id}' not found")
             workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
             return evo_context, workspace
         # workspace_name path
