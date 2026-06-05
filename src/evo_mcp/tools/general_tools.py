@@ -127,7 +127,11 @@ def register_general_tools(mcp):
                         break
                     next_offset = workspaces.next_offset
                     if next_offset <= offset:
-                        break
+                        raise RuntimeError(
+                            f"Pagination stalled while searching for deleted workspace '{workspace_id}': "
+                            f"offset={offset}, next_offset={next_offset}. "
+                            "This may indicate an issue with the workspace listing API."
+                        )
                     offset = next_offset
                 raise ValueError(f"Deleted workspace '{workspace_id}' not found")
             workspace = await evo_context.workspace_client.get_workspace(UUID(workspace_id))
