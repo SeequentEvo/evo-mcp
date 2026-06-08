@@ -37,9 +37,10 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 COPY src ./src
 
-# Runtime state dirs (cache/logs) are created on demand by the app under $HOME,
-# honouring EVO_MCP_* overrides — useradd --create-home already gives the
-# non-root user a writable, owned home directory, so no dirs are pre-created here.
+# Seed default runtime dirs with non-root ownership so Docker named volumes
+# mounted at these paths inherit writeable ownership on first use.
+RUN mkdir -p /home/evo-mcp/.local/share/evo-mcp/cache /home/evo-mcp/.local/share/evo-mcp/logs \
+    && chown -R evo-mcp:evo-mcp /home/evo-mcp
 
 EXPOSE 5000
 
