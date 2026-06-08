@@ -104,6 +104,22 @@ flowchart LR
 - Python 3.10+
 - Access to Seequent Evo (https://evo.seequent.com)
 
+### Quick Start with Docker
+
+**Recommended for**: Fast evaluation, containerised deployments, and users who want the easiest setup path.
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+   Then fill in your auth and deployment settings in [Configure your environment](#5-configure-your-environment); `.env.example` shows the available options.
+2. Start the server:
+   ```bash
+   docker compose up --build
+   ```
+   If you use the legacy Compose CLI, the equivalent command is `docker-compose up --build`.
+3. Open `http://localhost:5000/health` to confirm the server is running.
+
 ### Installation 
 
 #### 1. Clone this repository
@@ -214,6 +230,7 @@ Configure your client (VS Code, Cursor, etc.) to start the MCP server process. T
 **Recommended for**: Testing, remote access, programmatic access via FastMCP CLI/scripts, containerised deployments (Docker), and client-delegated shared deployments
 
 HTTP transport turns your MCP server into a web service accessible via a URL. This transport uses the Streamable HTTP protocol, which allows clients to connect over the network. Unlike STDIO where each client gets its own process, an HTTP server can handle multiple clients simultaneously.
+For the containerised path, see [Quick Start with Docker](#quick-start-with-docker) section.
 
 The Streamable HTTP protocol provides full bidirectional communication between client and server, supporting all MCP operations including streaming responses. Combined with `CLIENT_DELEGATED_AUTH=true`, HTTP transport supports multiple concurrent user sessions each authenticating with their own Bentley account.
 

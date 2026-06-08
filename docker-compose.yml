@@ -1,0 +1,14 @@
+services:
+  evo-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      MCP_TRANSPORT: http
+      MCP_HTTP_HOST: 0.0.0.0
+      MCP_HTTP_PORT: 5000
+      MCP_PUBLIC_BASE_URL: ${MCP_PUBLIC_BASE_URL:-http://localhost:5000}
+    ports:
+      - "5000:5000"

@@ -32,6 +32,8 @@ from pathlib import Path
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import configure_logging
 from starlette.middleware import Middleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from evo_mcp.client_auth import AuthMetadataPatchMiddleware, create_auth_provider
 from evo_mcp.tools import (
@@ -155,6 +157,12 @@ if TOOL_FILTER in ["all", "compute"]:
         print("Evo MCP Server configured for Compute Agent")
     else:
         print("Evo MCP Server configured - Compute tools enabled")
+
+
+@mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
+async def health_check(_: Request):
+    return JSONResponse({"status": "ok"})
+
 
 # =============================================================================
 # Resources (not currently supported in ADK)
