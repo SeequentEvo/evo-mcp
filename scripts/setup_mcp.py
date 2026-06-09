@@ -4,9 +4,16 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+# Fix this docstring! It should be a concise summary of what the script does, its purpose, and any important notes about usage. Avoid including implementation details or function descriptions here.
 """
 Evo MCP Configuration Setup
-Cross-platform script to configure the Evo MCP server for VS Code, Cursor, or Claude Desktop.
+Cross-platform script to configure the Evo MCP server for:
+* VS Code
+* VS Code Insiders
+* Cursor
+* Claude Desktop
+* Copilot CLI
+* Claude Code CLI
 """
 
 import json
