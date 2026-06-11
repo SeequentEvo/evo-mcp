@@ -249,8 +249,7 @@ The Streamable HTTP protocol provides full bidirectional communication between c
 Make a copy of the file `.env.example` and rename it to `.env`. Fill in your app credentials as described below.
 
 ##### Evo app credentials
-
-You first need to create a **native app** in the [iTwin Developer Portal](https://developer.bentley.com/register/?product=seequent-evo). This app will allow you to sign in with your Bentley account to access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
+You first need to create a **native app** in the [Seequent Evo My Apps page](https://developer.seequent.com/my-apps). This app will allow you to sign in with your Bentley account to access Seequent Evo. Visit the [Evo Developer Portal](https://developer.seequent.com/docs/guides/getting-started/apps-and-tokens) to learn more.
 
 Fill in your app credentials in the `.env` file:
 ```bash
@@ -263,7 +262,7 @@ When you first use the server it will open your browser so you can sign in with 
 <details>
 <summary><strong>Alternative: Service authentication (for automation/CI)</strong></summary>
 
-If you need to run the server without interactive sign-in (e.g. automation, CI/CD, or background services), you can use a **service app** instead. Create a service app in the iTwin Developer Portal and set the following in your `.env` file:
+If you need to run the server without interactive sign-in (e.g. automation, CI/CD, or background services), you can use a **service app** instead. Create a service app in the [Seequent Evo My Apps page](https://developer.seequent.com/my-apps) Developer Portal and set the following in your `.env` file:
 
 ```bash
 AUTH_METHOD=client_credentials
@@ -296,7 +295,7 @@ The authentication flow (server-managed vs. client-delegated) is controlled by t
 
 **Redirect URL configuration:**
 
-  Based on the authentication mode, the redirect URL for OAuth will be configured differently. Ensure you set the correct redirect URL in your iTwin app registration and the correct environment variable in your `.env` file.
+  Based on the authentication mode, the redirect URL for OAuth will be configured differently. Ensure you set the correct redirect URL in My Apps in app registration and the correct environment variable in your `.env` file.
 
   - **Server-managed auth**: ``EVO_REDIRECT_URL`` — used only in managed auth mode where the MCP server will manage the OAuth callback and token storage (e.g. ``http://localhost:3000/signin-callback``). In this mode, the hostname and port combination must be different to the ``MCP_HTTP_HOST:MCP_HTTP_PORT`` to avoid conflicts (e.g. if `MCP_HTTP_HOST=localhost` and `MCP_HTTP_PORT=5000`, use `EVO_REDIRECT_URL=http://localhost:3000/signin-callback`).
 
