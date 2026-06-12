@@ -285,20 +285,20 @@ def configure_env_settings(project_dir: Path) -> dict[str, str]:
     new_values["EVO_CLIENT_ID"] = prompt_for_env_value(
         "EVO_CLIENT_ID",
         current_values.get("EVO_CLIENT_ID"),
-        "Your Evo application client ID from the My apps in Developer Portal.",
+        "Your Evo application client ID from the My apps page in the Seequent Developer Portal.",
     )
 
     if new_values["AUTH_METHOD"] == "client_credentials":
         new_values["EVO_CLIENT_SECRET"] = prompt_for_env_value(
             "EVO_CLIENT_SECRET",
             mask_value(current_values.get("EVO_CLIENT_SECRET")),
-            "Your Evo application client secret from the My apps in Developer Portal.",
+            "Your Evo application client secret from the My apps page in the Seequent Developer Portal.",
         )
     else:
         new_values["EVO_REDIRECT_URL"] = prompt_for_env_value(
             "EVO_REDIRECT_URL",
             current_values.get("EVO_REDIRECT_URL"),
-            "Your Evo application redirect URL from the My apps in Developer Portal.",
+            "Your Evo application redirect URL from the My apps page in the Seequent Developer Portal.",
             DEFAULT_REDIRECT_URL,
         )
 

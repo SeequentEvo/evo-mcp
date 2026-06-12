@@ -33,7 +33,7 @@ def create_auth_provider(base_url: str):
     if not client_id:
         raise ValueError(
             "EVO_CLIENT_ID environment variable is required for authentication. "
-            "Register an application at the My apps in Developer Portal and set EVO_CLIENT_ID."
+            "Set the EVO_CLIENT_ID environment variable to the client ID of a native app you can create at the Seequent Developer Portal."
         )
     issuer_url = os.getenv("ISSUER_URL", "https://ims.bentley.com")
     config_url = f"{issuer_url}/.well-known/openid-configuration"
