@@ -113,12 +113,14 @@ flowchart LR
    cp .env.example .env
    ```
    Then fill in your auth and deployment settings in [Configure your environment](#5-configure-your-environment); `.env.example` shows the available options.
-2. Start the server:
+2. Build from source and start with Docker Compose:
    ```bash
    docker compose up --build
    ```
-   If you use the legacy Compose CLI, the equivalent command is `docker-compose up --build`.
-3. Open `http://localhost:5000/health` to confirm the server is running.
+   Note: If you use the legacy Compose CLI, the equivalent command is `docker-compose up`.
+   
+3. Open `http://localhost:5001/health` to confirm the server is running.
+
 
 ### Installation 
 
@@ -318,8 +320,17 @@ The authentication flow (server-managed vs. client-delegated) is controlled by t
   - **Server-managed auth**: ``EVO_REDIRECT_URL`` — used only in managed auth mode where the MCP server will manage the OAuth callback and token storage (e.g. ``http://localhost:3000/signin-callback``). In this mode, the hostname and port combination must be different to the ``MCP_HTTP_HOST:MCP_HTTP_PORT`` to avoid conflicts (e.g. if `MCP_HTTP_HOST=localhost` and `MCP_HTTP_PORT=5000`, use `EVO_REDIRECT_URL=http://localhost:3000/signin-callback`).
 
   - **Client-delegated auth**: ``OIDCPROXY_REDIRECT_PATH`` — the path on *this* MCP server where IMS sends the OAuth callback in delegated auth mode. The full url will be `http://{MCP_PUBLIC_BASE_URL}/signin-callback` (e.g. `http://localhost:5000/signin-callback` or `http://my.evo.mcp.server.com/signin-callback`). 
-  
+   
   **Note**: MCP_PUBLIC_BASE_URL defaults to `http://{MCP_HTTP_HOST}:{MCP_HTTP_PORT}` if not set. The full redirect URL will be `http://{MCP_HTTP_HOST}:{MCP_HTTP_PORT}/signin-callback`. 
+
+**HTTP port and callback contract (container deployments):**
+
+| Concern | Setting(s) | Contract |
+|---|---|---|
+| Server bind inside container | `MCP_HTTP_HOST`, `MCP_HTTP_PORT` | Keep `MCP_HTTP_HOST=0.0.0.0` so the container is reachable; `MCP_HTTP_PORT` is the single app listen port inside the container. |
+| Host/service endpoint | Docker/Compose/K8S port mapping + `MCP_PUBLIC_BASE_URL` | Map host/service port to `MCP_HTTP_PORT` and set `MCP_PUBLIC_BASE_URL` to the URL clients use externally. |
+| Managed auth callback | `EVO_REDIRECT_URL` | Must be a different host:port than the MCP server URL to avoid callback port conflicts. |
+| Delegated auth callback | `MCP_PUBLIC_BASE_URL`, `OIDCPROXY_REDIRECT_PATH` | Callback is on the MCP server itself: `{MCP_PUBLIC_BASE_URL}{OIDCPROXY_REDIRECT_PATH}` (default path `/signin-callback`). |
 
 
 ##### MCP transport mode (optional)
