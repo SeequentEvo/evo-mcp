@@ -47,11 +47,11 @@ graph LR
 
 ## Container port and callback topology
 
-For HTTP deployments, keep one canonical app port inside the container (`MCP_HTTP_PORT`) and map external traffic to that same container port.
+In containers, we keep one canonical app port inside the container (`MCP_HTTP_PORT`) and map external traffic - received on an arbitrary container port - to the app port.
 
 | Concern | Configuration | Rule |
 |---|---|---|
-| App bind in container | `MCP_HTTP_HOST`, `MCP_HTTP_PORT` | Set `MCP_HTTP_HOST=0.0.0.0` so traffic can reach the container. |
+| App bind in container | `MCP_HTTP_HOST`, `MCP_HTTP_PORT` | Must set `MCP_HTTP_HOST=0.0.0.0` so traffic can reach the app. |
 | Public MCP URL | `MCP_PUBLIC_BASE_URL` | Must match the URL seen by MCP clients (including proxy/TLS host+port). |
 | Managed auth callback | `EVO_REDIRECT_URL` | Cannot be used inside a container as the container does not have a browser to handle the redirect. It also is generally not useful for containerized deployments. |
 | Delegated auth callback | `MCP_PUBLIC_BASE_URL`, `OIDCPROXY_REDIRECT_PATH` | Callback is served by MCP at `{MCP_PUBLIC_BASE_URL}{OIDCPROXY_REDIRECT_PATH}`. |

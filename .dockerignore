@@ -1,20 +1,12 @@
-.agentic
-.git
-.github
-.env
-.env.*
-.venv
-__pycache__
-.pytest_cache
-.ruff_cache
-.mypy_cache
-.coverage
-*.pyc
-*.pyo
-*.pyd
-mcp_tools_debug.log
-tests
-docs
-scripts
-README.md
-*.md
+# Ignore everything by default
+**
+
+# Keep only build inputs used by Dockerfile
+!pyproject.toml
+!uv.lock
+!src/
+!src/**
+
+# Keep license files and other important docs
+!LICENSE.md
+

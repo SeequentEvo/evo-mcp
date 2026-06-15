@@ -6,19 +6,23 @@ services:
     env_file:
       - .env
     environment:
-      # Containered MCP should use HTTP transport, and bind to all interfaces to be accessible from the host
+      # In containers, run MCP over HTTP and bind to all interfaces.
       MCP_TRANSPORT: http
-      # MCP container can only run on delegated auth mode
-      CLIENT_DELEGATED_AUTH: true
-      # Container internal process need run on 0.0.0.0 to be accessible from the host
       MCP_HTTP_HOST: 0.0.0.0
       MCP_HTTP_PORT: ${MCP_HTTP_PORT:-5000}
-      # Note: This address should be registered as the redirect URI in your OAuth provider configuration, e.g., http://localhost:5001/signin-callback
+      
+      # Managed auth will not work in a container. Use delegated auth instead.
+      CLIENT_DELEGATED_AUTH: true
+      
+
+      # Public URL clients use to reach MCP.
+      # Register redirect URI:
+      #   {MCP_PUBLIC_BASE_URL}{OIDCPROXY_REDIRECT_PATH}
+      # (default path: /signin-callback)
       MCP_PUBLIC_BASE_URL: ${MCP_PUBLIC_BASE_URL:-http://localhost:5001}
       EVO_LOCAL_DATA_DIR: /data
     ports:
-    # The bound host port should be the same as where MCP_PUBLIC_BASE_URL points to, e.g., if MCP_PUBLIC_BASE_URL is http://127.0.0.1:4321, then this should be "127.0.0.1:4321:${MCP_HTTP_PORT:-5000}"
-    # Note: port 5000 is reserved by some operating systems (e.g. OSX) for system services, so we recommend using a different port for the host side, e.g., 5001
+      # Host port should match the port to which MCP_PUBLIC_BASE_URL will be mapped (e.g. HTTP:80, HTTPS:443, local: custom).
       - "localhost:5001:${MCP_HTTP_PORT:-5000}" 
     volumes:
       - ./data:/data
