@@ -8,7 +8,7 @@ dependencies = [
     "fastmcp>=3.2.4",
     "google-adk==1.28.1",
     "evo-files>=0.2.4",
-    "evo-compute>=0.0.2",
+    "evo-compute>=0.0.4",
     "evo-objects>=0.4.0",
     "evo-sdk-common>=0.5.21",
     "evo-schemas>=2025.9.2",
