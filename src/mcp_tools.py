@@ -44,6 +44,7 @@ from evo_mcp.tools import (
     register_object_builder_tools,
     register_object_staging_tools,
 )
+from poc.tool_strategy import apply_strategy
 
 logger = logging.getLogger(__name__)
 OBJECTS_REFERENCE_UNAVAILABLE = "Objects reference information is currently unavailable."
@@ -155,6 +156,20 @@ if TOOL_FILTER in ["all", "compute"]:
         print("Evo MCP Server configured for Compute Agent")
     else:
         print("Evo MCP Server configured - Compute tools enabled")
+
+# =============================================================================
+# Tool-exposure strategy (applied AFTER all tools are registered)
+# =============================================================================
+# MCP_TOOL_STRATEGY selects how the LLM sees and reaches the tool catalog:
+#   - "none"        : full catalog listed upfront (default, current behavior)
+#   - "tool-search" : catalog hidden behind search_tools / call_tool
+#   - "code-mode"   : catalog hidden behind search / get_schema / execute (sandbox)
+# MCP_SEARCH_ENGINE ("bm25" | "regex") tunes the tool-search strategy.
+#
+# The strategy factory lives in the PoC package (src/poc) so the real
+# server shares the exact same wiring the PoC demonstrates.
+_applied_strategy = apply_strategy(mcp)
+print(f"Tool exposure strategy: {_applied_strategy.value}")
 
 # =============================================================================
 # Resources (not currently supported in ADK)

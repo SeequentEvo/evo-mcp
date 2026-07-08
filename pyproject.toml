@@ -5,7 +5,7 @@ description = "An MCP server implementation using Evo SDK"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
-    "fastmcp>=3.2.4",
+    "fastmcp[code-mode]>=3.2.4",
     "google-adk==1.28.1",
     "evo-files>=0.2.4",
     "evo-compute>=0.0.2",
@@ -29,6 +29,10 @@ dev = [
     "pre-commit>=4",
     "ruff==0.15.4",
     "reuse",
+]
+poc = [
+    "jupyterlab>=4",
+    "ipykernel>=6",
 ]
 
 [tool.ruff]
