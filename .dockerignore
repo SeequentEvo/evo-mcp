@@ -1,0 +1,12 @@
+# Ignore everything by default
+**
+
+# Keep only build inputs used by Dockerfile
+!pyproject.toml
+!uv.lock
+!src/
+!src/**
+
+# Keep license files and other important docs
+!LICENSE.md
+

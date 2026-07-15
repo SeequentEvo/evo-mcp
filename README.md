@@ -104,6 +104,36 @@ flowchart LR
 - Python 3.10+
 - Access to Seequent Evo (https://evo.seequent.com)
 
+### Quick Start with Docker
+
+**Recommended for**: Fast evaluation, containerised deployments, and users who want the easiest setup path.
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+   Then fill in your auth and deployment settings in [Configure your environment](#5-configure-your-environment); `.env.example` shows the available options.
+2. Start the server from the published image:
+  ```bash
+   docker run --rm \
+   --env-file .env \
+   -e MCP_TRANSPORT=http \
+   -e CLIENT_DELEGATED_AUTH=true \
+   -e MCP_HTTP_HOST=0.0.0.0 \
+   -e MCP_HTTP_PORT=5000 \
+   -e MCP_PUBLIC_BASE_URL=http://localhost:5001 \
+   -p 5001:5000 \
+   ghcr.io/seequentevo/evo-mcp:latest
+   ```
+  Or to build from source and start with Docker Compose:
+   ```bash
+   docker compose up --build
+   ```
+   Note: If you use the legacy Compose CLI, the equivalent command is `docker-compose up`.
+   
+3. Open `http://localhost:5001/health` to confirm the server is running.
+
+
 ### Installation 
 
 #### 1. Clone this repository
@@ -214,6 +244,7 @@ Configure your client (VS Code, Cursor, etc.) to start the MCP server process. T
 **Recommended for**: Testing, remote access, programmatic access via FastMCP CLI/scripts, containerised deployments (Docker), and client-delegated shared deployments
 
 HTTP transport turns your MCP server into a web service accessible via a URL. This transport uses the Streamable HTTP protocol, which allows clients to connect over the network. Unlike STDIO where each client gets its own process, an HTTP server can handle multiple clients simultaneously.
+For the containerised path, see [Quick Start with Docker](#quick-start-with-docker) section.
 
 The Streamable HTTP protocol provides full bidirectional communication between client and server, supporting all MCP operations including streaming responses. Combined with `CLIENT_DELEGATED_AUTH=true`, HTTP transport supports multiple concurrent user sessions each authenticating with their own Bentley account.
 
@@ -300,7 +331,7 @@ The authentication flow (server-managed vs. client-delegated) is controlled by t
   - **Server-managed auth**: ``EVO_REDIRECT_URL`` — used only in managed auth mode where the MCP server will manage the OAuth callback and token storage (e.g. ``http://localhost:3000/signin-callback``). In this mode, the hostname and port combination must be different to the ``MCP_HTTP_HOST:MCP_HTTP_PORT`` to avoid conflicts (e.g. if `MCP_HTTP_HOST=localhost` and `MCP_HTTP_PORT=5000`, use `EVO_REDIRECT_URL=http://localhost:3000/signin-callback`).
 
   - **Client-delegated auth**: ``OIDCPROXY_REDIRECT_PATH`` — the path on *this* MCP server where IMS sends the OAuth callback in delegated auth mode. The full url will be `http://{MCP_PUBLIC_BASE_URL}/signin-callback` (e.g. `http://localhost:5000/signin-callback` or `http://my.evo.mcp.server.com/signin-callback`). 
-  
+   
   **Note**: MCP_PUBLIC_BASE_URL defaults to `http://{MCP_HTTP_HOST}:{MCP_HTTP_PORT}` if not set. The full redirect URL will be `http://{MCP_HTTP_HOST}:{MCP_HTTP_PORT}/signin-callback`. 
 
 

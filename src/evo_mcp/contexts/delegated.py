@@ -11,6 +11,7 @@ from pathlib import Path
 from evo.oauth import AccessTokenAuthorizer
 
 from evo_mcp.contexts.helpers import get_client_session_upstream_access_token
+from evo_mcp.runtime_paths import get_session_cache_dir
 
 from .base import EvoContextBase
 
@@ -32,13 +33,23 @@ class DelegatedAuthContext(EvoContextBase):
         self.client_session_id = client_session_id
         self._access_token = None
         # Temp dir for SDK Cache used by object_build_tools — cleaned up on GC
-        self._temp_dir = tempfile.TemporaryDirectory(prefix=f"evo-mcp-{client_session_id[:8]}-")
+        self._session_cache_dir = get_session_cache_dir(client_session_id)
+        self._session_cache_dir.mkdir(parents=True, exist_ok=True)
+        self._temp_dir = tempfile.TemporaryDirectory(
+            prefix="evo-mcp-session-",
+            dir=str(self._session_cache_dir),
+        )
         self.cache_path = Path(self._temp_dir.name)
         # TODO: Consider using redis-based cache backend to share session data across multiple MCP server instances or to deploy in ephemeral environments (e.g. Kubernetes)
 
     def cleanup(self) -> None:
-        """Remove the temporary cache directory."""
+        """Remove the temporary cache directory and its per-session parent."""
         self._temp_dir.cleanup()
+        try:
+            self._session_cache_dir.rmdir()
+        except OSError:
+            # Parent not empty (e.g. concurrent session reuse) or already gone — leave it.
+            pass
 
     async def get_authorizer(self) -> AccessTokenAuthorizer:
         return AccessTokenAuthorizer(access_token=self._access_token)
