@@ -782,7 +782,7 @@ utils = [
 
 [[package]]
 name = "evo-compute"
-version = "0.0.2"
+version = "0.0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "evo-blockmodels", extra = ["utils"] },
@@ -791,9 +791,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0f/db/74af15545151b23e4ab133dd4a05bca1a7dc2e052d654f3791590b7fbf79/evo_compute-0.0.2.tar.gz", hash = "sha256:2c445333f4becb0c69253e2423f825ef14ab3e3f366a2a483d9c223c245f306a", size = 24270, upload-time = "2026-03-08T21:49:44.601Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/78/d9/1e59b6e8ce7f8a9d726d330951eef61bb8284efb2431ae5d0d063be5e436/evo_compute-0.0.4.tar.gz", hash = "sha256:a1e58ed239e7130ba12705e5801cec384ea6bea5a81324fdf5576e5be1c82832", size = 39496, upload-time = "2026-07-01T21:44:30.349Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/92/93/2ba09e0d2d94ec2f38f0f7480242e66dbf7e9f9e8002bc9e9c75813b3583/evo_compute-0.0.2-py3-none-any.whl", hash = "sha256:021250b8195d4d285b716568c3f85d32331eb12e4c499bd1ba0093ed0f2ff22e", size = 38015, upload-time = "2026-03-08T21:49:43.171Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/e5/6fe6a782db10d9ef47d72d74d1f0e9945daab046dbb2ca816a7db1add8cc/evo_compute-0.0.4-py3-none-any.whl", hash = "sha256:21c64ede91d278a41408c204efe75eaa4d86c753c0afe2634a99a5c1070e8a99", size = 76169, upload-time = "2026-07-01T21:44:28.971Z" },
 ]
 
 [[package]]
@@ -844,7 +844,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.14.0" },
-    { name = "evo-compute", specifier = ">=0.0.2" },
+    { name = "evo-compute", specifier = ">=0.0.4" },
     { name = "evo-files", specifier = ">=0.2.4" },
     { name = "evo-objects", specifier = ">=0.4.0" },
     { name = "evo-schemas", specifier = ">=2025.9.2" },
@@ -856,7 +856,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4" },
     { name = "pyarrow", specifier = ">=14.0.0" },
-    { name = "pyjwt", specifier = ">=2.11.0" },
+    { name = "pyjwt", specifier = ">=2.13.0" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-asyncio", marker = "extra == 'dev'" },
     { name = "reuse", marker = "extra == 'dev'" },
@@ -3693,14 +3693,14 @@ wheels = [
 
 [[package]]
 name = "pyjwt"
-version = "2.12.1"
+version = "2.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c2/27/a3b6e5bf6ff856d2509292e95c8f57f0df7017cf5394921fc4e4ef40308a/pyjwt-2.12.1.tar.gz", hash = "sha256:c74a7a2adf861c04d002db713dd85f84beb242228e671280bf709d765b03672b", size = 102564, upload-time = "2026-03-13T19:27:37.25Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3b/81/58d0ac84e1ef3a3843791d6954d94c0b33d526c75eeb1efbce9d0a4c4077/pyjwt-2.13.0.tar.gz", hash = "sha256:41571c89ca91598c79e8ef18a2d07367d4810fbbd6f637794879baf1b7703423", size = 107515, upload-time = "2026-05-21T19:54:36.618Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/7a/8dd906bd22e79e47397a61742927f6747fe93242ef86645ee9092e610244/pyjwt-2.12.1-py3-none-any.whl", hash = "sha256:28ca37c070cad8ba8cd9790cd940535d40274d22f80ab87f3ac6a713e6e8454c", size = 29726, upload-time = "2026-03-13T19:27:35.677Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/5e/ecf12fdb62546d64385c158514e9b2b671f7832108ef2ecd2020ce0af2d1/pyjwt-2.13.0-py3-none-any.whl", hash = "sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728", size = 31274, upload-time = "2026-05-21T19:54:35.362Z" },
 ]
 
 [package.optional-dependencies]

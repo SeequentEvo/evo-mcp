@@ -11,15 +11,14 @@ from typing import Any
 from evo.common import StaticContext
 from evo.compute.tasks import run as run_compute
 from evo.compute.tasks.common import (
+    Filter,
     SearchNeighborhood,
     Source,
-    Target,
 )
-from evo.compute.tasks.kriging import (
+from evo.compute.tasks.geostatistics.kriging import (
     BlockDiscretisation,
     KrigingParameters,
     OrdinaryKriging,
-    RegionFilter,
     SimpleKriging,
 )
 from evo.objects.typed import object_from_uuid
@@ -64,9 +63,21 @@ class KrigingBuildParams(BaseModel):
         default_factory=OrdinaryKriging,
         description="Kriging method object. Defaults to ordinary kriging.",
     )
-    target_region_filter: RegionFilter | None = Field(
+    source_filter: Filter | None = Field(
         default=None,
-        description="Optional region filter for the target object.",
+        description=(
+            "Optional filter restricting kriging to a subset of the source samples. "
+            "Provide a Filter with a 'where' condition, e.g. "
+            "{'where': {'attribute': 'grade', 'operator': 'greater_than', 'threshold': 0.0}}."
+        ),
+    )
+    target_filter: Filter | None = Field(
+        default=None,
+        description=(
+            "Optional filter restricting kriging to a subset of the target object. "
+            "Provide a Filter with a 'where' condition, e.g. "
+            "{'where': {'attribute': 'domain', 'operator': 'in', 'values': ['LMS1', 'LMS2']}}."
+        ),
     )
     block_discretisation: BlockDiscretisation | None = Field(
         default=None,
@@ -85,12 +96,22 @@ def _normalize_kriging_payload(payload: dict[str, Any]) -> dict[str, Any]:
     - `search` -> `neighborhood`, `method` -> `kriging_method`.
     - SearchNeighborhood serialization emits `ellipsoid_ranges`, while
       Ellipsoid construction expects `ranges`.
+    - KrigingParameters serializes `source_filter`/`target_filter` into the
+      backend-shaped `source.filter`/`target.filter` (the fields are excluded
+      from the model dump). Relocate them back to the top-level input fields so
+      the filters survive the `kriging_build_parameters` -> `kriging_run`
+      round-trip instead of being silently dropped on re-parse.
     """
     if "search" in payload and "neighborhood" not in payload:
         payload["neighborhood"] = payload.pop("search")
 
     if "method" in payload and "kriging_method" not in payload:
         payload["kriging_method"] = payload.pop("method")
+
+    for side, field in (("source", "source_filter"), ("target", "target_filter")):
+        container = payload.get(side)
+        if isinstance(container, dict) and "filter" in container:
+            payload[field] = container.pop("filter")
 
     neighborhood = payload.get("neighborhood")
     if not isinstance(neighborhood, dict):
@@ -131,7 +152,7 @@ def register_compute_tools(mcp) -> None:
         if not params.target_attribute or not params.target_attribute.strip():
             raise ValueError(
                 "target_attribute must be a non-empty string. "
-                "Specify the name of the attribute to create on the target block model (e.g. 'OK_estimate')."
+                "Specify the name of the attribute to create or update on the target block model (e.g. 'OK_estimate')."
             )
         environment = await get_workspace_environment(workspace_id)
         evo_context = await get_evo_context()
@@ -142,13 +163,21 @@ def register_compute_tools(mcp) -> None:
             object_from_uuid(context, params.variogram_object_id),
         )
         source_attribute = source_object.attributes[params.point_set_attribute]
+        if not getattr(source_attribute, "exists", True):
+            available = [name for a in source_object.attributes if isinstance(name := getattr(a, "name", None), str)]
+            raise ValueError(
+                f"point_set_attribute '{params.point_set_attribute}' does not exist on the source point set. "
+                f"A kriging source must reference an existing attribute containing the sample values. "
+                f"Available attributes: {available}."
+            )
         payload = KrigingParameters(
             source=Source(object=source_object, attribute=source_attribute),
-            target=Target.new_attribute(target_object, params.target_attribute),
+            target=target_object.attributes[params.target_attribute],
             variogram=variogram_object,
             search=params.search,
             method=params.method,
-            target_region_filter=params.target_region_filter,
+            source_filter=params.source_filter,
+            target_filter=params.target_filter,
             block_discretisation=params.block_discretisation,
         )
 

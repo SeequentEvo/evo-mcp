@@ -7,7 +7,6 @@
 import json
 import logging
 import os
-from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
@@ -20,12 +19,13 @@ from evo.oauth import (
     OAuthConnector,
 )
 
+from evo_mcp.runtime_paths import get_cache_dir
+
 from .base import EvoContextBase
 
 logger = logging.getLogger(__name__)
 
-_REPO_ROOT = Path(__file__).parent.parent.parent.parent
-_CACHE_PATH = _REPO_ROOT / ".cache"
+_CACHE_PATH = get_cache_dir()
 
 
 class ManagedAuthContext(EvoContextBase):

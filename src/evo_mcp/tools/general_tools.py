@@ -19,11 +19,16 @@ from evo.widgets import get_portal_url, get_viewer_url
 from fastmcp import Context
 
 from evo_mcp.context import get_evo_context
+from evo_mcp.runtime_paths import get_debug_log_path
 from evo_mcp.utils.tool_support import get_workspace_context, get_workspace_environment, schema_label
 
 # Set up logging to file for debugging
+_DEBUG_LOG_PATH = get_debug_log_path()
+_DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
-    filename="mcp_tools_debug.log", level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    filename=str(_DEBUG_LOG_PATH),
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
