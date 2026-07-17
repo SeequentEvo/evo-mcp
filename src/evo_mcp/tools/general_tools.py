@@ -61,12 +61,18 @@ def register_general_tools(mcp):
 
     @mcp.tool()
     async def list_workspaces(name: str = "", deleted: bool = False, limit: int = 50) -> list[dict]:
-        """List workspaces with optional filtering by name or deleted status.
+        """List workspaces in the selected instance.
+
+        Use this when the user asks to list, show, or find their workspaces or
+        projects. This is NOT the same as `list_my_instances` (which lists
+        organizations/tenants). Requires an instance to be selected first via
+        `select_instance`.
+        Optionally filter by name or deleted status.
 
         Args:
             name: Filter by workspace name (leave empty for no filter)
             deleted: Include deleted workspaces
-            limit: Maximum number of results
+            limit: Maximum number of results (Max 100)
         """
         evo_context = await get_evo_context()
 
@@ -212,7 +218,12 @@ def register_general_tools(mcp):
     async def list_my_instances(
         ctx: Context,
     ) -> list[dict]:
-        """List instances the user has access to."""
+        """List the Evo instances (organizations/tenants) the user can access.
+
+        Use this only to discover or choose an instance — typically before
+        `select_instance`. This does NOT list workspaces: for workspaces/projects
+        use `list_workspaces` instead.
+        """
         evo_context = await get_evo_context()
 
         if evo_context.org_id:
