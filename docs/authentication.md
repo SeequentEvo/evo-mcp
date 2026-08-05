@@ -249,6 +249,18 @@ If the `mcp-session-id` header is absent (fallback), the raw token is used inste
 
 When `CLIENT_DELEGATED_AUTH=true`, the OIDCProxy is configured with `require_authorization_consent="external"`. This means the built-in consent screen is skipped because Bentley IMS handles user consent/login directly as the upstream identity provider.
 
+For Bentley IMS, authorization starts with `prompt=none` to reuse an existing IMS browser session. If IMS requires interaction, the proxy retries the same transaction once without that parameter.
+
+### Optional downstream callback allowlist
+
+`MCP_ALLOWED_CLIENT_REDIRECT_URIS` optionally restricts the callback URIs that MCP clients may submit through Dynamic Client Registration. It is a comma-separated list of exact URLs or FastMCP wildcard patterns:
+
+```bash
+MCP_ALLOWED_CLIENT_REDIRECT_URIS=http://localhost:*,http://127.0.0.1:*,https://claude.ai/api/mcp/auth_callback
+```
+
+Leave it unset to preserve FastMCP's default behavior of accepting any client callback URI. This setting is distinct from `OIDCPROXY_REDIRECT_PATH`: IMS redirects to `{MCP_PUBLIC_BASE_URL}{OIDCPROXY_REDIRECT_PATH}`, then the MCP server forwards its authorization code to the registered client callback URI.
+
 | Environment | Guidance |
 |-------------|----------|
 | **Local development** | No consent warning is shown — IMS handles consent upstream. |

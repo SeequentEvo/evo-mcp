@@ -815,6 +815,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
+    { name = "cachetools" },
     { name = "evo-compute" },
     { name = "evo-files" },
     { name = "evo-objects" },
@@ -844,6 +845,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.14.1" },
+    { name = "cachetools", specifier = ">=7.1.2" },
     { name = "evo-compute", specifier = ">=0.0.4" },
     { name = "evo-files", specifier = ">=0.2.4" },
     { name = "evo-objects", specifier = ">=0.4.0" },
