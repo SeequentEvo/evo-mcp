@@ -36,6 +36,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from evo_mcp.client_auth import AuthMetadataPatchMiddleware, create_auth_provider
+from evo_mcp.tool_strategy import SearchEngine, ToolStrategy, apply_strategy
 from evo_mcp.tools import (
     register_admin_tools,
     register_compute_tools,
@@ -105,11 +106,35 @@ if TOOL_FILTER not in VALID_TOOL_FILTERS:
 
 # Initialize FastMCP server with agent type in name for clarity
 server_name = "Evo MCP Server" if TOOL_FILTER == "all" else f"Evo MCP Server ({TOOL_FILTER})"
+
+# Server instructions are sent to clients in the MCP `initialize` response and are
+# surfaced to the model as connection context. They teach the Evo data hierarchy and
+# the instance-selection precondition so the model does not confuse instances with
+# workspaces — especially important under the tool-search strategy, where the full
+# catalog is hidden and only the bootstrap tools are directly visible.
+SERVER_INSTRUCTIONS = """\
+Evo organizes data as a hierarchy: Instances -> Workspaces -> Data (Objects, Files, Block models, etc.)
+
+A user can have access to multiple Evo instances, and within each, multiple workspaces.
+Evo instances are organizations or tenants, and workspaces are projects within those instances.
+
+Workflow rules:
+- An Evo Instance must be selected with `select_instance` before any workspace or object
+  operation. If none is selected yet, call `list_my_instances` and ask the user which
+  instance to use, then `select_instance`.
+- "list my workspaces" means call `list_workspaces` — NOT
+  `list_my_instances`.
+- `list_my_instances` lists Evo instances only; it never lists
+  workspaces.
+- When the catalog is hidden behind tool search, use `search_tools` to find the right
+  tool (e.g. search "workspaces", "objects", "download") before calling it.
+"""
+
 # MCP_PUBLIC_BASE_URL supports reverse proxy / TLS deployments where the
 # bind address differs from the public URL clients use for OAuth callbacks.
 public_base_url = os.getenv("MCP_PUBLIC_BASE_URL", f"http://{HTTP_HOST}:{HTTP_PORT}")
 auth_provider = create_auth_provider(public_base_url) if CLIENT_DELEGATED_AUTH else None
-mcp = FastMCP(server_name, auth=auth_provider)
+mcp = FastMCP(server_name, instructions=SERVER_INSTRUCTIONS, auth=auth_provider)
 
 
 # Show more traceback frame for now, we may want to disabled the rich
@@ -157,6 +182,46 @@ if TOOL_FILTER in ["all", "compute"]:
         print("Evo MCP Server configured for Compute Agent")
     else:
         print("Evo MCP Server configured - Compute tools enabled")
+
+
+# =============================================================================
+# Tool-exposure strategy (applied AFTER all tools are registered)
+# =============================================================================
+# MCP_TOOL_STRATEGY selects how the LLM sees and reaches the tool catalog:
+#   - "tool-search" : catalog hidden behind search_tools / call_tool (default).
+#                     Keeps per-request context small so the toolset can grow.
+#   - "none"        : full catalog listed upfront (historical behavior / escape hatch).
+# MCP_SEARCH_ENGINE ("bm25" | "regex") tunes the tool-search ranking engine.
+#
+# Bootstrap tools are pinned via always_visible so agents can always find their
+# entry point regardless of strategy.
+_TOOL_STRATEGY_RAW = os.getenv("MCP_TOOL_STRATEGY", ToolStrategy.TOOL_SEARCH.value).strip().lower()
+try:
+    TOOL_STRATEGY = ToolStrategy(_TOOL_STRATEGY_RAW)
+except ValueError:
+    logging.warning(
+        "Invalid MCP_TOOL_STRATEGY '%s', defaulting to 'tool-search'",
+        _TOOL_STRATEGY_RAW,
+    )
+    TOOL_STRATEGY = ToolStrategy.TOOL_SEARCH
+
+_SEARCH_ENGINE_RAW = os.getenv("MCP_SEARCH_ENGINE", SearchEngine.BM25.value).strip().lower()
+try:
+    SEARCH_ENGINE = SearchEngine(_SEARCH_ENGINE_RAW)
+except ValueError:
+    logging.warning(
+        "Invalid MCP_SEARCH_ENGINE '%s', defaulting to 'bm25'",
+        _SEARCH_ENGINE_RAW,
+    )
+    SEARCH_ENGINE = SearchEngine.BM25
+
+applied_strategy = apply_strategy(
+    mcp,
+    TOOL_STRATEGY,
+    search_engine=SEARCH_ENGINE,
+    always_visible=["select_instance", "list_my_instances"],
+)
+print(f"Tool exposure strategy: {applied_strategy.value}")
 
 
 @mcp.custom_route("/health", methods=["GET"], include_in_schema=False)

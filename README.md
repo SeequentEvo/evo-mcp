@@ -367,6 +367,23 @@ Set `MCP_TOOL_FILTER` environment variable in `.env` to filter available tools:
 MCP_TOOL_FILTER=all
 ```
 
+##### Tool exposure strategy (optional)
+
+Set `MCP_TOOL_STRATEGY` to control how the model discovers and reaches the tool catalog:
+- `tool-search` (default) - the catalog is hidden behind two synthetic tools, `search_tools` and `call_tool`. The model searches for the tool it needs, then calls it. This keeps model-exposed toolset small and on-demand. The bootstrap tools `select_instance` and `list_my_instances` stay directly visible so an agent can always find its entry point.
+- `none` - the full tool catalog is listed upfront (the historical behavior). Use this as an escape hatch for clients or evals that prefer a flat catalog.
+
+When `tool-search` is active, `MCP_SEARCH_ENGINE` selects the ranking engine:
+- `bm25` (default) - relevance ranking over tool names and descriptions. For real agent use (fuzzy, ranked, natural-language tolerant).
+- `regex` - pattern matching over tool names and descriptions. Deterministic, reproducible results — same query always returns the same set in the same order. Useful for tests, evals, and demos where you don't want BM25 ranking to shift.
+
+
+
+```bash
+MCP_TOOL_STRATEGY=tool-search
+MCP_SEARCH_ENGINE=bm25
+```
+
 ## Connect to Evo MCP
 
 Apps like VS Code and Cursor make it easy to connect to MCP servers, whether they are running locally, are available over a local network, or over the internet. VS Code is free to download and use. Cursor requires a paid subscription.
