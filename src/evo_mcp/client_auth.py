@@ -105,7 +105,7 @@ def create_auth_provider(base_url: str):
         token_endpoint_auth_method="none",
         base_url=base_url,
         redirect_path=redirect_path,
-        require_authorization_consent="external",
+        require_authorization_consent="remember",
         allowed_client_redirect_uris=_allowed_client_redirect_uris(),
         extra_authorize_params={"scope": evo_scopes, "prompt": "none"},
         # MCP clients send an RFC 8707 resource indicator (the MCP server URL).
