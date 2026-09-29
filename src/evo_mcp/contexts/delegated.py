@@ -44,12 +44,20 @@ class DelegatedAuthContext(EvoContextBase):
 
     def cleanup(self) -> None:
         """Remove the temporary cache directory and its per-session parent."""
-        self._temp_dir.cleanup()
-        try:
-            self._session_cache_dir.rmdir()
-        except OSError:
-            # Parent not empty (e.g. concurrent session reuse) or already gone — leave it.
-            pass
+        temp_dir, session_cache_dir = self._temp_dir, self._session_cache_dir
+
+        def remove_cache():
+            temp_dir.cleanup()
+            try:
+                session_cache_dir.rmdir()
+            except OSError:
+                # Concurrent session reuse or already gone — leave the parent.
+                pass
+
+        if self._file_transfers is not None:
+            self._file_transfers.cleanup(on_cleanup=remove_cache)
+        else:
+            remove_cache()
 
     async def get_authorizer(self) -> AccessTokenAuthorizer:
         return AccessTokenAuthorizer(access_token=self._access_token)

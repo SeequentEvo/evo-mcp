@@ -10,7 +10,6 @@ Interactions:
   - attribute_details: Inspect attribute columns with statistics.
 """
 
-from pathlib import Path
 from typing import Any, Literal, Union
 
 import pandas as pd
@@ -18,6 +17,7 @@ from evo.objects.typed import EpsgCode, PointSet, PointSetData
 from pydantic import BaseModel, ConfigDict, Field
 
 from evo_mcp.context import get_evo_context
+from evo_mcp.file_transfer import resolve_input_path
 from evo_mcp.staging.errors import StageValidationError
 from evo_mcp.staging.objects.base import (
     EvoStagedObjectType,
@@ -47,7 +47,9 @@ class PointSetCreateParams(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     object_name: str = Field(..., description="Name for the new point set.")
-    csv_file: str = Field(..., description="Path to the CSV file containing point data.")
+    csv_file: str = Field(
+        ..., description="Path to the CSV file containing point data (hosted: file_ref from prepare_file_upload)."
+    )
     x_column: str = Field(..., description="Column name for X coordinates.")
     y_column: str = Field(..., description="Column name for Y coordinates.")
     z_column: str = Field(..., description="Column name for Z coordinates.")
@@ -120,7 +122,7 @@ async def _attribute_details(payload: Any) -> dict[str, Any]:
 
 async def _create(params: PointSetCreateParams) -> dict[str, Any]:
     """Build a local PointSet payload from CSV data."""
-    csv_path = Path(params.csv_file)
+    csv_path = await resolve_input_path(params.csv_file)
     if not csv_path.exists():
         raise ValueError(f"CSV file not found: {params.csv_file}")
 
@@ -175,7 +177,6 @@ async def _create(params: PointSetCreateParams) -> dict[str, Any]:
         name=params.object_name,
         object_type="point_set",
         stage_id=envelope.stage_id,
-        summary=summary,
     )
     message = "Point set created."
     if invalid_count > 0:

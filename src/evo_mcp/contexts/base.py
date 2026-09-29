@@ -45,6 +45,7 @@ class EvoContextBase(ABC):
         # Session-scoped staging layer (lazy — created on first access)
         self._object_staging = None
         self._object_registry = None
+        self._file_transfers = None
 
     # -- Abstract contract --------------------------------------------------
 
@@ -57,6 +58,17 @@ class EvoContextBase(ABC):
         """Get the access token authorizer to be used for API calls."""
 
     # -- Class properties --------------------------------------------------
+    @property
+    def file_transfers(self):
+        """Per-session temporary binary input, created on first access."""
+        if self._file_transfers is None:
+            from evo_mcp.file_transfer import FileTransfers
+
+            if self.cache_path is None:
+                raise ValueError("Context must be initialized before preparing file input.")
+            self._file_transfers = FileTransfers(self.cache_path)
+        return self._file_transfers
+
     @property
     def object_staging(self):
         """Per-session staging service, created on first access."""
