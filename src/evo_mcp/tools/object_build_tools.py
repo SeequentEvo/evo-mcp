@@ -18,7 +18,6 @@ All tools follow a similar pattern:
 """
 
 import logging
-from pathlib import Path
 from typing import Optional, Union
 from uuid import UUID
 
@@ -30,6 +29,7 @@ from evo_schemas.objects.line_segments import LineSegments_V2_2_0
 from evo_schemas.objects.pointset import Pointset_V1_3_0
 
 from evo_mcp.context import get_evo_context
+from evo_mcp.file_transfer import resolve_input_path
 from evo_mcp.utils.object_builders import (
     DownholeCollectionBuilder,
     DownholeIntervalsBuilder,
@@ -68,7 +68,7 @@ def register_object_builder_tools(mcp):
             object_path: Path for the new object (e.g., "/samples/locations.json")
             object_name: Display name for the object
             description: Object description
-            csv_file: Path to CSV file with point data
+            csv_file: Path to CSV file with point data (hosted: file_ref from prepare_file_upload)
             x_column: X coordinate column name
             y_column: Y coordinate column name
             z_column: Z coordinate column name
@@ -84,7 +84,7 @@ def register_object_builder_tools(mcp):
 
         # Load CSV
         try:
-            csv_path = Path(csv_file)
+            csv_path = await resolve_input_path(csv_file)
             if not csv_path.exists():
                 return {"status": "error", "error": f"CSV file not found: {csv_file}"}
             df = pd.read_csv(csv_path)
@@ -236,8 +236,8 @@ def register_object_builder_tools(mcp):
             object_path: Path for the new object (e.g., "/lines/faults.json")
             object_name: Display name for the object
             description: Object description
-            vertices_file: Path to CSV with vertex coordinates
-            segments_file: Path to CSV with segment definitions
+            vertices_file: Path to CSV with vertex coordinates (hosted: file_ref from prepare_file_upload)
+            segments_file: Path to CSV with segment definitions (hosted: file_ref from prepare_file_upload)
             x_column: X coordinate column name in vertices
             y_column: Y coordinate column name in vertices
             z_column: Z coordinate column name in vertices
@@ -256,7 +256,7 @@ def register_object_builder_tools(mcp):
 
         # Load vertices
         try:
-            vertices_path = Path(vertices_file)
+            vertices_path = await resolve_input_path(vertices_file)
             if not vertices_path.exists():
                 return {"status": "error", "error": f"Vertices file not found: {vertices_file}"}
             vertices_df = pd.read_csv(vertices_path)
@@ -267,7 +267,7 @@ def register_object_builder_tools(mcp):
 
         # Load segments
         try:
-            segments_path = Path(segments_file)
+            segments_path = await resolve_input_path(segments_file)
             if not segments_path.exists():
                 return {"status": "error", "error": f"Segments file not found: {segments_file}"}
             segments_df = pd.read_csv(segments_path)
@@ -433,8 +433,8 @@ def register_object_builder_tools(mcp):
             object_path: Path for the new object (e.g., "/drillholes/my_data.json")
             object_name: Display name for the object
             description: Object description
-            collar_file: Path to collar CSV file
-            survey_file: Path to survey CSV file
+            collar_file: Path to collar CSV file (hosted: file_ref from prepare_file_upload)
+            survey_file: Path to survey CSV file (hosted: file_ref from prepare_file_upload)
             collar_id_column: Hole ID column name in collar file
             survey_id_column: Hole ID column name in survey file
             x_column: X coordinate column in collar
@@ -446,7 +446,7 @@ def register_object_builder_tools(mcp):
             max_depth_column: Max depth column in collar file (optional - if not provided,
                 will be calculated from survey data)
             interval_files: List of interval file configs, each with:
-                - file: Path to CSV file
+                - file: Path to CSV file (hosted: file_ref from prepare_file_upload)
                 - name: Collection name (e.g., "assay", "geology")
                 - id_column: Hole ID column name
                 - from_column: From depth column name
@@ -464,7 +464,7 @@ def register_object_builder_tools(mcp):
 
         # Load collar file
         try:
-            collar_path = Path(collar_file)
+            collar_path = await resolve_input_path(collar_file)
             if not collar_path.exists():
                 return {"status": "error", "error": f"Collar file not found: {collar_file}"}
             collar_df = pd.read_csv(collar_path)
@@ -474,7 +474,7 @@ def register_object_builder_tools(mcp):
 
         # Load survey file
         try:
-            survey_path = Path(survey_file)
+            survey_path = await resolve_input_path(survey_file)
             if not survey_path.exists():
                 return {"status": "error", "error": f"Survey file not found: {survey_file}"}
             survey_df = pd.read_csv(survey_path)
@@ -541,7 +541,7 @@ def register_object_builder_tools(mcp):
         interval_configs = []
         for i, cfg in enumerate(interval_files):
             try:
-                interval_path = Path(cfg.get("file", ""))
+                interval_path = await resolve_input_path(cfg.get("file", ""))
                 if not interval_path.exists():
                     result["errors"].append(f"Interval file not found: {interval_path}")
                     continue
@@ -690,7 +690,7 @@ def register_object_builder_tools(mcp):
             object_path: Path for the new object (e.g., "/intervals/assay.json")
             object_name: Display name for the object
             description: Object description
-            csv_file: Path to CSV file with interval data
+            csv_file: Path to CSV file with interval data (hosted: file_ref from prepare_file_upload)
             hole_id_column: Hole ID column name
             from_column: From depth column name
             to_column: To depth column name
@@ -716,7 +716,7 @@ def register_object_builder_tools(mcp):
 
         # Load CSV
         try:
-            csv_path = Path(csv_file)
+            csv_path = await resolve_input_path(csv_file)
             if not csv_path.exists():
                 return {"status": "error", "error": f"CSV file not found: {csv_file}"}
             df = pd.read_csv(csv_path)

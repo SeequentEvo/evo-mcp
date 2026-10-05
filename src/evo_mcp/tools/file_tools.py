@@ -82,41 +82,6 @@ def register_file_tools(mcp):
             }
 
     @mcp.tool()
-    async def list_file_versions(workspace_id: str, file_path: str) -> dict:
-        """List all versions of a file in a workspace.
-
-        Args:
-            workspace_id: Workspace UUID
-            file_path: Path to the file in workspace (e.g., "/Core Logging_Headers.csv")
-
-        Returns:
-            List of file versions with version_id and created_at
-        """
-        evo_context = await get_evo_context()
-
-        # Ensure file_path starts with /
-        if not file_path.startswith("/"):
-            file_path = f"/{file_path}"
-
-        file_client = await evo_context.get_file_client(UUID(workspace_id))
-
-        versions = await file_client.list_versions_by_path(file_path)
-
-        versions_list = [
-            {
-                "version_id": v.version_id,
-                "created_at": v.created_at.isoformat() if v.created_at else None,
-            }
-            for v in versions
-        ]
-
-        return {
-            "file_path": file_path,
-            "total_versions": len(versions_list),
-            "versions": versions_list,
-        }
-
-    @mcp.tool()
     async def download_file(workspace_id: str, file_path: str, local_filename: str = "", version: str = "") -> dict:
         """Download a file from a workspace to the local data directory.
 
@@ -173,6 +138,47 @@ def register_file_tools(mcp):
             }
         except Exception as e:
             return {"error": str(e), "file_path": file_path, "status": "download_failed"}
+
+    register_file_catalog_tools(mcp)
+
+
+def register_file_catalog_tools(mcp):
+    """Register file listing tools shared by local and hosted MCP servers."""
+
+    @mcp.tool()
+    async def list_file_versions(workspace_id: str, file_path: str) -> dict:
+        """List all versions of a file in a workspace.
+
+        Args:
+            workspace_id: Workspace UUID
+            file_path: Path to the file in workspace (e.g., "/Core Logging_Headers.csv")
+
+        Returns:
+            List of file versions with version_id and created_at
+        """
+        evo_context = await get_evo_context()
+
+        # Ensure file_path starts with /
+        if not file_path.startswith("/"):
+            file_path = f"/{file_path}"
+
+        file_client = await evo_context.get_file_client(UUID(workspace_id))
+
+        versions = await file_client.list_versions_by_path(file_path)
+
+        versions_list = [
+            {
+                "version_id": v.version_id,
+                "created_at": v.created_at.isoformat() if v.created_at else None,
+            }
+            for v in versions
+        ]
+
+        return {
+            "file_path": file_path,
+            "total_versions": len(versions_list),
+            "versions": versions_list,
+        }
 
     @mcp.tool()
     async def list_files(workspace_id: str, path_filter: str = "") -> dict:

@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from evo_mcp.file_transfer import REMOTE_FILE_TRANSFER, resolve_input_path
+
 
 def _get_data_directory() -> Path:
     """Get the configured local data directory from environment."""
@@ -115,6 +117,12 @@ def register_filesystem_tools(mcp):
             "files": file_info,
         }
 
+    register_csv_preview_tools(mcp)
+
+
+def register_csv_preview_tools(mcp):
+    """Register CSV inspection for local files or hosted upload references."""
+
     # ==========================================================================
     # CSV Analysis Tools
     # ==========================================================================
@@ -124,12 +132,14 @@ def register_filesystem_tools(mcp):
         """Preview contents of a CSV file.
 
         Args:
-            file_path: Path to CSV file (absolute or relative to data directory)
+            file_path: Path to CSV file (absolute or relative to data directory);
+                in hosted mode, use file_ref from prepare_file_upload
             max_rows: Maximum rows to preview
         """
 
         # Resolve path
-        file_path = Path(file_path)
+        input_reference = file_path
+        file_path = await resolve_input_path(file_path)
         if not file_path.is_absolute():
             file_path = _get_data_directory() / file_path
 
@@ -158,7 +168,7 @@ def register_filesystem_tools(mcp):
             sample = df.head(max_rows).to_dict(orient="records")
 
             return {
-                "file_path": str(file_path),
+                "file_path": input_reference if REMOTE_FILE_TRANSFER else str(file_path),
                 "total_rows": len(df),
                 "total_columns": len(df.columns),
                 "columns": columns,

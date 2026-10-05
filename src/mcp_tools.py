@@ -35,6 +35,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from evo_mcp.client_auth import create_auth_provider
+from evo_mcp.file_transfer import file_transfer_lifespan
 from evo_mcp.tool_strategy import BOOTSTRAP_TOOLS, SearchEngine, ToolStrategy, apply_strategy
 from evo_mcp.tools import (
     register_admin_tools,
@@ -45,7 +46,9 @@ from evo_mcp.tools import (
     register_instance_users_admin_tools,
     register_object_builder_tools,
     register_object_staging_tools,
+    register_remote_file_tools,
 )
+from evo_mcp.tools.remote_file_tools import FILE_TRANSFER_INSTRUCTIONS, register_remote_input_tools
 
 logger = logging.getLogger(__name__)
 OBJECTS_REFERENCE_UNAVAILABLE = "Objects reference information is currently unavailable."
@@ -97,6 +100,10 @@ TOOL_FILTER = os.getenv(
     ),
 ).lower()
 VALID_TOOL_FILTERS = ["admin", "data", "compute", "all"]
+REMOTE_FILE_TRANSFER = os.getenv("EVO_MCP_REMOTE_FILE_TRANSFER", "").lower() in ("1", "true")
+
+if REMOTE_FILE_TRANSFER and TRANSPORT != "http":
+    raise ValueError("EVO_MCP_REMOTE_FILE_TRANSFER requires MCP_TRANSPORT=http.")
 
 if TOOL_FILTER not in VALID_TOOL_FILTERS:
     logging.warning("Invalid MCP_TOOL_FILTER '%s', defaulting to 'all'", TOOL_FILTER)
@@ -128,12 +135,19 @@ Workflow rules:
 - When the catalog is hidden behind tool search, use `search_tools` to find the right
   tool (e.g. search "workspaces", "objects", "download") before calling it.
 """
+if REMOTE_FILE_TRANSFER:
+    SERVER_INSTRUCTIONS += "\n" + FILE_TRANSFER_INSTRUCTIONS
 
 # MCP_PUBLIC_BASE_URL supports reverse proxy / TLS deployments where the
 # bind address differs from the public URL clients use for OAuth callbacks.
 public_base_url = os.getenv("MCP_PUBLIC_BASE_URL", f"http://{HTTP_HOST}:{HTTP_PORT}")
 auth_provider = create_auth_provider(public_base_url) if CLIENT_DELEGATED_AUTH else None
-mcp = FastMCP(server_name, instructions=SERVER_INSTRUCTIONS, auth=auth_provider)
+mcp = FastMCP(
+    server_name,
+    instructions=SERVER_INSTRUCTIONS,
+    auth=auth_provider,
+    lifespan=file_transfer_lifespan if REMOTE_FILE_TRANSFER else None,
+)
 
 
 # Show more traceback frame for now, we may want to disabled the rich
@@ -159,6 +173,9 @@ def _get_objects_reference_content() -> str:
 # Always register general tools (workspace discovery, object queries, etc.)
 register_general_tools(mcp)
 
+if REMOTE_FILE_TRANSFER and TOOL_FILTER in ["all", "data", "compute"]:
+    register_remote_input_tools(mcp, public_base_url)
+
 if TOOL_FILTER in ["all", "admin"]:
     # Admin Agent: Workspace and instance management tools
     # Includes: workspace creation, snapshots, duplication, permissions management
@@ -166,9 +183,10 @@ if TOOL_FILTER in ["all", "admin"]:
     register_instance_users_admin_tools(mcp)
 if TOOL_FILTER in ["all", "data"]:  #  "data_agent"
     # register_data_tools(mcp)
-    register_filesystem_tools(mcp)
+    if not REMOTE_FILE_TRANSFER:
+        register_filesystem_tools(mcp)
     register_object_builder_tools(mcp)
-    register_file_tools(mcp)
+    (register_remote_file_tools if REMOTE_FILE_TRANSFER else register_file_tools)(mcp)
     if TOOL_FILTER == "data":
         print("Evo MCP Server configured for Data Agent")
     else:
@@ -329,6 +347,18 @@ if TOOL_FILTER in ["all", "data"]:
     @mcp.prompt(name="data_prompt")
     def data_prompt() -> str:
         """Prompt for local file system data connector and object creation operations."""
+        if REMOTE_FILE_TRANSFER:
+            return (
+                FILE_TRANSFER_INSTRUCTIONS
+                + """
+Use preview_csv_file to inspect uploaded CSV column names and types, then use
+build_and_create_pointset, build_and_create_line_segments,
+build_and_create_downhole_collection, or build_and_create_downhole_intervals.
+Supply uploaded file_ref values for every CSV parameter, including interval_files.
+Always validate with dry_run=True first, review errors/warnings and mappings with
+the user, then create with dry_run=False. Return full tool errors when a step fails.
+"""
+            )
         return """\
         You are a local data import specialist for the Evo platform created by Seequent.
 
