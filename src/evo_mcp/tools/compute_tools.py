@@ -16,7 +16,7 @@ from evo.compute.tasks.common import (
     Source,
 )
 from evo.compute.tasks.geostatistics.kriging import (
-    BlockDiscretisation,
+    BlockDiscretization,
     KrigingParameters,
     OrdinaryKriging,
     SimpleKriging,
@@ -38,7 +38,7 @@ from evo_mcp.utils.tool_support import (
 class KrigingBuildParams(BaseModel):
     """Parameters for building a validated kriging payload."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     target_object_id: str = Field(
         description=(
@@ -79,9 +79,9 @@ class KrigingBuildParams(BaseModel):
             "{'where': {'attribute': 'domain', 'operator': 'in', 'values': ['LMS1', 'LMS2']}}."
         ),
     )
-    block_discretisation: BlockDiscretisation | None = Field(
+    block_discretization: BlockDiscretization | None = Field(
         default=None,
-        description="Optional sub-block discretisation settings.",
+        description="Optional sub-block discretization settings.",
     )
 
 
@@ -178,7 +178,7 @@ def register_compute_tools(mcp) -> None:
             method=params.method,
             source_filter=params.source_filter,
             target_filter=params.target_filter,
-            block_discretisation=params.block_discretisation,
+            block_discretization=params.block_discretization,
         )
 
         return _normalize_kriging_payload(payload.model_dump(mode="json"))
