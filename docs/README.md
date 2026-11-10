@@ -34,5 +34,5 @@ MCP tool groups.
 
 | File | Description |
 |---|---|
-| [compute-tools.md](tools/compute-tools.md) | Kriging build + run tools |
+| [compute-tools.md](tools/compute-tools.md) | Kriging and IDW build + run tools |
 

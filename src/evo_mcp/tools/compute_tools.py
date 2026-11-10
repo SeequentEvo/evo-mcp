@@ -2,129 +2,28 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""MCP tools for compute task execution."""
+"""MCP tool registration for compute tasks."""
 
-import asyncio
-import logging
 from typing import Any
 
-from evo.common import StaticContext
-from evo.compute.tasks import run as run_compute
-from evo.compute.tasks.common import (
-    Filter,
-    SearchNeighborhood,
-    Source,
-)
-from evo.compute.tasks.geostatistics.kriging import (
-    BlockDiscretization,
-    KrigingParameters,
-    OrdinaryKriging,
-    SimpleKriging,
-)
-from evo.objects.typed import object_from_uuid
-from evo.widgets import format_task_result_with_target
 from fastmcp import Context
-from pydantic import BaseModel, ConfigDict, Field
 
-from evo_mcp.context import get_evo_context
-from evo_mcp.utils.tool_support import (
-    MCPFeedback,
-    VariogramObjectId,
-    build_links_from_metadata,
-    get_workspace_environment,
+from evo_mcp.utils.compute_helpers import build_idw_parameters, build_kriging_parameters, run_estimation_scenarios
+from evo_mcp.utils.compute_params import (
+    IDWBuildInput,
+    IDWScenario,
+    KrigingBuildInput,
+    KrigingScenario,
 )
-
-
-class KrigingBuildParams(BaseModel):
-    """Parameters for building a validated kriging payload."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    target_object_id: str = Field(
-        description=(
-            "UUID of the target object for an estimation or spatial-validation workflow. "
-            "For kriging, this should identify an existing BlockModel or Regular3DGrid in the provided workspace."
-        ),
-    )
-    target_attribute: str = Field(
-        description="Target attribute name to create or update on the target object for estimation results.",
-    )
-    point_set_object_id: str = Field(
-        description="UUID of the source PointSet object containing known sample values.",
-    )
-    point_set_attribute: str = Field(
-        description="Existing numeric source attribute name on the point set object, for example 'CU_pct'.",
-    )
-    variogram_object_id: VariogramObjectId
-    search: SearchNeighborhood = Field(
-        description="Search neighborhood parameters including ellipsoid and sample counts.",
-    )
-    method: SimpleKriging | OrdinaryKriging = Field(
-        default_factory=OrdinaryKriging,
-        description="Kriging method object. Defaults to ordinary kriging.",
-    )
-    source_filter: Filter | None = Field(
-        default=None,
-        description=(
-            "Optional filter restricting kriging to a subset of the source samples. "
-            "Provide a Filter with a 'where' condition, e.g. "
-            "{'where': {'attribute': 'grade', 'operator': 'greater_than', 'threshold': 0.0}}."
-        ),
-    )
-    target_filter: Filter | None = Field(
-        default=None,
-        description=(
-            "Optional filter restricting kriging to a subset of the target object. "
-            "Provide a Filter with a 'where' condition, e.g. "
-            "{'where': {'attribute': 'domain', 'operator': 'in', 'values': ['LMS1', 'LMS2']}}."
-        ),
-    )
-    block_discretization: BlockDiscretization | None = Field(
-        default=None,
-        description="Optional sub-block discretization settings.",
-    )
-
-
-logger = logging.getLogger(__name__)
-
-
-def _normalize_kriging_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Normalize payload shape for MCP round-trips.
-
-    The evo-objects SDK uses different field names compared to evo-compute for some kriging parameters.
-
-    - `search` -> `neighborhood`, `method` -> `kriging_method`.
-    - SearchNeighborhood serialization emits `ellipsoid_ranges`, while
-      Ellipsoid construction expects `ranges`.
-    - KrigingParameters serializes `source_filter`/`target_filter` into the
-      backend-shaped `source.filter`/`target.filter` (the fields are excluded
-      from the model dump). Relocate them back to the top-level input fields so
-      the filters survive the `kriging_build_parameters` -> `kriging_run`
-      round-trip instead of being silently dropped on re-parse.
-    """
-    if "search" in payload and "neighborhood" not in payload:
-        payload["neighborhood"] = payload.pop("search")
-
-    if "method" in payload and "kriging_method" not in payload:
-        payload["kriging_method"] = payload.pop("method")
-
-    for side, field in (("source", "source_filter"), ("target", "target_filter")):
-        container = payload.get(side)
-        if isinstance(container, dict) and "filter" in container:
-            payload[field] = container.pop("filter")
-
-    neighborhood = payload.get("neighborhood")
-    if not isinstance(neighborhood, dict):
-        return payload
-
-    ellipsoid = neighborhood.get("ellipsoid")
-    if not isinstance(ellipsoid, dict):
-        return payload
-
-    if "ellipsoid_ranges" in ellipsoid and "ranges" not in ellipsoid:
-        ellipsoid["ranges"] = ellipsoid.pop("ellipsoid_ranges")
-
-    return payload
+from evo_mcp.utils.compute_params import (
+    IDWBuildParams as IDWBuildParams,
+)
+from evo_mcp.utils.compute_params import (
+    KrigingBuildParams as KrigingBuildParams,
+)
+from evo_mcp.utils.compute_params import (
+    NeighborhoodBuildParams as NeighborhoodBuildParams,
+)
 
 
 def register_compute_tools(mcp) -> None:
@@ -133,7 +32,7 @@ def register_compute_tools(mcp) -> None:
     @mcp.tool()
     async def kriging_build_parameters(
         workspace_id: str,
-        params: KrigingBuildParams,
+        params: KrigingBuildInput,
     ) -> dict[str, Any]:
         """Build a validated kriging payload from primitive inputs.
 
@@ -144,84 +43,32 @@ def register_compute_tools(mcp) -> None:
         Returns:
             A validated payload object suitable for kriging_run.
         """
-        if not params.point_set_attribute or not params.point_set_attribute.strip():
-            raise ValueError(
-                "point_set_attribute must be a non-empty string. "
-                "Specify the attribute name on the point set to use as the estimation input (e.g. 'CU_pct')."
-            )
-        if not params.target_attribute or not params.target_attribute.strip():
-            raise ValueError(
-                "target_attribute must be a non-empty string. "
-                "Specify the name of the attribute to create or update on the target block model (e.g. 'OK_estimate')."
-            )
-        environment = await get_workspace_environment(workspace_id)
-        evo_context = await get_evo_context()
-        context = StaticContext.from_environment(environment, evo_context.connector)
-        source_object, target_object, variogram_object = await asyncio.gather(
-            object_from_uuid(context, params.point_set_object_id),
-            object_from_uuid(context, params.target_object_id),
-            object_from_uuid(context, params.variogram_object_id),
-        )
-        source_attribute = source_object.attributes[params.point_set_attribute]
-        if not getattr(source_attribute, "exists", True):
-            available = [name for a in source_object.attributes if isinstance(name := getattr(a, "name", None), str)]
-            raise ValueError(
-                f"point_set_attribute '{params.point_set_attribute}' does not exist on the source point set. "
-                f"A kriging source must reference an existing attribute containing the sample values. "
-                f"Available attributes: {available}."
-            )
-        payload = KrigingParameters(
-            source=Source(object=source_object, attribute=source_attribute),
-            target=target_object.attributes[params.target_attribute],
-            variogram=variogram_object,
-            search=params.search,
-            method=params.method,
-            source_filter=params.source_filter,
-            target_filter=params.target_filter,
-            block_discretization=params.block_discretization,
-        )
+        return await build_kriging_parameters(workspace_id, params)
 
-        return _normalize_kriging_payload(payload.model_dump(mode="json"))
+    @mcp.tool()
+    async def idw_build_parameters(workspace_id: str, params: IDWBuildInput) -> dict[str, Any]:
+        """Build validated inverse distance weighting (IDW) parameters for idw_run.
 
-    def _format_single_result(
-        result: Any,
-        scenario: KrigingParameters,
-        environment: Any,
-    ) -> dict[str, Any]:
-        target_reference = str(scenario.target.object)
-        target_object_id = target_reference.rstrip("/").split("/")[-1].split("?")[0]
-        links = build_links_from_metadata(environment, target_object_id)
-        requested_attribute = getattr(scenario.target.attribute, "name", result.attribute_name)
-        return {
-            "status": "success",
-            "message": result.message,
-            "target": {
-                "name": result.target_name,
-                "reference": result.target_reference,
-                "schema_id": str(result.schema),
-                "locator": {
-                    "org_id": str(environment.org_id),
-                    "workspace_id": str(environment.workspace_id),
-                    "object_id": target_object_id,
-                    "hub_url": environment.hub_url,
-                },
-                "attribute": {
-                    "operation": scenario.target.attribute.operation,
-                    "name": result.attribute_name,
-                    "requested": requested_attribute,
-                },
-            },
-            "presentation": {
-                "html": format_task_result_with_target(result),
-                "portal_url": links["portal_url"],
-                "viewer_url": links["viewer_url"],
-            },
-        }
+        Resolve the existing source and target objects, select nearby samples
+        using the search neighborhood, and configure distance-weighting power.
+        No variogram is required. This step does not execute estimation.
+        """
+        return await build_idw_parameters(workspace_id, params)
+
+    @mcp.tool()
+    async def idw_run(workspace_id: str, scenarios: list[IDWScenario], ctx: Context) -> dict[str, Any]:
+        """Run inverse distance weighting (IDW) estimation scenarios in parallel.
+
+        Accept payloads from idw_build_parameters. Estimates create or update
+        attributes on the published target objects. Returns output references
+        and viewer links in input order, with progress reported while running.
+        """
+        return await run_estimation_scenarios(workspace_id, scenarios, ctx)
 
     @mcp.tool()
     async def kriging_run(
         workspace_id: str,
-        scenarios: list[KrigingParameters],
+        scenarios: list[KrigingScenario],
         ctx: Context,
     ) -> dict[str, Any]:
         """Run one or more kriging compute tasks in parallel.
@@ -233,16 +80,4 @@ def register_compute_tools(mcp) -> None:
         Returns:
             A list of result summaries in the same order as the input scenarios.
         """
-        if len(scenarios) == 0:
-            raise ValueError("Must specify at least one scenario.")
-
-        environment = await get_workspace_environment(workspace_id)
-        evo_context = await get_evo_context()
-        context = StaticContext.from_environment(environment, evo_context.connector)
-
-        results = await run_compute(context, scenarios, preview=True, fb=MCPFeedback(ctx))
-        return {
-            "status": "success",
-            "scenarios_completed": len(results),
-            "results": [_format_single_result(r, scenario, environment) for r, scenario in zip(results, scenarios)],
-        }
+        return await run_estimation_scenarios(workspace_id, scenarios, ctx)
