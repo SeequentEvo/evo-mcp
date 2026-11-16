@@ -506,6 +506,8 @@ To verify that the Evo MCP server is correctly configured in Cursor:
 
 Running Evo MCP in streamable HTTP mode allows you to use the `fastmcp` CLI to access MCP tools without manually crafting JSON-RPC payloads.
 
+FastMCP 4 (MCP SDK v2) serves both sessionless MCP 2026-07-28 clients and legacy session-based clients. In delegated-auth mode, sessionless clients retain their selected instance only while their access token stays the same; refreshing the token creates a new context. See [session identity](docs/authentication.md#session-identity).
+
 **Setup:**
 ```bash
 # In .env or environment

@@ -120,7 +120,7 @@ async def delegated_server_client(delegated_server):
 def test_auth_provider_uses_evo_public_client_settings(auth_provider):
     assert auth_provider._forward_resource is False
     assert auth_provider._token_endpoint_auth_method == "none"
-    assert auth_provider._require_authorization_consent == "external"
+    assert auth_provider._require_authorization_consent == "remember"
     assert auth_provider._redirect_path == "/signin-callback"
     assert auth_provider._extra_authorize_params == {
         "scope": EvoScopes.all_evo,

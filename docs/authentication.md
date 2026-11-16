@@ -227,13 +227,13 @@ stateDiagram-v2
 The session key is derived from two values:
 
 1. **`sub` claim** from the IMS JWT — identifies the user
-2. **`mcp-session-id` header** — identifies the client session (set by MCP protocol)
+2. **`mcp-session-id` header** — identifies the client session on legacy MCP connections
 
 ```
 session_key = sha256(user_sub + ":" + mcp_session_id)[:32]
 ```
 
-If the `mcp-session-id` header is absent (fallback), the raw token is used instead — but this means a token refresh creates a new session (the old one is evicted by TTL).
+On sessionless MCP v2 connections (2026-07-28), there is no `mcp-session-id` header. The fallback uses the raw token instead — a token refresh creates a new context and loses the selected instance (the old context is evicted by TTL). Clients sharing an access token also share the same context and selected instance. These limitations remain until the stateless context flow is implemented.
 
 ### Eviction and cleanup
 
@@ -247,7 +247,7 @@ If the `mcp-session-id` header is absent (fallback), the raw token is used inste
 
 ## Security: Authorization consent screen
 
-When `CLIENT_DELEGATED_AUTH=true`, the OIDCProxy is configured with `require_authorization_consent="external"`. This means the built-in consent screen is skipped because Bentley IMS handles user consent/login directly as the upstream identity provider.
+When `CLIENT_DELEGATED_AUTH=true`, the OIDCProxy uses `require_authorization_consent="remember"`. FastMCP shows a consent screen on the first authorization of a client and remembers approval for return visits. Bentley IMS handles upstream login separately.
 
 For Bentley IMS, authorization starts with `prompt=none` to reuse an existing IMS browser session. If IMS requires interaction, the proxy retries the same transaction once without that parameter.
 
