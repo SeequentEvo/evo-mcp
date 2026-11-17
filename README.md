@@ -101,7 +101,7 @@ flowchart LR
 ## Getting started
 
 ### Prerequisites
-- Python 3.10+
+- Python 3.11+
 - Access to Seequent Evo (https://evo.seequent.com)
 
 ### Quick Start with Docker
@@ -181,10 +181,10 @@ If you prefer using `pip` and `pyenv` to manage your Python environment:
    - **Linux**: Follow [pyenv installation guide](https://github.com/pyenv/pyenv#installation)
 
 
-##### b. Install Python 3.10+
+##### b. Install Python 3.11+
    ```bash
-   pyenv install 3.10
-   pyenv local 3.10
+   pyenv install 3.11
+   pyenv local 3.11
    ```
 
 ##### c. Create a virtual environment
@@ -593,6 +593,16 @@ To add new MCP tools:
 2. Decorate with `@mcp.tool()` decorator
 3. Tools are auto-registered based on their module (general/admin/data) on server startup
 4. Test using VS Code integration or the ADK agent
+
+### Testing
+
+Pull requests run the test suite on Python 3.11, 3.12, 3.13 and 3.14. Python 3.15 is not yet included because several locked native dependencies lack compatible wheels.
+
+Run tests locally:
+
+```bash
+PYTHONPATH=src uv run --locked --extra dev pytest -q
+```
 
 ### Linting
 

@@ -7,12 +7,32 @@ on:
   pull_request:
 
 jobs:
+  run-tests:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    env:
+      PYTHONPATH: src
+      UV_PYTHON: ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/install-uv
+        with:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+      - name: Run tests
+        run: uv run --locked --extra dev pytest -q
+
   run-pre-commit:
     name: Run pre-commit hooks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
       - uses: pre-commit/action@v3.0.1
 
   run-linting:
