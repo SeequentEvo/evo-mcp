@@ -20,9 +20,11 @@ Create:
   - staging_invoke_interaction(variogram_name, "create_search_neighborhood", params): Derive from staged variogram.
 """
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from evo.compute.tasks.common import SearchNeighborhood as ComputeSearchNeighborhood
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from evo_mcp.context import get_evo_context
 from evo_mcp.staging.objects.base import (
@@ -31,25 +33,161 @@ from evo_mcp.staging.objects.base import (
     staged_object_type_registry,
 )
 
+_UNIT_ELLIPSOID_RANGES = {"major": 1.0, "semi_major": 1.0, "minor": 1.0}
 
-class SearchNeighborhoodData(BaseModel):
+
+class SearchNeighborhoodLimits(BaseModel):
+    """Shared sample, sector, and drillhole limits delegated to evo-compute's SearchNeighborhood."""
+
+    max_samples: int = Field(..., ge=1, description="Maximum number of samples to use.")
+    min_samples: int | None = Field(None, ge=1, description="Minimum number of samples required (optional).")
+    max_empty_octants: int | None = Field(
+        None,
+        ge=0,
+        le=8,
+        description="Maximum number of empty octants allowed (0-8; omit or use 8 to disable).",
+    )
+    max_samples_per_octant: int | None = Field(
+        None,
+        ge=1,
+        description="Maximum number of samples to use from each octant.",
+    )
+    max_empty_quadrants: int | None = Field(
+        None,
+        ge=0,
+        le=4,
+        description="Maximum number of empty quadrants allowed (0-4; omit or use 4 to disable).",
+    )
+    max_samples_per_quadrant: int | None = Field(
+        None,
+        ge=1,
+        description="Maximum number of samples to use from each quadrant.",
+    )
+    max_samples_per_drillhole: int | None = Field(
+        None,
+        ge=1,
+        description="Maximum number of samples per drillhole (requires a DownholeIntervals source).",
+    )
+    max_drillholes: int | None = Field(
+        None,
+        ge=1,
+        validation_alias=AliasChoices("max_drillholes", "max_drillholes_per_estimate"),
+        description="Maximum number of drillholes per estimate (requires a DownholeIntervals source).",
+    )
+    min_drillholes: int | None = Field(
+        None,
+        ge=0,
+        validation_alias=AliasChoices("min_drillholes", "min_drillholes_per_estimate"),
+        description="Minimum number of distinct drillholes per estimate (Kriging-only; requires a DownholeIntervals source).",
+    )
+    drillhole_limit_scope: Literal["global", "quadrant", "octant"] | None = Field(
+        None,
+        description="Scope at which max_samples_per_drillhole applies ('global', 'quadrant', or 'octant').",
+    )
+
+    @property
+    def max_drillholes_per_estimate(self) -> int | None:
+        """Backwards-compatible alias for `max_drillholes`."""
+        return self.max_drillholes
+
+    @model_validator(mode="before")
+    @classmethod
+    def _validate_drillhole_aliases(cls, data: Any) -> Any:
+        if not isinstance(data, Mapping):
+            return data
+        cleaned = dict(data)
+        for canonical, legacy in (
+            ("max_drillholes", "max_drillholes_per_estimate"),
+            ("min_drillholes", "min_drillholes_per_estimate"),
+        ):
+            if canonical in cleaned and legacy in cleaned:
+                if cleaned[canonical] != cleaned[legacy]:
+                    ComputeSearchNeighborhood.model_validate(
+                        {
+                            "ellipsoid": {"ranges": _UNIT_ELLIPSOID_RANGES},
+                            "max_samples": 1,
+                            canonical: cleaned[canonical],
+                            legacy: cleaned[legacy],
+                        }
+                    )
+                cleaned.pop(legacy)
+        return cleaned
+
+    def _validate_with_compute_neighborhood(
+        self,
+        *,
+        major: float = 1.0,
+        semi_major: float = 1.0,
+        minor: float = 1.0,
+        dip_azimuth: float = 0.0,
+        dip: float = 0.0,
+        pitch: float = 0.0,
+    ) -> ComputeSearchNeighborhood:
+        return ComputeSearchNeighborhood(
+            ellipsoid={
+                "ranges": {"major": major, "semi_major": semi_major, "minor": minor},
+                "rotation": {"dip_azimuth": dip_azimuth, "dip": dip, "pitch": pitch},
+            },
+            max_samples=self.max_samples,
+            min_samples=self.min_samples,
+            max_empty_octants=self.max_empty_octants,
+            max_samples_per_octant=self.max_samples_per_octant,
+            max_empty_quadrants=self.max_empty_quadrants,
+            max_samples_per_quadrant=self.max_samples_per_quadrant,
+            max_samples_per_drillhole=self.max_samples_per_drillhole,
+            max_drillholes=self.max_drillholes,
+            min_drillholes=self.min_drillholes,
+            drillhole_limit_scope=self.drillhole_limit_scope,
+        )
+
+    def limit_kwargs(self) -> dict[str, Any]:
+        """Return validated sample, sector, and drillhole limit fields as keyword arguments."""
+        return {
+            "max_samples": self.max_samples,
+            "min_samples": self.min_samples,
+            "max_empty_octants": self.max_empty_octants,
+            "max_samples_per_octant": self.max_samples_per_octant,
+            "max_empty_quadrants": self.max_empty_quadrants,
+            "max_samples_per_quadrant": self.max_samples_per_quadrant,
+            "max_samples_per_drillhole": self.max_samples_per_drillhole,
+            "max_drillholes": self.max_drillholes,
+            "min_drillholes": self.min_drillholes,
+            "drillhole_limit_scope": self.drillhole_limit_scope,
+        }
+
+
+class SearchNeighborhoodData(SearchNeighborhoodLimits):
     """In-memory representation of a staged search neighborhood.
 
-    Contains exactly the parameters required to configure a search neighborhood
-    for kriging: ellipsoid ranges, rotation, and sample limits.
+    Contains the parameters required to configure a search neighborhood for
+    estimation workflows: ellipsoid ranges, rotation, and sample/sector/drillhole limits.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     name: str
-    max_samples: int = Field(ge=1)
-    min_samples: int | None = Field(None, ge=0)
     major: float = Field(gt=0)
     semi_major: float = Field(gt=0)
     minor: float = Field(gt=0)
     dip_azimuth: float = 0.0
     dip: float = 0.0
     pitch: float = 0.0
+
+    def to_compute_neighborhood(self) -> ComputeSearchNeighborhood:
+        """Convert to an `evo.compute.tasks.common.SearchNeighborhood` instance."""
+        return self._validate_with_compute_neighborhood(
+            major=self.major,
+            semi_major=self.semi_major,
+            minor=self.minor,
+            dip_azimuth=self.dip_azimuth,
+            dip=self.dip,
+            pitch=self.pitch,
+        )
+
+    @model_validator(mode="after")
+    def _validate_neighborhood(self) -> "SearchNeighborhoodData":
+        self.to_compute_neighborhood()
+        return self
 
 
 # ── Interaction handlers ──────────────────────────────────────────────────────
@@ -58,14 +196,12 @@ class SearchNeighborhoodData(BaseModel):
 # ── Create interaction handlers ────────────────────────────────────────────────
 
 
-class CreateFromRangesParams(BaseModel):
+class CreateFromRangesParams(SearchNeighborhoodLimits):
     """Parameters for creating a search neighborhood from explicit ellipsoid ranges."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     object_name: str = Field(..., description="Name for the staged search neighborhood.")
-    max_samples: int = Field(..., ge=1, description="Maximum number of samples to use.")
-    min_samples: int | None = Field(None, ge=0, description="Minimum number of samples (optional).")
     major: float = Field(..., gt=0, description="Major ellipsoid range.")
     semi_major: float = Field(..., gt=0, description="Semi-major ellipsoid range.")
     minor: float = Field(..., gt=0, description="Minor ellipsoid range.")
@@ -75,8 +211,14 @@ class CreateFromRangesParams(BaseModel):
 
     @model_validator(mode="after")
     def check_samples(self) -> "CreateFromRangesParams":
-        if self.min_samples is not None and self.min_samples > self.max_samples:
-            raise ValueError("min_samples cannot exceed max_samples.")
+        self._validate_with_compute_neighborhood(
+            major=self.major,
+            semi_major=self.semi_major,
+            minor=self.minor,
+            dip_azimuth=self.dip_azimuth,
+            dip=self.dip,
+            pitch=self.pitch,
+        )
         return self
 
 
@@ -84,14 +226,13 @@ async def _create_from_ranges(params: CreateFromRangesParams) -> dict[str, Any]:
     """Design a search neighborhood from explicit ellipsoid ranges and stage it."""
     data = SearchNeighborhoodData(
         name=params.object_name,
-        max_samples=params.max_samples,
-        min_samples=params.min_samples,
         major=params.major,
         semi_major=params.semi_major,
         minor=params.minor,
         dip_azimuth=params.dip_azimuth,
         dip=params.dip,
         pitch=params.pitch,
+        **params.limit_kwargs(),
     )
     ctx = await get_evo_context()
     envelope = ctx.object_staging.stage_local_build(
