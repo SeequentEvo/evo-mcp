@@ -37,6 +37,10 @@ from evo_mcp.staging.objects.base import (
     Interaction,
     staged_object_type_registry,
 )
+from evo_mcp.staging.objects.search_neighborhood import (
+    SearchNeighborhoodData,
+    SearchNeighborhoodLimits,
+)
 
 # ── Variogram-specific helpers ────────────────────────────────────────────────
 
@@ -322,14 +326,12 @@ def _build_variogram_structures(
 # ── Create interaction helpers ─────────────────────────────────────────────────
 
 
-class CreateSearchNeighborhoodParams(BaseModel):
+class CreateSearchNeighborhoodParams(SearchNeighborhoodLimits):
     """Parameters for deriving a search neighborhood from a staged variogram."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     object_name: str = Field(..., description="Name for the new staged search neighborhood.")
-    max_samples: int = Field(..., ge=1, description="Maximum number of samples to use in kriging.")
-    min_samples: int | None = Field(None, ge=0, description="Minimum number of samples (optional).")
     structure_index: int | None = Field(
         None, ge=0, description="Zero-based structure index. Uses selection_mode if omitted."
     )
@@ -341,15 +343,16 @@ class CreateSearchNeighborhoodParams(BaseModel):
 
     @model_validator(mode="after")
     def check_samples(self) -> "CreateSearchNeighborhoodParams":
-        if self.min_samples is not None and self.min_samples > self.max_samples:
-            raise ValueError("min_samples cannot exceed max_samples.")
+        self._validate_with_compute_neighborhood(
+            dip_azimuth=self.dip_azimuth if self.dip_azimuth is not None else 0.0,
+            dip=self.dip if self.dip is not None else 0.0,
+            pitch=self.pitch if self.pitch is not None else 0.0,
+        )
         return self
 
 
 async def _create_search_neighborhood(payload: VariogramData, params: CreateSearchNeighborhoodParams) -> dict[str, Any]:
     """Derive a search neighborhood from this variogram and stage it."""
-    from evo_mcp.staging.objects.search_neighborhood import SearchNeighborhoodData  # lazy — avoids circular import
-
     structures = payload.get_structures_as_dicts()
     if not structures:
         raise ValueError("Variogram must contain at least one structure.")
@@ -366,14 +369,13 @@ async def _create_search_neighborhood(payload: VariogramData, params: CreateSear
 
     data = SearchNeighborhoodData(
         name=params.object_name,
-        max_samples=params.max_samples,
-        min_samples=params.min_samples,
         major=maj,
         semi_major=smaj,
         minor=mnr,
         dip_azimuth=params.dip_azimuth if params.dip_azimuth is not None else float(rot_d.get("dip_azimuth", 0.0)),
         dip=params.dip if params.dip is not None else float(rot_d.get("dip", 0.0)),
         pitch=params.pitch if params.pitch is not None else float(rot_d.get("pitch", 0.0)),
+        **params.limit_kwargs(),
     )
     ctx = await get_evo_context()
     envelope = ctx.object_staging.stage_local_build(object_type="search_neighborhood", typed_payload=data)

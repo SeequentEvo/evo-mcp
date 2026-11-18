@@ -1,15 +1,15 @@
 version = 1
 revision = 3
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
-    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version < '3.13' and sys_platform == 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version < '3.13' and sys_platform == 'emscripten'",
+    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version < '3.13' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
@@ -713,15 +713,15 @@ wheels = [
 
 [[package]]
 name = "evo-blockmodels"
-version = "0.4.0"
+version = "0.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "evo-sdk-common" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/32/79/e18eed51655911dc6734b03fb96730028872cdb8f862614fe3f0d76cfdae/evo_blockmodels-0.4.0.tar.gz", hash = "sha256:aa0e209e7f6f4f2f65dc61c604f846e3e5d429c02526837ce56a7f62974672be", size = 55289, upload-time = "2026-05-11T01:55:13.577Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/a3/9bc6573919520158e07914a06a4a9ac42d1d8c2be45fa941b106afbad93b/evo_blockmodels-0.10.0.tar.gz", hash = "sha256:ee2af670afa16a0a1b0f94ab0e25749b88d7a928b80753f8e06be45d53d308a8", size = 69748, upload-time = "2026-11-17T22:46:30.432Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/10/6f/2599cf5aa337cff54c2f6f04c1157a14e56a0a7b83dacc961213ad63929a/evo_blockmodels-0.4.0-py3-none-any.whl", hash = "sha256:96346fb1596975ba56412869d4d9d569e5a895c31926bf390575003689192f4d", size = 82245, upload-time = "2026-05-11T01:55:12.075Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/11/61424437fa240b4d17e10346dddd54ad1ae1315d1462f6f52e10597fb9fb/evo_blockmodels-0.10.0-py3-none-any.whl", hash = "sha256:f1562580f6c933b1bb9d44bfdfa07d06f48f27af99e335240b2d5aaa39bf8b96", size = 97175, upload-time = "2026-11-17T22:46:28.995Z" },
 ]
 
 [package.optional-dependencies]
@@ -732,7 +732,7 @@ utils = [
 
 [[package]]
 name = "evo-compute"
-version = "0.0.6"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "evo-blockmodels", extra = ["utils"] },
@@ -741,9 +741,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4c/89/4b1c42395d41abb7df29a3d9372b59d3da7117770a5e4abecfe13d956c77/evo_compute-0.0.6.tar.gz", hash = "sha256:b55adbe64b97d0d3f321ad6e6a7ead74ddd128e6b2e60e4ffc262da6b064f43f", size = 45190, upload-time = "2026-10-19T19:30:06.887Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/98/2f/54551baa51600c5fdf4b87ca7950e8daa98e132504d5a67a5f8ae9e0fc42/evo_compute-0.1.1.tar.gz", hash = "sha256:b60ff5a8fdebfb4ac47fc77cbb9ca13f657177c0766fd1f50aae59c8bbb8b1bf", size = 49797, upload-time = "2026-11-18T01:05:28.426Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ec/db/847f60c1b78c69dcfad92d0cd8dc17cf819ea05273f3f3d78f40394dbb2d/evo_compute-0.0.6-py3-none-any.whl", hash = "sha256:7eae19520a0bce2fa4552820e8c2868ef663f0bccdf7fdbf56944d5b7478948e", size = 82647, upload-time = "2026-10-19T19:30:05.301Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/e7/3463d30b2c406b9f1cb6cb04088a9a0e2ea7f90ca58e985b73ab1cfbeda5/evo_compute-0.1.1-py3-none-any.whl", hash = "sha256:513821f899ea3987a5b9791f51256e7c088c85f396102794cda7a9b9d78f512e", size = 89798, upload-time = "2026-11-18T01:05:26.927Z" },
 ]
 
 [[package]]
@@ -793,11 +793,11 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.14.4" },
     { name = "cachetools", specifier = ">=7.1.2" },
-    { name = "evo-compute", specifier = ">=0.0.6" },
+    { name = "evo-compute", specifier = ">=0.1.1" },
     { name = "evo-files", specifier = ">=0.2.4" },
-    { name = "evo-objects", specifier = ">=0.4.0" },
+    { name = "evo-objects", specifier = ">=0.7.0" },
     { name = "evo-schemas", specifier = ">=2025.9.2" },
-    { name = "evo-sdk-common", specifier = ">=0.5.21" },
+    { name = "evo-sdk-common", specifier = ">=0.6.0" },
     { name = "evo-widgets", specifier = ">=0.2.0" },
     { name = "fastmcp", specifier = ">=3.4.3" },
     { name = "google-adk", specifier = "==1.38.0" },
@@ -816,15 +816,15 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "evo-objects"
-version = "0.4.3"
+version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "evo-sdk-common", extra = ["jmespath"] },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/d7/15ade803a48412447512cc2b2ec2b4999d2f0b5d7d3ebbfe2d27450891af/evo_objects-0.4.3.tar.gz", hash = "sha256:5fe939fd605c0524e5f554c6a666d80e08853829f0ddb5a2bbddebf67d2da68c", size = 73856, upload-time = "2026-04-13T02:59:11.928Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cc/a2/14016f2cc238a386c09409c7b832e7843767b1edf56bad16c56c05b14db8/evo_objects-0.7.0.tar.gz", hash = "sha256:fc0a0e150c15871ecec73c4545413f55d4f4b04c04dbbb1f555ecd794c5bb08b", size = 88061, upload-time = "2026-11-17T22:53:15.14Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/19/06/5a219a270d8004a694d6e715347a11dfbf772f85f9013090df82282ffd79/evo_objects-0.4.3-py3-none-any.whl", hash = "sha256:5784c22d9c437d045c66402170472387b30560786b700d23ebaebc9207ab3768", size = 110338, upload-time = "2026-04-13T02:59:10.319Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/13/78837cf18bb7f687f38d10d5994f16db7cf7b33530440b142efafc002731/evo_objects-0.7.0-py3-none-any.whl", hash = "sha256:9aeaf98875dc2dc3cda9d375f7b9f79ec4bcfb8975506dce886761a4edc1f041", size = 130283, upload-time = "2026-11-17T22:53:13.493Z" },
 ]
 
 [package.optional-dependencies]
@@ -852,16 +852,16 @@ wheels = [
 
 [[package]]
 name = "evo-sdk-common"
-version = "0.5.22"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pure-interface" },
     { name = "pydantic" },
     { name = "python-dateutil" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9e/73/1fc6550fbfceab2a44f44e2a3b15b2344a9d8fa37d7529d54e2db4e82e4f/evo_sdk_common-0.5.22.tar.gz", hash = "sha256:0f8522fa026297e413f3956c373623377fd0df962eb05878b8aa02adcc15d5e6", size = 118186, upload-time = "2026-05-13T17:53:47.439Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/62/27/92dfcf33851ee908bcfd45df22fcdf273e27cacb23b90d8050f3ebd19b38/evo_sdk_common-0.6.0.tar.gz", hash = "sha256:730efafe6efce764d903f773755670126cb8063b09be26f61d322da41cec8435", size = 128753, upload-time = "2026-11-17T22:38:29.224Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/a9/7b6ba04c4ca8bcad39b28a0baf4cf19f8262ad71533182ae04a6c16647a8/evo_sdk_common-0.5.22-py3-none-any.whl", hash = "sha256:93240378fe1e353c7c0da34977cf6c9262a0b8e3c7f9805fa880f40c68102b11", size = 181057, upload-time = "2026-05-13T17:53:46.128Z" },
+    { url = "https://files.pythonhosted.org/packages/50/c8/f00c510f7db65dbaaed057d6421ffc327e61ef3a9c9587cac32c0e9f0fcf/evo_sdk_common-0.6.0-py3-none-any.whl", hash = "sha256:e4f4ce127f36841b9c4f2bee660f41ac7f9f96be00dc8699b9e67e529c9c068e", size = 197871, upload-time = "2026-11-17T22:38:27.872Z" },
 ]
 
 [package.optional-dependencies]
