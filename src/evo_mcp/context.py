@@ -53,7 +53,9 @@ class _CleanupTTLCache(TTLCache):
                 cleanup()
             except Exception:
                 logger.exception("Failed to clean up context for session %s", key)
-        self._locks.pop(key, None)
+        lock = self._locks.get(key)
+        if lock is not None and not lock.locked():
+            self._locks.pop(key, None)
 
     def expire(self, time=None):
         """Override to call cleanup() on TTL-expired items.
@@ -127,12 +129,14 @@ async def get_evo_context() -> EvoContextBase:
         return managed_context
 
     explicit_id = modern_session_id()
-    session_id = await validated_session_key(explicit_id) if explicit_id else get_client_session_id()
+    session_id = await validated_session_key(explicit_id, refresh=False) if explicit_id else get_client_session_id()
 
     # Per-session lock prevents duplicate context creation when
     # concurrent requests arrive for the same new session.
     lock = session_locks.setdefault(session_id, asyncio.Lock())
     async with lock:
+        if explicit_id:
+            await validated_session_key(explicit_id)
         context = delegated_contexts.get(session_id)
         if context is None:
             context = DelegatedAuthContext(client_session_id=session_id)

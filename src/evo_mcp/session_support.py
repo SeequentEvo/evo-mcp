@@ -37,13 +37,18 @@ def _context_key(user_id: str, session_id: str) -> str:
     return hashlib.sha256(f"{user_id}:{session_id}".encode()).hexdigest()[:32]
 
 
-async def validated_session_key(session_id: str) -> str:
+def conversation_session_key(session_id: str) -> str:
+    return _context_key(_user_id(), session_id)
+
+
+async def validated_session_key(session_id: str, *, refresh: bool = True) -> str:
     session = await get_session(session_id)
     user_id = _user_id()
     if await session.get("evo_owner") != user_id:
         raise ValueError("Invalid or unknown session.")
-    # SessionProvider's store is TTL-bounded; refresh it on every stateful call.
-    await session.set("evo_owner", user_id)
+    if refresh:
+        # SessionProvider's store is TTL-bounded; refresh it on every stateful call.
+        await session.set("evo_owner", user_id)
     return _context_key(user_id, session_id)
 
 
@@ -59,12 +64,20 @@ async def create_conversation_session() -> str:
 
 async def end_conversation_session(session_id: SessionId) -> str:
     """End a conversation and discard its server-side context."""
-    key = await validated_session_key(session_id)
-    from evo_mcp.context import delegated_contexts
+    import asyncio
 
-    delegated_contexts.pop(key, None)
-    session = await get_session(session_id)
-    await session.end()
+    from evo_mcp.context import delegated_contexts, session_locks
+
+    await validated_session_key(session_id, refresh=False)
+    key = conversation_session_key(session_id)
+    lock = session_locks.setdefault(key, asyncio.Lock())
+    async with lock:
+        await validated_session_key(session_id, refresh=False)
+        session = await get_session(session_id)
+        await session.end()
+        delegated_contexts.pop(key, None)
+    if session_locks.get(key) is lock:
+        session_locks.pop(key, None)
     return "session ended"
 
 
@@ -120,7 +133,7 @@ class ConversationSessionMiddleware(Middleware):
         session_id = arguments.pop("session_id", None)
         if not isinstance(session_id, str) or not session_id:
             raise ValueError("A sessionless tool call requires a session_id from create_session.")
-        await validated_session_key(session_id)
+        await validated_session_key(session_id, refresh=False)
         token = _modern_session_id.set(session_id)
         try:
             return await call_next(context.copy(message=context.message.model_copy(update={"arguments": arguments})))

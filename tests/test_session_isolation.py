@@ -33,6 +33,7 @@ from evo_mcp.session_support import (
     ConversationSessionArguments,
     ConversationSessionMiddleware,
     ConversationSessionProvider,
+    end_conversation_session,
 )
 from evo_mcp.staging.errors import StageNotFoundError
 from evo_mcp.staging.models import StagedEnvelope
@@ -617,6 +618,116 @@ def test_no_http_request_fails_without_token_fallback():
         pytest.raises(RuntimeError, match="No HTTP request"),
     ):
         get_client_session_id()
+
+
+@pytest.mark.asyncio
+async def test_end_session_waits_for_context_initialization_and_cleans_it_up():
+    initialized = asyncio.Event()
+    resume = asyncio.Event()
+    session = MagicMock()
+    session.get = AsyncMock(return_value="alice")
+    session.set = AsyncMock()
+    session.end = AsyncMock()
+    key = hashlib.sha256(b"alice:conversation").hexdigest()[:32]
+
+    async def blocked_initialize(_context):
+        initialized.set()
+        await resume.wait()
+
+    original_mode = ctx_module.delegated_mode
+    ctx_module.delegated_mode = True
+    ctx_module.delegated_contexts.clear()
+    ctx_module.session_locks.clear()
+    try:
+        with (
+            patch("evo_mcp.session_support._user_id", return_value="alice"),
+            patch("evo_mcp.session_support.get_session", new_callable=AsyncMock, return_value=session),
+            patch("evo_mcp.context.modern_session_id", return_value="conversation"),
+            patch.object(DelegatedAuthContext, "initialize", blocked_initialize),
+        ):
+            pending_get = asyncio.create_task(ctx_module.get_evo_context())
+            pending_end = None
+            try:
+                await asyncio.wait_for(initialized.wait(), 2)
+                pending_end = asyncio.create_task(end_conversation_session("conversation"))
+                await asyncio.sleep(0)
+                assert not pending_end.done()
+
+                resume.set()
+                context = await asyncio.wait_for(pending_get, 2)
+                assert await asyncio.wait_for(pending_end, 2) == "session ended"
+                assert key not in ctx_module.delegated_contexts
+                assert key not in ctx_module.session_locks
+                assert not context.cache_path.exists()
+                session.end.assert_awaited_once()
+            finally:
+                resume.set()
+                await asyncio.gather(*(task for task in (pending_get, pending_end) if task), return_exceptions=True)
+    finally:
+        ctx_module.delegated_mode = original_mode
+        ctx_module.delegated_contexts.clear()
+        ctx_module.session_locks.clear()
+
+
+@pytest.mark.asyncio
+async def test_context_waiting_for_end_revalidates_before_initialization():
+    ending = asyncio.Event()
+    resume = asyncio.Event()
+    active = True
+    session = MagicMock()
+    session.get = AsyncMock(return_value="alice")
+    session.set = AsyncMock()
+
+    async def get_session(session_id):
+        if not active:
+            raise ValueError("Invalid or unknown session.")
+        return session
+
+    async def end():
+        nonlocal active
+        ending.set()
+        await resume.wait()
+        active = False
+
+    session.end = AsyncMock(side_effect=end)
+    original_mode = ctx_module.delegated_mode
+    ctx_module.delegated_mode = True
+    ctx_module.delegated_contexts.clear()
+    ctx_module.session_locks.clear()
+    try:
+        with (
+            patch("evo_mcp.session_support._user_id", return_value="alice"),
+            patch("evo_mcp.session_support.get_session", side_effect=get_session),
+            patch("evo_mcp.context.modern_session_id", return_value="conversation"),
+            patch.object(DelegatedAuthContext, "initialize", new_callable=AsyncMock) as initialize,
+        ):
+            pending_end = asyncio.create_task(end_conversation_session("conversation"))
+            pending_get = None
+            try:
+                await asyncio.wait_for(ending.wait(), 2)
+                pending_get = asyncio.create_task(ctx_module.get_evo_context())
+                await asyncio.sleep(0)
+                assert not pending_get.done()
+
+                resume.set()
+                assert await asyncio.wait_for(pending_end, 2) == "session ended"
+                with pytest.raises(ValueError, match="Invalid or unknown session"):
+                    await asyncio.wait_for(pending_get, 2)
+                initialize.assert_not_awaited()
+                assert not ctx_module.delegated_contexts
+                assert not ctx_module.session_locks
+                with pytest.raises(ValueError, match="Invalid or unknown session"):
+                    await ctx_module.get_evo_context()
+                with pytest.raises(ValueError, match="Invalid or unknown session"):
+                    await end_conversation_session("conversation")
+                assert not ctx_module.session_locks
+            finally:
+                resume.set()
+                await asyncio.gather(*(task for task in (pending_end, pending_get) if task), return_exceptions=True)
+    finally:
+        ctx_module.delegated_mode = original_mode
+        ctx_module.delegated_contexts.clear()
+        ctx_module.session_locks.clear()
 
 
 @pytest.mark.asyncio
