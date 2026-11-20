@@ -224,7 +224,7 @@ stateDiagram-v2
 
 ### Session identity
 
-The session key is derived from two values:
+In legacy MCP connections the session key is derived from two values:
 
 1. **`sub` claim** from the IMS JWT — identifies the user
 2. **`mcp-session-id` header** — identifies the client session (set by MCP protocol)
@@ -233,7 +233,9 @@ The session key is derived from two values:
 session_key = sha256(user_sub + ":" + mcp_session_id)[:32]
 ```
 
-If the `mcp-session-id` header is absent (fallback), the raw token is used instead — but this means a token refresh creates a new session (the old one is evicted by TTL).
+For legacy MCP connections the `mcp-session-id` header is required for client-delegated stateful tools. If it is absent, the request fails rather than falling back to a token-derived key: token refresh would otherwise silently create a new context and lose session state. The server-managed mode does not require this header.
+
+For modern sessionless connections, call `create_session` once per conversation and include the returned `session_id` in every stateful tool call. When using the tool-search proxy, put it inside `call_tool.arguments`, not alongside `name` and `arguments`. Call `end_session` when the conversation finishes. Session IDs are scoped to the authenticated user and expire after `SESSION_TTL_SECONDS` of inactivity (default one hour); after expiration, create a new session. In-memory conversation state is not preserved across server restarts or shared across replicas. Legacy sessions continue to use their transport header and do not need an explicit tool argument.
 
 ### Eviction and cleanup
 

@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 
 from evo_mcp.contexts import DelegatedAuthContext, EvoContextBase, ManagedAuthContext
 from evo_mcp.contexts.helpers import get_client_session_id
+from evo_mcp.session_support import modern_session_id, validated_session_key
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -113,7 +114,8 @@ async def get_evo_context() -> EvoContextBase:
 
     In managed mode, returns the single shared ManagedAuthContext.
     In delegated mode, looks up (or creates) a DelegatedAuthContext
-    keyed by the MCP session ID.  On every request the context is
+    keyed by the legacy transport session ID or the validated explicit
+    conversation ID. On every request the context is
     re-initialized with the current access token, rebuilding API clients
     cleanly while preserving instance selection via seeds.
     """
@@ -124,7 +126,8 @@ async def get_evo_context() -> EvoContextBase:
         await managed_context.initialize()
         return managed_context
 
-    session_id = get_client_session_id()
+    explicit_id = modern_session_id()
+    session_id = await validated_session_key(explicit_id) if explicit_id else get_client_session_id()
 
     # Per-session lock prevents duplicate context creation when
     # concurrent requests arrive for the same new session.

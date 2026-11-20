@@ -35,25 +35,17 @@ def get_client_session_upstream_access_token() -> str:
 def get_client_session_id() -> str:
     """Return a stable identifier for the current MCP client session.
 
-    Combines the ``mcp-session-id`` HTTP header (or token-hash fallback)
-    with the user's identity (``sub`` claim from the IMS JWT).  This
-    composite key prevents session-ID spoofing: even if an attacker
-    forges the ``mcp-session-id`` header, the resulting key won't match
-    another user's context because the ``sub`` claim differs.
+    Combines the ``mcp-session-id`` HTTP header with the user's identity
+    (``sub`` claim from the IMS JWT). This composite key prevents
+    session-ID spoofing across users. A missing header is an error:
+    token-based identity cannot preserve state across token refreshes.
     """
     upstream_access_token = get_client_session_upstream_access_token()
     user_id = get_user_id_from_token(upstream_access_token)
 
-    try:
-        request = get_http_request()
-        session_id = request.headers.get("mcp-session-id")
-        if session_id:
-            composite = f"{user_id}:{session_id}"
-        else:
-            # Fallback: (user_id + token) hash (no state persistence across refreshes)
-            composite = f"{user_id}:{upstream_access_token}"
-    except Exception:
-        # Fallback: (user_id + token) hash (no state persistence across refreshes)
-        composite = f"{user_id}:{upstream_access_token}"
-
+    request = get_http_request()
+    session_id = request.headers.get("mcp-session-id")
+    if not session_id:
+        raise RuntimeError("Missing mcp-session-id header in delegated auth mode; a legacy MCP session is required")
+    composite = f"{user_id}:{session_id}"
     return hashlib.sha256(composite.encode()).hexdigest()[:32]
