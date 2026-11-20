@@ -21,7 +21,7 @@ from fastmcp import Client, FastMCP
 
 def _initialize_instructions(mcp: FastMCP) -> str | None:
     async def go() -> str | None:
-        async with Client(mcp) as client:
+        async with Client(mcp, mode="legacy") as client:
             return client.initialize_result.instructions
 
     return asyncio.run(go())

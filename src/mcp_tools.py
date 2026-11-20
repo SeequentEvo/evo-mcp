@@ -31,10 +31,13 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 from fastmcp.utilities.logging import configure_logging
+from key_value.aio.stores.memory import MemoryStore
+from key_value.aio.wrappers.ttl_clamp import TTLClampWrapper
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from evo_mcp.client_auth import create_auth_provider
+from evo_mcp.context import SESSION_TTL_SECONDS
 from evo_mcp.file_transfer import file_transfer_lifespan
 from evo_mcp.tool_strategy import BOOTSTRAP_TOOLS, SearchEngine, ToolStrategy, apply_strategy
 from evo_mcp.tools import (
@@ -137,6 +140,12 @@ Workflow rules:
 """
 if REMOTE_FILE_TRANSFER:
     SERVER_INSTRUCTIONS += "\n" + FILE_TRANSFER_INSTRUCTIONS
+if CLIENT_DELEGATED_AUTH:
+    SERVER_INSTRUCTIONS += (
+        "\nFor sessionless MCP connections, call create_session once per conversation "
+        "and pass its session_id on each tool call (inside arguments for call_tool). "
+        "Call end_session when finished. Legacy MCP sessions need no session_id argument."
+    )
 
 # MCP_PUBLIC_BASE_URL supports reverse proxy / TLS deployments where the
 # bind address differs from the public URL clients use for OAuth callbacks.
@@ -147,7 +156,27 @@ mcp = FastMCP(
     instructions=SERVER_INSTRUCTIONS,
     auth=auth_provider,
     lifespan=file_transfer_lifespan if REMOTE_FILE_TRANSFER else None,
+    session_state_store=(
+        TTLClampWrapper(
+            MemoryStore(),
+            min_ttl=SESSION_TTL_SECONDS,
+            max_ttl=SESSION_TTL_SECONDS,
+            missing_ttl=SESSION_TTL_SECONDS,
+        )
+        if CLIENT_DELEGATED_AUTH
+        else None
+    ),
 )
+if CLIENT_DELEGATED_AUTH:
+    from evo_mcp.session_support import (
+        ConversationSessionArguments,
+        ConversationSessionMiddleware,
+        ConversationSessionProvider,
+    )
+
+    mcp.add_provider(ConversationSessionProvider())
+    mcp.add_transform(ConversationSessionArguments())
+    mcp.add_middleware(ConversationSessionMiddleware())
 
 
 # Show more traceback frame for now, we may want to disabled the rich
@@ -238,7 +267,7 @@ applied_strategy = apply_strategy(
     mcp,
     TOOL_STRATEGY,
     search_engine=SEARCH_ENGINE,
-    always_visible=BOOTSTRAP_TOOLS,
+    always_visible=[*BOOTSTRAP_TOOLS, *(["create_session", "end_session"] if CLIENT_DELEGATED_AUTH else [])],
 )
 print(f"Tool exposure strategy: {applied_strategy.value}")
 

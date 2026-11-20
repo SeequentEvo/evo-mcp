@@ -1,12 +1,12 @@
 [project]
 name = "evo-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "An MCP server implementation using Evo SDK"
 license = "Apache-2.0"
 requires-python = ">=3.11.5"
 dependencies = [
-    "fastmcp>=3.4.3",
-    "google-adk==1.38.0",
+    "fastmcp>=4,<5",
+    "google-adk==2.14.1",
     "evo-files>=0.2.4",
     "evo-compute>=0.1.1",
     "evo-objects>=0.7.0",

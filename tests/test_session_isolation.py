@@ -10,12 +10,18 @@ DelegatedAuthContext with independent StagingService and ObjectRegistry.
 
 import asyncio
 import base64
+import hashlib
 import json
 import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
+import pytest
 from cachetools import TTLCache
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.debug import DebugTokenVerifier
+from fastmcp.server.transforms.search import BM25SearchTransform
 
 import evo_mcp.context as ctx_module
 from evo_mcp.context import _CleanupTTLCache
@@ -23,6 +29,12 @@ from evo_mcp.contexts.delegated import DelegatedAuthContext
 from evo_mcp.contexts.helpers import get_client_session_id
 from evo_mcp.contexts.managed import ManagedAuthContext
 from evo_mcp.session.resolver import ResolutionError
+from evo_mcp.session_support import (
+    ConversationSessionArguments,
+    ConversationSessionMiddleware,
+    ConversationSessionProvider,
+    end_conversation_session,
+)
 from evo_mcp.staging.errors import StageNotFoundError
 from evo_mcp.staging.models import StagedEnvelope
 
@@ -581,6 +593,336 @@ class TestUserIsolation(unittest.IsolatedAsyncioTestCase):
             id_bob = get_client_session_id()
 
         self.assertNotEqual(id_alice, id_bob)
+
+
+@pytest.mark.parametrize("session_id", [None, ""])
+def test_missing_session_header_fails_without_token_fallback(session_id):
+    token = _make_mock_token("user-alice")
+    request = MagicMock()
+    request.headers = {} if session_id is None else {"mcp-session-id": session_id}
+
+    with (
+        patch("evo_mcp.contexts.helpers.get_access_token", return_value=_mock_access_token_obj(token)),
+        patch("evo_mcp.contexts.helpers.get_http_request", return_value=request),
+        pytest.raises(RuntimeError, match="Missing mcp-session-id header"),
+    ):
+        get_client_session_id()
+
+
+def test_no_http_request_fails_without_token_fallback():
+    token = _make_mock_token("user-alice")
+
+    with (
+        patch("evo_mcp.contexts.helpers.get_access_token", return_value=_mock_access_token_obj(token)),
+        patch("evo_mcp.contexts.helpers.get_http_request", side_effect=RuntimeError("No HTTP request")),
+        pytest.raises(RuntimeError, match="No HTTP request"),
+    ):
+        get_client_session_id()
+
+
+@pytest.mark.asyncio
+async def test_end_session_waits_for_context_initialization_and_cleans_it_up():
+    initialized = asyncio.Event()
+    resume = asyncio.Event()
+    session = MagicMock()
+    session.get = AsyncMock(return_value="alice")
+    session.set = AsyncMock()
+    session.end = AsyncMock()
+    key = hashlib.sha256(b"alice:conversation").hexdigest()[:32]
+
+    async def blocked_initialize(_context):
+        initialized.set()
+        await resume.wait()
+
+    original_mode = ctx_module.delegated_mode
+    ctx_module.delegated_mode = True
+    ctx_module.delegated_contexts.clear()
+    ctx_module.session_locks.clear()
+    try:
+        with (
+            patch("evo_mcp.session_support._user_id", return_value="alice"),
+            patch("evo_mcp.session_support.get_session", new_callable=AsyncMock, return_value=session),
+            patch("evo_mcp.context.modern_session_id", return_value="conversation"),
+            patch.object(DelegatedAuthContext, "initialize", blocked_initialize),
+        ):
+            pending_get = asyncio.create_task(ctx_module.get_evo_context())
+            pending_end = None
+            try:
+                await asyncio.wait_for(initialized.wait(), 2)
+                pending_end = asyncio.create_task(end_conversation_session("conversation"))
+                await asyncio.sleep(0)
+                assert not pending_end.done()
+
+                resume.set()
+                context = await asyncio.wait_for(pending_get, 2)
+                assert await asyncio.wait_for(pending_end, 2) == "session ended"
+                assert key not in ctx_module.delegated_contexts
+                assert key not in ctx_module.session_locks
+                assert not context.cache_path.exists()
+                session.end.assert_awaited_once()
+            finally:
+                resume.set()
+                await asyncio.gather(*(task for task in (pending_get, pending_end) if task), return_exceptions=True)
+    finally:
+        ctx_module.delegated_mode = original_mode
+        ctx_module.delegated_contexts.clear()
+        ctx_module.session_locks.clear()
+
+
+@pytest.mark.asyncio
+async def test_context_waiting_for_end_revalidates_before_initialization():
+    ending = asyncio.Event()
+    resume = asyncio.Event()
+    active = True
+    session = MagicMock()
+    session.get = AsyncMock(return_value="alice")
+    session.set = AsyncMock()
+
+    async def get_session(session_id):
+        if not active:
+            raise ValueError("Invalid or unknown session.")
+        return session
+
+    async def end():
+        nonlocal active
+        ending.set()
+        await resume.wait()
+        active = False
+
+    session.end = AsyncMock(side_effect=end)
+    original_mode = ctx_module.delegated_mode
+    ctx_module.delegated_mode = True
+    ctx_module.delegated_contexts.clear()
+    ctx_module.session_locks.clear()
+    try:
+        with (
+            patch("evo_mcp.session_support._user_id", return_value="alice"),
+            patch("evo_mcp.session_support.get_session", side_effect=get_session),
+            patch("evo_mcp.context.modern_session_id", return_value="conversation"),
+            patch.object(DelegatedAuthContext, "initialize", new_callable=AsyncMock) as initialize,
+        ):
+            pending_end = asyncio.create_task(end_conversation_session("conversation"))
+            pending_get = None
+            try:
+                await asyncio.wait_for(ending.wait(), 2)
+                pending_get = asyncio.create_task(ctx_module.get_evo_context())
+                await asyncio.sleep(0)
+                assert not pending_get.done()
+
+                resume.set()
+                assert await asyncio.wait_for(pending_end, 2) == "session ended"
+                with pytest.raises(ValueError, match="Invalid or unknown session"):
+                    await asyncio.wait_for(pending_get, 2)
+                initialize.assert_not_awaited()
+                assert not ctx_module.delegated_contexts
+                assert not ctx_module.session_locks
+                with pytest.raises(ValueError, match="Invalid or unknown session"):
+                    await ctx_module.get_evo_context()
+                with pytest.raises(ValueError, match="Invalid or unknown session"):
+                    await end_conversation_session("conversation")
+                assert not ctx_module.session_locks
+            finally:
+                resume.set()
+                await asyncio.gather(*(task for task in (pending_end, pending_get) if task), return_exceptions=True)
+    finally:
+        ctx_module.delegated_mode = original_mode
+        ctx_module.delegated_contexts.clear()
+        ctx_module.session_locks.clear()
+
+
+@pytest.mark.asyncio
+async def test_http_legacy_session_works_and_sessionless_call_fails():
+    token = _make_mock_token("wire-user")
+    mcp = FastMCP("session-test", auth=DebugTokenVerifier(validate=lambda value: value == token))
+
+    @mcp.tool
+    async def session_identity() -> str:
+        return get_client_session_id()
+
+    app = mcp.http_app()
+    async with app.lifespan(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
+            headers = {"Authorization": f"Bearer {token}", "Accept": "application/json, text/event-stream"}
+            initialized = await client.post(
+                "/mcp",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-03-26",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test-client", "version": "1"},
+                    },
+                },
+            )
+            initialized.raise_for_status()
+            session_id = initialized.headers["mcp-session-id"]
+            legacy = await client.post(
+                "/mcp",
+                headers={**headers, "mcp-session-id": session_id},
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {"name": "session_identity", "arguments": {}},
+                },
+            )
+            legacy.raise_for_status()
+            assert f'"text":"{hashlib.sha256(f"wire-user:{session_id}".encode()).hexdigest()[:32]}"' in legacy.text
+
+            modern = await client.post(
+                "/mcp",
+                headers={
+                    **headers,
+                    "MCP-Protocol-Version": "2026-07-28",
+                    "mcp-method": "tools/call",
+                    "mcp-name": "session_identity",
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {
+                        "_meta": {
+                            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                            "io.modelcontextprotocol/clientCapabilities": {},
+                        },
+                        "name": "session_identity",
+                        "arguments": {},
+                    },
+                },
+            )
+            modern.raise_for_status()
+            result = modern.json()["result"]
+            assert result["isError"] is True
+            assert "Missing mcp-session-id header" in result["content"][0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_sessionless_conversations_are_isolated_and_legacy_still_works():
+    alice = _make_mock_token("alice", iat=100)
+    alice_refreshed = _make_mock_token("alice", iat=200)
+    bob = _make_mock_token("bob", iat=100)
+    mcp = FastMCP(
+        "session-test", auth=DebugTokenVerifier(validate=lambda value: value in {alice, alice_refreshed, bob})
+    )
+    mcp.add_provider(ConversationSessionProvider())
+    mcp.add_transform(ConversationSessionArguments())
+    mcp.add_middleware(ConversationSessionMiddleware())
+
+    @mcp.tool
+    async def session_identity() -> str:
+        context = await ctx_module.get_evo_context()
+        return context.client_session_id
+
+    mcp.add_transform(BM25SearchTransform(always_visible=["create_session", "end_session", "session_identity"]))
+    listed = {tool.name: tool for tool in await mcp.list_tools()}
+    assert "session_id" in listed["session_identity"].parameters["properties"]
+    assert "session_id" not in listed["create_session"].parameters["properties"]
+    app = mcp.http_app()
+
+    async def invoke(client, bearer, name, arguments, legacy_session=None):
+        headers = {
+            "Authorization": f"Bearer {bearer}",
+            "Accept": "application/json, text/event-stream",
+        }
+        params = {"name": name, "arguments": arguments}
+        if legacy_session is None:
+            headers.update(
+                {
+                    "MCP-Protocol-Version": "2026-07-28",
+                    "mcp-method": "tools/call",
+                    "mcp-name": name,
+                }
+            )
+            params["_meta"] = {
+                "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                "io.modelcontextprotocol/clientCapabilities": {},
+            }
+        else:
+            headers["mcp-session-id"] = legacy_session
+        response = await client.post(
+            "/mcp",
+            headers=headers,
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params},
+        )
+        response.raise_for_status()
+        payload = (
+            json.loads(response.text.split("data: ", 1)[1].splitlines()[0])
+            if response.headers.get("content-type", "").startswith("text/event-stream")
+            else response.json()
+        )
+        return payload["result"] if "result" in payload else {"isError": True, "error": payload["error"]}
+
+    original_mode = ctx_module.delegated_mode
+    ctx_module.delegated_mode = True
+    ctx_module.delegated_contexts.clear()
+    try:
+        with patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock):
+            async with app.lifespan(app):
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
+                    first = await invoke(client, alice, "create_session", {})
+                    second = await invoke(client, alice, "create_session", {})
+                    assert not first["isError"] and not second["isError"]
+                    first_id = first["content"][0]["text"]
+                    second_id = second["content"][0]["text"]
+                    assert first_id != second_id
+
+                    async def identity(token, session_id, via_proxy=False):
+                        args = {"session_id": session_id}
+                        if via_proxy:
+                            return await invoke(
+                                client,
+                                token,
+                                "call_tool",
+                                {
+                                    "name": "session_identity",
+                                    "arguments": args,
+                                },
+                            )
+                        return await invoke(client, token, "session_identity", args)
+
+                    a = await identity(alice, first_id)
+                    first_key = hashlib.sha256(f"alice:{first_id}".encode()).hexdigest()[:32]
+                    first_context = ctx_module.delegated_contexts[first_key]
+                    again = await identity(alice_refreshed, first_id, via_proxy=True)
+                    b = await identity(alice, second_id)
+                    assert not a["isError"] and not again["isError"] and not b["isError"]
+                    assert a["content"] == again["content"]
+                    assert ctx_module.delegated_contexts[first_key] is first_context
+                    assert a["content"] != b["content"]
+                    assert (await identity(bob, first_id))["isError"]
+                    assert (await identity(alice, "not-created"))["isError"]
+                    assert (await invoke(client, alice, "session_identity", {}))["isError"]
+                    ended = await invoke(client, alice, "end_session", {"session_id": first_id})
+                    assert not ended["isError"]
+                    assert first_key not in ctx_module.delegated_contexts
+                    assert (await identity(alice, first_id))["isError"]
+
+                    initialized = await client.post(
+                        "/mcp",
+                        headers={"Authorization": f"Bearer {alice}", "Accept": "application/json, text/event-stream"},
+                        json={
+                            "jsonrpc": "2.0",
+                            "id": 2,
+                            "method": "initialize",
+                            "params": {
+                                "protocolVersion": "2025-03-26",
+                                "capabilities": {},
+                                "clientInfo": {"name": "test-client", "version": "1"},
+                            },
+                        },
+                    )
+                    initialized.raise_for_status()
+                    legacy_id = initialized.headers["mcp-session-id"]
+                    legacy = await invoke(client, alice, "session_identity", {}, legacy_session=legacy_id)
+                    assert not legacy["isError"]
+                    assert legacy == await invoke(client, alice, "session_identity", {}, legacy_session=legacy_id)
+    finally:
+        ctx_module.delegated_mode = original_mode
+        ctx_module.delegated_contexts.clear()
 
 
 # ---------------------------------------------------------------------------
