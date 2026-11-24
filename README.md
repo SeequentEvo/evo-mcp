@@ -553,7 +553,7 @@ uv run fastmcp call http://localhost:5000/mcp create_workspace \
   --json
 ```
 
-> Note: The FastMCP CLI handles MCP session setup automatically, so no manual `initialize` request or `Mcp-Session-Id` header handling is required.
+> Note: The server requires stateless MCP (2026-07-28 or newer), including for server-managed authentication. Legacy `initialize` handshakes and `Mcp-Session-Id` transport sessions are not supported. Client-delegated tools additionally require an application-level `session_id` from `create_session`.
 
 ### Testing with a Google ADK agent
 

@@ -8,6 +8,8 @@ SPDX-License-Identifier: Apache-2.0
 
 The Evo MCP server supports two authentication modes depending on the deployment scenario. This document explains how each mode works, including the OAuth flows, session management, and current workarounds.
 
+Both authentication modes require the stateless MCP protocol (2026-07-28 or newer), including for stdio clients. Legacy initialize-based MCP connections are not supported. For HTTP deployments, run the server with stateless HTTP enabled; the built-in HTTP entry point configures this automatically.
+
 ## Overview
 
 | Mode | When to use | How it works |
@@ -168,10 +170,10 @@ sequenceDiagram
     MCP-->>Client: Proxy access token
 
     Note over Client,Evo: 4. Authenticated MCP requests
-    Client->>MCP: POST /mcp (tool call)<br/>Authorization: Bearer <proxy_token><br/>mcp-session-id: <session_id>
+    Client->>MCP: POST /mcp (tool call)<br/>Authorization: Bearer <proxy_token><br/>session_id in tool arguments
     activate MCP
 
-    Note over MCP: Extract upstream IMS token<br/>from proxy token.<br/>Derive session key:<br/>sha256(user_sub + session_id)
+    Note over MCP: Validate conversation ownership<br/>with upstream IMS token.<br/>Derive context key:<br/>sha256(user_sub + session_id)
 
     alt Existing session
         MCP->>MCP: Reuse DelegatedAuthContext
@@ -197,7 +199,7 @@ sequenceDiagram
 | `forward_resource=False` | MCP clients send RFC 8707 `resource` parameter. Bentley IMS rejects unknown resource URLs with `invalid_target`. OIDCProxy strips it before forwarding to IMS. |
 | `token_endpoint_auth_method: "none"` | AI clients are public OAuth clients (no client secret). IMS native/SPA apps use PKCE only. |
 | Configurable redirect path | In CLIENT DELEGATED AUTH mode, the MCP server receives the IMS OAuth callback. The callback path defaults to `/signin-callback` and can be overridden via `OIDCPROXY_REDIRECT_PATH`. The full redirect URI registered in IMS must be `{MCP_PUBLIC_BASE_URL}{OIDCPROXY_REDIRECT_PATH}`. |
-| Composite session key | `sha256(user_sub + mcp-session-id)` prevents session-ID spoofing — even with a forged header, the `sub` claim from the JWT differs per user. |
+| Conversation ownership | `create_session` issues an explicit conversation ID; each call validates it against the authenticated user. The context key combines that user's `sub` claim with the ID. |
 
 ## Session lifecycle (delegated mode)
 
@@ -216,7 +218,7 @@ stateDiagram-v2
     Evicted --> [*]: cleanup()<br/>remove temp dir + lock
 
     note right of Active
-        Session key = sha256(user_sub + mcp-session-id)
+        Context key = sha256(user_sub + conversation_id)
         Stored in _CleanupTTLCache
         TTL resets on each request
     end note
@@ -224,16 +226,16 @@ stateDiagram-v2
 
 ### Session identity
 
-The session key is derived from two values:
+The delegated context key is derived from two values:
 
 1. **`sub` claim** from the IMS JWT — identifies the user
-2. **`mcp-session-id` header** — identifies the client session (set by MCP protocol)
+2. **`session_id`** from `create_session` — identifies the conversation
 
 ```
-session_key = sha256(user_sub + ":" + mcp_session_id)[:32]
+context_key = sha256(user_sub + ":" + session_id)[:32]
 ```
 
-If the `mcp-session-id` header is absent (fallback), the raw token is used instead — but this means a token refresh creates a new session (the old one is evicted by TTL).
+Call `create_session` once per conversation and include the returned `session_id` in every stateful tool call. When using the tool-search proxy, put it inside `call_tool.arguments`, not alongside `name` and `arguments`. Call `end_session` when the conversation finishes. Session IDs are scoped to the authenticated user and expire after `SESSION_TTL_SECONDS` of inactivity (default one hour); after expiration, create a new session. In-memory conversation state is not preserved across server restarts or shared across replicas. Server-managed authentication still shares one context across clients and does not require `create_session`.
 
 ### Eviction and cleanup
 

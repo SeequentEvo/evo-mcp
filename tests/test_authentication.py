@@ -109,7 +109,7 @@ def delegated_server():
 
 @pytest_asyncio.fixture
 async def delegated_server_client(delegated_server):
-    app = delegated_server.mcp.http_app()
+    app = delegated_server.mcp.http_app(stateless_http=True)
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app),
         base_url=_BASE_URL,
@@ -233,15 +233,12 @@ async def test_delegated_server_wires_auth_provider_and_challenges_requests(
 
     response = await delegated_server_client.post(
         "/mcp",
+        headers={"MCP-Protocol-Version": "2026-07-28", "Accept": "application/json, text/event-stream"},
         json={
             "jsonrpc": "2.0",
             "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2025-03-26",
-                "capabilities": {},
-                "clientInfo": {"name": "test-client", "version": "1.0"},
-            },
+            "method": "server/discover",
+            "params": {},
         },
     )
 
