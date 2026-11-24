@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import weakref
 from collections.abc import Sequence
 from contextvars import ContextVar
 from typing import Any
@@ -23,6 +25,7 @@ from mcp_types.version import MODERN_PROTOCOL_VERSIONS
 from evo_mcp.contexts.helpers import get_client_session_upstream_access_token, get_user_id_from_token
 
 _modern_session_id: ContextVar[str | None] = ContextVar("evo_modern_session_id", default=None)
+_conversation_call_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
 _LIFECYCLE_TOOLS = frozenset({"create_session", "end_session", "search_tools", "call_tool"})
 _SESSION_DESCRIPTION = "Call create_session first and pass its ID here on every call in this conversation."
 
@@ -62,20 +65,20 @@ async def create_conversation_session() -> str:
 
 async def end_conversation_session(session_id: SessionId) -> str:
     """End a conversation and discard its server-side context."""
-    import asyncio
-
     from evo_mcp.context import delegated_contexts, session_locks
 
-    await validated_session_key(session_id, refresh=False)
     key = conversation_session_key(session_id)
-    lock = session_locks.setdefault(key, asyncio.Lock())
-    async with lock:
+    call_lock = _conversation_call_locks.setdefault(key, asyncio.Lock())
+    async with call_lock:
         await validated_session_key(session_id, refresh=False)
-        session = await get_session(session_id)
-        await session.end()
-        delegated_contexts.pop(key, None)
-    if session_locks.get(key) is lock:
-        session_locks.pop(key, None)
+        lock = session_locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            await validated_session_key(session_id, refresh=False)
+            session = await get_session(session_id)
+            await session.end()
+            delegated_contexts.pop(key, None)
+        if session_locks.get(key) is lock:
+            session_locks.pop(key, None)
     return "session ended"
 
 
@@ -105,6 +108,9 @@ class ConversationSessionArguments(Transform):
                         **schema.get("properties", {}),
                         "session_id": {"type": "string", "description": _SESSION_DESCRIPTION},
                     },
+                    "required": [*schema.get("required", []), "session_id"]
+                    if "session_id" not in schema.get("required", [])
+                    else schema["required"],
                 }
             }
         )
@@ -131,12 +137,17 @@ class ConversationSessionMiddleware(Middleware):
         session_id = arguments.pop("session_id", None)
         if not isinstance(session_id, str) or not session_id:
             raise ValueError("A sessionless tool call requires a session_id from create_session.")
-        await validated_session_key(session_id, refresh=False)
-        token = _modern_session_id.set(session_id)
-        try:
-            return await call_next(context.copy(message=context.message.model_copy(update={"arguments": arguments})))
-        finally:
-            _modern_session_id.reset(token)
+        key = conversation_session_key(session_id)
+        call_lock = _conversation_call_locks.setdefault(key, asyncio.Lock())
+        async with call_lock:
+            await validated_session_key(session_id, refresh=False)
+            token = _modern_session_id.set(session_id)
+            try:
+                return await call_next(
+                    context.copy(message=context.message.model_copy(update={"arguments": arguments}))
+                )
+            finally:
+                _modern_session_id.reset(token)
 
 
 def modern_session_id() -> str | None:

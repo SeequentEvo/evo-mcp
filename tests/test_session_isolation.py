@@ -65,6 +65,36 @@ def _mock_access_token_obj(token: str):
     return obj
 
 
+async def _invoke_tool(client, bearer, name, arguments):
+    headers = {
+        "Authorization": f"Bearer {bearer}",
+        "Accept": "application/json, text/event-stream",
+        "MCP-Protocol-Version": "2026-07-28",
+        "mcp-method": "tools/call",
+        "mcp-name": name,
+    }
+    params = {
+        "name": name,
+        "arguments": arguments,
+        "_meta": {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {},
+        },
+    }
+    response = await client.post(
+        "/mcp",
+        headers=headers,
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params},
+    )
+    response.raise_for_status()
+    payload = (
+        json.loads(response.text.split("data: ", 1)[1].splitlines()[0])
+        if response.headers.get("content-type", "").startswith("text/event-stream")
+        else response.json()
+    )
+    return payload["result"] if "result" in payload else {"isError": True, "error": payload["error"]}
+
+
 async def _validated_key(session_id: str, *, refresh: bool = True) -> str:
     user_id = get_user_id_from_token(get_client_session_upstream_access_token())
     return hashlib.sha256(f"{user_id}:{session_id}".encode()).hexdigest()[:32]
@@ -762,6 +792,90 @@ async def test_http_rejects_legacy_protocol_in_both_auth_modes(delegated):
 
 
 @pytest.mark.asyncio
+async def test_session_id_is_required_without_losing_existing_required_fields():
+    mcp = FastMCP("session-test")
+    mcp.add_transform(ConversationSessionArguments())
+
+    @mcp.tool
+    async def echo(value: str) -> str:
+        return value
+
+    listed = {tool.name: tool for tool in await mcp.list_tools()}
+    assert set(listed["echo"].parameters["required"]) == {"value", "session_id"}
+    assert set((await mcp.get_tool("echo")).parameters["required"]) == {"value", "session_id"}
+
+
+@pytest.mark.asyncio
+async def test_end_session_waits_for_active_tool_to_finish():
+    token = _make_mock_token("alice")
+    mcp = FastMCP("session-test", auth=DebugTokenVerifier(validate=lambda value: value == token))
+    mcp.add_provider(ConversationSessionProvider())
+    mcp.add_transform(ConversationSessionArguments())
+    mcp.add_middleware(StatelessProtocolMiddleware())
+    mcp.add_middleware(ConversationSessionMiddleware())
+    entered = asyncio.Event()
+    resume = asyncio.Event()
+    context_path = None
+
+    @mcp.tool
+    async def build_object() -> str:
+        nonlocal context_path
+        context = await ctx_module.get_evo_context()
+        context_path = context.cache_path
+        entered.set()
+        await resume.wait()
+        assert context_path.exists()
+        return "built"
+
+    app = mcp.http_app(stateless_http=True)
+    original_mode = ctx_module.delegated_mode
+    ctx_module.delegated_mode = True
+    ctx_module.delegated_contexts.clear()
+    ctx_module.session_locks.clear()
+    try:
+        with patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock):
+            async with app.lifespan(app):
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
+                    created = await _invoke_tool(client, token, "create_session", {})
+                    assert not created["isError"]
+                    session_id = created["content"][0]["text"]
+                    active_call = asyncio.create_task(
+                        _invoke_tool(client, token, "build_object", {"session_id": session_id})
+                    )
+                    ending = None
+                    queued_call = None
+                    try:
+                        await asyncio.wait_for(entered.wait(), 2)
+                        ending = asyncio.create_task(
+                            _invoke_tool(client, token, "end_session", {"session_id": session_id})
+                        )
+                        await asyncio.sleep(0.05)
+                        assert not ending.done()
+                        assert context_path.exists()
+                        queued_call = asyncio.create_task(
+                            _invoke_tool(client, token, "build_object", {"session_id": session_id})
+                        )
+
+                        resume.set()
+                        assert not (await asyncio.wait_for(active_call, 2))["isError"]
+                        assert not (await asyncio.wait_for(ending, 2))["isError"]
+                        assert (await asyncio.wait_for(queued_call, 2))["isError"]
+                        assert not context_path.exists()
+                        assert (await _invoke_tool(client, token, "build_object", {"session_id": session_id}))[
+                            "isError"
+                        ]
+                    finally:
+                        resume.set()
+                        await asyncio.gather(
+                            *(task for task in (active_call, ending, queued_call) if task), return_exceptions=True
+                        )
+    finally:
+        ctx_module.delegated_mode = original_mode
+        ctx_module.delegated_contexts.clear()
+        ctx_module.session_locks.clear()
+
+
+@pytest.mark.asyncio
 async def test_sessionless_conversations_are_isolated():
     alice = _make_mock_token("alice", iat=100)
     alice_refreshed = _make_mock_token("alice", iat=200)
@@ -782,37 +896,9 @@ async def test_sessionless_conversations_are_isolated():
     mcp.add_transform(BM25SearchTransform(always_visible=["create_session", "end_session", "session_identity"]))
     listed = {tool.name: tool for tool in await mcp.list_tools()}
     assert "session_id" in listed["session_identity"].parameters["properties"]
+    assert "session_id" in listed["session_identity"].parameters["required"]
     assert "session_id" not in listed["create_session"].parameters["properties"]
     app = mcp.http_app(stateless_http=True)
-
-    async def invoke(client, bearer, name, arguments):
-        headers = {
-            "Authorization": f"Bearer {bearer}",
-            "Accept": "application/json, text/event-stream",
-            "MCP-Protocol-Version": "2026-07-28",
-            "mcp-method": "tools/call",
-            "mcp-name": name,
-        }
-        params = {
-            "name": name,
-            "arguments": arguments,
-            "_meta": {
-                "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-                "io.modelcontextprotocol/clientCapabilities": {},
-            },
-        }
-        response = await client.post(
-            "/mcp",
-            headers=headers,
-            json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params},
-        )
-        response.raise_for_status()
-        payload = (
-            json.loads(response.text.split("data: ", 1)[1].splitlines()[0])
-            if response.headers.get("content-type", "").startswith("text/event-stream")
-            else response.json()
-        )
-        return payload["result"] if "result" in payload else {"isError": True, "error": payload["error"]}
 
     original_mode = ctx_module.delegated_mode
     ctx_module.delegated_mode = True
@@ -821,8 +907,8 @@ async def test_sessionless_conversations_are_isolated():
         with patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock):
             async with app.lifespan(app):
                 async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
-                    first = await invoke(client, alice, "create_session", {})
-                    second = await invoke(client, alice, "create_session", {})
+                    first = await _invoke_tool(client, alice, "create_session", {})
+                    second = await _invoke_tool(client, alice, "create_session", {})
                     assert not first["isError"] and not second["isError"]
                     first_id = first["content"][0]["text"]
                     second_id = second["content"][0]["text"]
@@ -831,7 +917,7 @@ async def test_sessionless_conversations_are_isolated():
                     async def identity(token, session_id, via_proxy=False):
                         args = {"session_id": session_id}
                         if via_proxy:
-                            return await invoke(
+                            return await _invoke_tool(
                                 client,
                                 token,
                                 "call_tool",
@@ -840,7 +926,7 @@ async def test_sessionless_conversations_are_isolated():
                                     "arguments": args,
                                 },
                             )
-                        return await invoke(client, token, "session_identity", args)
+                        return await _invoke_tool(client, token, "session_identity", args)
 
                     a = await identity(alice, first_id)
                     first_key = hashlib.sha256(f"alice:{first_id}".encode()).hexdigest()[:32]
@@ -853,8 +939,8 @@ async def test_sessionless_conversations_are_isolated():
                     assert a["content"] != b["content"]
                     assert (await identity(bob, first_id))["isError"]
                     assert (await identity(alice, "not-created"))["isError"]
-                    assert (await invoke(client, alice, "session_identity", {}))["isError"]
-                    ended = await invoke(client, alice, "end_session", {"session_id": first_id})
+                    assert (await _invoke_tool(client, alice, "session_identity", {}))["isError"]
+                    ended = await _invoke_tool(client, alice, "end_session", {"session_id": first_id})
                     assert not ended["isError"]
                     assert first_key not in ctx_module.delegated_contexts
                     assert (await identity(alice, first_id))["isError"]

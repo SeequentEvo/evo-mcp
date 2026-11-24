@@ -235,7 +235,7 @@ The delegated context key is derived from two values:
 context_key = sha256(user_sub + ":" + session_id)[:32]
 ```
 
-Call `create_session` once per conversation and include the returned `session_id` in every stateful tool call. When using the tool-search proxy, put it inside `call_tool.arguments`, not alongside `name` and `arguments`. Call `end_session` when the conversation finishes. Session IDs are scoped to the authenticated user and expire after `SESSION_TTL_SECONDS` of inactivity (default one hour); after expiration, create a new session. In-memory conversation state is not preserved across server restarts or shared across replicas. Server-managed authentication still shares one context across clients and does not require `create_session`.
+Call `create_session` once per conversation and include the returned `session_id` in every stateful tool call. When using the tool-search proxy, put it inside `call_tool.arguments`, not alongside `name` and `arguments`. Calls with the same ID run one at a time. Call `end_session` when the conversation finishes. It waits for a running tool call to finish before removing that conversation's context; subsequent calls with the ended ID are rejected. Session IDs are scoped to the authenticated user and expire after `SESSION_TTL_SECONDS` of inactivity (default one hour); after expiration, create a new session. In-memory conversation state is not preserved across server restarts or shared across replicas. Server-managed authentication still shares one context across clients and does not require `create_session`.
 
 ### Eviction and cleanup
 
