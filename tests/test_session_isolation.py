@@ -4,25 +4,38 @@
 
 """Tests for session isolation: context, object_staging, and object_registry.
 
-Verifies that in delegated auth mode, each MCP client session gets its own
+Verifies that in delegated auth mode, each conversation gets its own
 DelegatedAuthContext with independent StagingService and ObjectRegistry.
 """
 
 import asyncio
 import base64
+import hashlib
 import json
 import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
+import pytest
 from cachetools import TTLCache
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.debug import DebugTokenVerifier
+from fastmcp.server.transforms.search import BM25SearchTransform
 
 import evo_mcp.context as ctx_module
 from evo_mcp.context import _CleanupTTLCache
 from evo_mcp.contexts.delegated import DelegatedAuthContext
-from evo_mcp.contexts.helpers import get_client_session_id
+from evo_mcp.contexts.helpers import get_client_session_upstream_access_token, get_user_id_from_token
 from evo_mcp.contexts.managed import ManagedAuthContext
 from evo_mcp.session.resolver import ResolutionError
+from evo_mcp.session_support import (
+    ConversationSessionArguments,
+    ConversationSessionMiddleware,
+    ConversationSessionProvider,
+    StatelessProtocolMiddleware,
+    end_conversation_session,
+)
 from evo_mcp.staging.errors import StageNotFoundError
 from evo_mcp.staging.models import StagedEnvelope
 
@@ -52,11 +65,39 @@ def _mock_access_token_obj(token: str):
     return obj
 
 
-def _mock_http_request(session_id: str):
-    """Create a mock HTTP request with mcp-session-id header."""
-    request = MagicMock()
-    request.headers = {"mcp-session-id": session_id}
-    return request
+async def _invoke_tool(client, bearer, name, arguments):
+    headers = {
+        "Authorization": f"Bearer {bearer}",
+        "Accept": "application/json, text/event-stream",
+        "MCP-Protocol-Version": "2026-07-28",
+        "mcp-method": "tools/call",
+        "mcp-name": name,
+    }
+    params = {
+        "name": name,
+        "arguments": arguments,
+        "_meta": {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {},
+        },
+    }
+    response = await client.post(
+        "/mcp",
+        headers=headers,
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params},
+    )
+    response.raise_for_status()
+    payload = (
+        json.loads(response.text.split("data: ", 1)[1].splitlines()[0])
+        if response.headers.get("content-type", "").startswith("text/event-stream")
+        else response.json()
+    )
+    return payload["result"] if "result" in payload else {"isError": True, "error": payload["error"]}
+
+
+async def _validated_key(session_id: str, *, refresh: bool = True) -> str:
+    user_id = get_user_id_from_token(get_client_session_upstream_access_token())
+    return hashlib.sha256(f"{user_id}:{session_id}".encode()).hexdigest()[:32]
 
 
 # ---------------------------------------------------------------------------
@@ -84,18 +125,19 @@ class TestContextPerSession(unittest.IsolatedAsyncioTestCase):
         try:
             with (
                 patch("evo_mcp.contexts.helpers.get_access_token") as mock_at,
-                patch("evo_mcp.contexts.helpers.get_http_request") as mock_req,
+                patch("evo_mcp.context.modern_session_id") as mock_session,
+                patch("evo_mcp.context.validated_session_key", side_effect=_validated_key),
                 patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock),
             ):
                 # Session A
                 mock_at.return_value = _mock_access_token_obj(token_a)
-                mock_req.return_value = _mock_http_request("session-AAA")
+                mock_session.return_value = "session-AAA"
 
                 context_a = await ctx_module.get_evo_context()
 
                 # Session B
                 mock_at.return_value = _mock_access_token_obj(token_b)
-                mock_req.return_value = _mock_http_request("session-BBB")
+                mock_session.return_value = "session-BBB"
 
                 context_b = await ctx_module.get_evo_context()
 
@@ -132,17 +174,18 @@ class TestStagingIsolation(unittest.IsolatedAsyncioTestCase):
         try:
             with (
                 patch("evo_mcp.contexts.helpers.get_access_token") as mock_at,
-                patch("evo_mcp.contexts.helpers.get_http_request") as mock_req,
+                patch("evo_mcp.context.modern_session_id") as mock_session,
+                patch("evo_mcp.context.validated_session_key", side_effect=_validated_key),
                 patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock),
             ):
                 # Create session A context
                 mock_at.return_value = _mock_access_token_obj(token_a)
-                mock_req.return_value = _mock_http_request("session-AAA")
+                mock_session.return_value = "session-AAA"
                 context_a = await ctx_module.get_evo_context()
 
                 # Create session B context
                 mock_at.return_value = _mock_access_token_obj(token_b)
-                mock_req.return_value = _mock_http_request("session-BBB")
+                mock_session.return_value = "session-BBB"
                 context_b = await ctx_module.get_evo_context()
 
             # Use _put directly to bypass type/domain validation — the test only
@@ -196,15 +239,16 @@ class TestRegistryIsolation(unittest.IsolatedAsyncioTestCase):
         try:
             with (
                 patch("evo_mcp.contexts.helpers.get_access_token") as mock_at,
-                patch("evo_mcp.contexts.helpers.get_http_request") as mock_req,
+                patch("evo_mcp.context.modern_session_id") as mock_session,
+                patch("evo_mcp.context.validated_session_key", side_effect=_validated_key),
                 patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock),
             ):
                 mock_at.return_value = _mock_access_token_obj(token_a)
-                mock_req.return_value = _mock_http_request("session-AAA")
+                mock_session.return_value = "session-AAA"
                 context_a = await ctx_module.get_evo_context()
 
                 mock_at.return_value = _mock_access_token_obj(token_b)
-                mock_req.return_value = _mock_http_request("session-BBB")
+                mock_session.return_value = "session-BBB"
                 context_b = await ctx_module.get_evo_context()
 
             # Stage and register in session A
@@ -259,12 +303,11 @@ class TestSameSessionReusesContext(unittest.IsolatedAsyncioTestCase):
         try:
             with (
                 patch("evo_mcp.contexts.helpers.get_access_token") as mock_at,
-                patch("evo_mcp.contexts.helpers.get_http_request") as mock_req,
+                patch("evo_mcp.context.modern_session_id", return_value="session-XYZ"),
+                patch("evo_mcp.context.validated_session_key", side_effect=_validated_key),
                 patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock),
             ):
                 mock_at.return_value = _mock_access_token_obj(token)
-                mock_req.return_value = _mock_http_request("session-XYZ")
-
                 context_1 = await ctx_module.get_evo_context()
 
                 # Register something to verify state persistence
@@ -404,13 +447,12 @@ class TestConcurrentSessionCreation(unittest.IsolatedAsyncioTestCase):
         try:
             with (
                 patch("evo_mcp.contexts.helpers.get_access_token") as mock_at,
-                patch("evo_mcp.contexts.helpers.get_http_request") as mock_req,
+                patch("evo_mcp.context.modern_session_id", return_value="session-concurrent"),
+                patch("evo_mcp.context.validated_session_key", side_effect=_validated_key),
                 patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock),
                 patch.object(DelegatedAuthContext, "__init__", counting_init),
             ):
                 mock_at.return_value = _mock_access_token_obj(token)
-                mock_req.return_value = _mock_http_request("session-concurrent")
-
                 # Launch 5 concurrent requests
                 results = await asyncio.gather(*[ctx_module.get_evo_context() for _ in range(5)])
 
@@ -447,12 +489,12 @@ class TestTokenRefreshPreservesState(unittest.IsolatedAsyncioTestCase):
         try:
             with (
                 patch("evo_mcp.contexts.helpers.get_access_token") as mock_at,
-                patch("evo_mcp.contexts.helpers.get_http_request") as mock_req,
+                patch("evo_mcp.context.modern_session_id", return_value="session-refresh"),
+                patch("evo_mcp.context.validated_session_key", side_effect=_validated_key),
                 patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock) as mock_build,
             ):
                 # First request with token_v1
                 mock_at.return_value = _mock_access_token_obj(token_v1)
-                mock_req.return_value = _mock_http_request("session-refresh")
                 context = await ctx_module.get_evo_context()
 
                 # Stage an object
@@ -524,14 +566,14 @@ class TestManagedModeSharedContext(unittest.IsolatedAsyncioTestCase):
 
 
 # ---------------------------------------------------------------------------
-# Test: Different users with same session header get different contexts
+# Test: Different users with same conversation ID get different contexts
 # ---------------------------------------------------------------------------
 
 
 class TestUserIsolation(unittest.IsolatedAsyncioTestCase):
-    """Different users with the same mcp-session-id cannot share contexts."""
+    """Different users cannot share contexts even with the same conversation ID."""
 
-    async def test_different_users_same_session_header_isolated(self):
+    async def test_different_users_same_conversation_id_isolated(self):
         token_user1 = _make_mock_token("user-alice")
         token_user2 = _make_mock_token("user-bob")
 
@@ -543,44 +585,368 @@ class TestUserIsolation(unittest.IsolatedAsyncioTestCase):
         try:
             with (
                 patch("evo_mcp.contexts.helpers.get_access_token") as mock_at,
-                patch("evo_mcp.contexts.helpers.get_http_request") as mock_req,
+                patch("evo_mcp.context.modern_session_id", return_value="session-SHARED"),
+                patch("evo_mcp.context.validated_session_key", side_effect=_validated_key),
                 patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock),
             ):
                 # User Alice with session-SHARED
                 mock_at.return_value = _mock_access_token_obj(token_user1)
-                mock_req.return_value = _mock_http_request("session-SHARED")
                 context_alice = await ctx_module.get_evo_context()
 
-                # User Bob with the SAME session header
+                # User Bob with the same conversation ID
                 mock_at.return_value = _mock_access_token_obj(token_user2)
-                mock_req.return_value = _mock_http_request("session-SHARED")
                 context_bob = await ctx_module.get_evo_context()
 
-            # Should be different contexts despite same session header
+            # Context keys remain distinct despite the same conversation ID.
             self.assertIsNot(context_alice, context_bob)
         finally:
             ctx_module.delegated_mode = False
             ctx_module.delegated_contexts.clear()
             ctx_module.session_locks.clear()
 
-    def test_get_client_session_id_differs_by_user(self):
-        """get_client_session_id() includes user identity in the key."""
-        token_alice = _make_mock_token("user-alice")
-        token_bob = _make_mock_token("user-bob")
 
+@pytest.mark.asyncio
+async def test_end_session_waits_for_context_initialization_and_cleans_it_up():
+    initialized = asyncio.Event()
+    resume = asyncio.Event()
+    session = MagicMock()
+    session.get = AsyncMock(return_value="alice")
+    session.set = AsyncMock()
+    session.end = AsyncMock()
+    key = hashlib.sha256(b"alice:conversation").hexdigest()[:32]
+
+    async def blocked_initialize(_context):
+        initialized.set()
+        await resume.wait()
+
+    original_mode = ctx_module.delegated_mode
+    ctx_module.delegated_mode = True
+    ctx_module.delegated_contexts.clear()
+    ctx_module.session_locks.clear()
+    try:
         with (
-            patch("evo_mcp.contexts.helpers.get_access_token") as mock_at,
-            patch("evo_mcp.contexts.helpers.get_http_request") as mock_req,
+            patch("evo_mcp.session_support._user_id", return_value="alice"),
+            patch("evo_mcp.session_support.get_session", new_callable=AsyncMock, return_value=session),
+            patch("evo_mcp.context.modern_session_id", return_value="conversation"),
+            patch.object(DelegatedAuthContext, "initialize", blocked_initialize),
         ):
-            mock_req.return_value = _mock_http_request("session-SAME")
+            pending_get = asyncio.create_task(ctx_module.get_evo_context())
+            pending_end = None
+            try:
+                await asyncio.wait_for(initialized.wait(), 2)
+                pending_end = asyncio.create_task(end_conversation_session("conversation"))
+                await asyncio.sleep(0)
+                assert not pending_end.done()
 
-            mock_at.return_value = _mock_access_token_obj(token_alice)
-            id_alice = get_client_session_id()
+                resume.set()
+                context = await asyncio.wait_for(pending_get, 2)
+                assert await asyncio.wait_for(pending_end, 2) == "session ended"
+                assert key not in ctx_module.delegated_contexts
+                assert key not in ctx_module.session_locks
+                assert not context.cache_path.exists()
+                session.end.assert_awaited_once()
+            finally:
+                resume.set()
+                await asyncio.gather(*(task for task in (pending_get, pending_end) if task), return_exceptions=True)
+    finally:
+        ctx_module.delegated_mode = original_mode
+        ctx_module.delegated_contexts.clear()
+        ctx_module.session_locks.clear()
 
-            mock_at.return_value = _mock_access_token_obj(token_bob)
-            id_bob = get_client_session_id()
 
-        self.assertNotEqual(id_alice, id_bob)
+@pytest.mark.asyncio
+async def test_context_waiting_for_end_revalidates_before_initialization():
+    ending = asyncio.Event()
+    resume = asyncio.Event()
+    active = True
+    session = MagicMock()
+    session.get = AsyncMock(return_value="alice")
+    session.set = AsyncMock()
+
+    async def get_session(session_id):
+        if not active:
+            raise ValueError("Invalid or unknown session.")
+        return session
+
+    async def end():
+        nonlocal active
+        ending.set()
+        await resume.wait()
+        active = False
+
+    session.end = AsyncMock(side_effect=end)
+    original_mode = ctx_module.delegated_mode
+    ctx_module.delegated_mode = True
+    ctx_module.delegated_contexts.clear()
+    ctx_module.session_locks.clear()
+    try:
+        with (
+            patch("evo_mcp.session_support._user_id", return_value="alice"),
+            patch("evo_mcp.session_support.get_session", side_effect=get_session),
+            patch("evo_mcp.context.modern_session_id", return_value="conversation"),
+            patch.object(DelegatedAuthContext, "initialize", new_callable=AsyncMock) as initialize,
+        ):
+            pending_end = asyncio.create_task(end_conversation_session("conversation"))
+            pending_get = None
+            try:
+                await asyncio.wait_for(ending.wait(), 2)
+                pending_get = asyncio.create_task(ctx_module.get_evo_context())
+                await asyncio.sleep(0)
+                assert not pending_get.done()
+
+                resume.set()
+                assert await asyncio.wait_for(pending_end, 2) == "session ended"
+                with pytest.raises(ValueError, match="Invalid or unknown session"):
+                    await asyncio.wait_for(pending_get, 2)
+                initialize.assert_not_awaited()
+                assert not ctx_module.delegated_contexts
+                assert not ctx_module.session_locks
+                with pytest.raises(ValueError, match="Invalid or unknown session"):
+                    await ctx_module.get_evo_context()
+                with pytest.raises(ValueError, match="Invalid or unknown session"):
+                    await end_conversation_session("conversation")
+                assert not ctx_module.session_locks
+            finally:
+                resume.set()
+                await asyncio.gather(*(task for task in (pending_end, pending_get) if task), return_exceptions=True)
+    finally:
+        ctx_module.delegated_mode = original_mode
+        ctx_module.delegated_contexts.clear()
+        ctx_module.session_locks.clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("delegated", [False, True])
+async def test_http_rejects_legacy_protocol_in_both_auth_modes(delegated):
+    token = _make_mock_token("wire-user")
+    auth = DebugTokenVerifier(validate=lambda value: value == token) if delegated else None
+    mcp = FastMCP("session-test", auth=auth)
+    mcp.add_middleware(StatelessProtocolMiddleware())
+
+    @mcp.tool
+    async def ping() -> str:
+        return "pong"
+
+    app = mcp.http_app(stateless_http=True)
+    async with app.lifespan(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
+            headers = {"Accept": "application/json, text/event-stream"}
+            if delegated:
+                headers["Authorization"] = f"Bearer {token}"
+            legacy = await client.post(
+                "/mcp",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-03-26",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test-client", "version": "1"},
+                    },
+                },
+            )
+            assert "mcp-session-id" not in legacy.headers
+            assert "2026-07-28" in legacy.text
+            assert "protocolVersion" not in legacy.text
+
+            legacy_call = await client.post(
+                "/mcp",
+                headers={**headers, "MCP-Protocol-Version": "2025-03-26"},
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {"name": "ping", "arguments": {}},
+                },
+            )
+            assert "2026-07-28" in legacy_call.text
+            assert "pong" not in legacy_call.text
+
+            modern = await client.post(
+                "/mcp",
+                headers={
+                    **headers,
+                    "MCP-Protocol-Version": "2026-07-28",
+                    "mcp-method": "tools/call",
+                    "mcp-name": "ping",
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {
+                        "_meta": {
+                            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                            "io.modelcontextprotocol/clientCapabilities": {},
+                        },
+                        "name": "ping",
+                        "arguments": {},
+                    },
+                },
+            )
+            modern.raise_for_status()
+            assert modern.json()["result"]["content"][0]["text"] == "pong"
+            assert "mcp-session-id" not in modern.headers
+
+
+@pytest.mark.asyncio
+async def test_session_id_is_required_without_losing_existing_required_fields():
+    mcp = FastMCP("session-test")
+    mcp.add_transform(ConversationSessionArguments())
+
+    @mcp.tool
+    async def echo(value: str) -> str:
+        return value
+
+    listed = {tool.name: tool for tool in await mcp.list_tools()}
+    assert set(listed["echo"].parameters["required"]) == {"value", "session_id"}
+    assert set((await mcp.get_tool("echo")).parameters["required"]) == {"value", "session_id"}
+
+
+@pytest.mark.asyncio
+async def test_end_session_waits_for_active_tool_to_finish():
+    token = _make_mock_token("alice")
+    mcp = FastMCP("session-test", auth=DebugTokenVerifier(validate=lambda value: value == token))
+    mcp.add_provider(ConversationSessionProvider())
+    mcp.add_transform(ConversationSessionArguments())
+    mcp.add_middleware(StatelessProtocolMiddleware())
+    mcp.add_middleware(ConversationSessionMiddleware())
+    entered = asyncio.Event()
+    resume = asyncio.Event()
+    context_path = None
+
+    @mcp.tool
+    async def build_object() -> str:
+        nonlocal context_path
+        context = await ctx_module.get_evo_context()
+        context_path = context.cache_path
+        entered.set()
+        await resume.wait()
+        assert context_path.exists()
+        return "built"
+
+    app = mcp.http_app(stateless_http=True)
+    original_mode = ctx_module.delegated_mode
+    ctx_module.delegated_mode = True
+    ctx_module.delegated_contexts.clear()
+    ctx_module.session_locks.clear()
+    try:
+        with patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock):
+            async with app.lifespan(app):
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
+                    created = await _invoke_tool(client, token, "create_session", {})
+                    assert not created["isError"]
+                    session_id = created["content"][0]["text"]
+                    active_call = asyncio.create_task(
+                        _invoke_tool(client, token, "build_object", {"session_id": session_id})
+                    )
+                    ending = None
+                    queued_call = None
+                    try:
+                        await asyncio.wait_for(entered.wait(), 2)
+                        ending = asyncio.create_task(
+                            _invoke_tool(client, token, "end_session", {"session_id": session_id})
+                        )
+                        await asyncio.sleep(0.05)
+                        assert not ending.done()
+                        assert context_path.exists()
+                        queued_call = asyncio.create_task(
+                            _invoke_tool(client, token, "build_object", {"session_id": session_id})
+                        )
+
+                        resume.set()
+                        assert not (await asyncio.wait_for(active_call, 2))["isError"]
+                        assert not (await asyncio.wait_for(ending, 2))["isError"]
+                        assert (await asyncio.wait_for(queued_call, 2))["isError"]
+                        assert not context_path.exists()
+                        assert (await _invoke_tool(client, token, "build_object", {"session_id": session_id}))[
+                            "isError"
+                        ]
+                    finally:
+                        resume.set()
+                        await asyncio.gather(
+                            *(task for task in (active_call, ending, queued_call) if task), return_exceptions=True
+                        )
+    finally:
+        ctx_module.delegated_mode = original_mode
+        ctx_module.delegated_contexts.clear()
+        ctx_module.session_locks.clear()
+
+
+@pytest.mark.asyncio
+async def test_sessionless_conversations_are_isolated():
+    alice = _make_mock_token("alice", iat=100)
+    alice_refreshed = _make_mock_token("alice", iat=200)
+    bob = _make_mock_token("bob", iat=100)
+    mcp = FastMCP(
+        "session-test", auth=DebugTokenVerifier(validate=lambda value: value in {alice, alice_refreshed, bob})
+    )
+    mcp.add_provider(ConversationSessionProvider())
+    mcp.add_transform(ConversationSessionArguments())
+    mcp.add_middleware(StatelessProtocolMiddleware())
+    mcp.add_middleware(ConversationSessionMiddleware())
+
+    @mcp.tool
+    async def session_identity() -> str:
+        context = await ctx_module.get_evo_context()
+        return context.client_session_id
+
+    mcp.add_transform(BM25SearchTransform(always_visible=["create_session", "end_session", "session_identity"]))
+    listed = {tool.name: tool for tool in await mcp.list_tools()}
+    assert "session_id" in listed["session_identity"].parameters["properties"]
+    assert "session_id" in listed["session_identity"].parameters["required"]
+    assert "session_id" not in listed["create_session"].parameters["properties"]
+    app = mcp.http_app(stateless_http=True)
+
+    original_mode = ctx_module.delegated_mode
+    ctx_module.delegated_mode = True
+    ctx_module.delegated_contexts.clear()
+    try:
+        with patch.object(DelegatedAuthContext, "discover_and_build", new_callable=AsyncMock):
+            async with app.lifespan(app):
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test") as client:
+                    first = await _invoke_tool(client, alice, "create_session", {})
+                    second = await _invoke_tool(client, alice, "create_session", {})
+                    assert not first["isError"] and not second["isError"]
+                    first_id = first["content"][0]["text"]
+                    second_id = second["content"][0]["text"]
+                    assert first_id != second_id
+
+                    async def identity(token, session_id, via_proxy=False):
+                        args = {"session_id": session_id}
+                        if via_proxy:
+                            return await _invoke_tool(
+                                client,
+                                token,
+                                "call_tool",
+                                {
+                                    "name": "session_identity",
+                                    "arguments": args,
+                                },
+                            )
+                        return await _invoke_tool(client, token, "session_identity", args)
+
+                    a = await identity(alice, first_id)
+                    first_key = hashlib.sha256(f"alice:{first_id}".encode()).hexdigest()[:32]
+                    first_context = ctx_module.delegated_contexts[first_key]
+                    again = await identity(alice_refreshed, first_id, via_proxy=True)
+                    b = await identity(alice, second_id)
+                    assert not a["isError"] and not again["isError"] and not b["isError"]
+                    assert a["content"] == again["content"]
+                    assert ctx_module.delegated_contexts[first_key] is first_context
+                    assert a["content"] != b["content"]
+                    assert (await identity(bob, first_id))["isError"]
+                    assert (await identity(alice, "not-created"))["isError"]
+                    assert (await _invoke_tool(client, alice, "session_identity", {}))["isError"]
+                    ended = await _invoke_tool(client, alice, "end_session", {"session_id": first_id})
+                    assert not ended["isError"]
+                    assert first_key not in ctx_module.delegated_contexts
+                    assert (await identity(alice, first_id))["isError"]
+    finally:
+        ctx_module.delegated_mode = original_mode
+        ctx_module.delegated_contexts.clear()
 
 
 # ---------------------------------------------------------------------------

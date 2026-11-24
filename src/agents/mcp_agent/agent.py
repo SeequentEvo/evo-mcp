@@ -9,6 +9,7 @@ This agent uses ADK (Google Agent Development Kit) with the Evo MCP server.
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -25,7 +26,7 @@ if env_path.exists():
     load_dotenv(env_path)
 
 # Agent configuration from environment variables
-AGENT_TYPE = os.getenv("MCP_TOOL_FILTER", "workspace")
+AGENT_TYPE = os.getenv("MCP_TOOL_FILTER", "all")
 MODEL = os.getenv("EVO_AGENT_MODEL", "gemini-3-flash-preview")
 
 # Get the absolute path to the MCP server script (in src directory)
@@ -42,7 +43,8 @@ auth_scheme, auth_credential = _generate_dummy_auth()
 
 tool_env = {
     # Pass AGENT_TYPE to MCP server for tool filtering
-    "MCP_TOOL_FILTER": AGENT_TYPE
+    "MCP_TOOL_FILTER": AGENT_TYPE,
+    "MCP_TRANSPORT": "stdio",
 }
 
 copy_env_vars = [
@@ -56,7 +58,7 @@ for var in copy_env_vars:
         tool_env[var] = os.environ[var]
 
 server_params = StdioServerParameters(
-    command="python",
+    command=sys.executable,
     args=[MCP_SERVER_PATH],
     env=tool_env,
 )
