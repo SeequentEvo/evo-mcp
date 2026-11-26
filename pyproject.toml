@@ -6,7 +6,7 @@ license = "Apache-2.0"
 requires-python = ">=3.11.5"
 dependencies = [
     "fastmcp>=3.4.3",
-    "google-adk==1.38.0",
+    "google-adk==2.14.0",
     "evo-files>=0.2.4",
     "evo-compute>=0.1.1",
     "evo-objects>=0.7.0",
